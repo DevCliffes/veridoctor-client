@@ -46,7 +46,7 @@ const features: { name: string; description: string; icon: ReactNode }[] = [
 export default function Home() {
   const [newsLetterEmail, setNewsLetterEmail] = useState<string>("");
   const router = useRouter();
-  const isLoggedin = useAppSelector((state) => state.auth.isLoggedIn);
+  const _isLoggedin = useAppSelector((state) => state.auth.isLoggedIn);
   const handleNewsLetterEmailChange = (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {

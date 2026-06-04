@@ -1,0 +1,25 @@
+{
+  "name": "@veridoctor/api-client",
+  "version": "1.0.0",
+  "description": "package to manage api client interactions",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "js-cookie": "^3.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.1",
+    "@veridoctor/eslint-config": "workspace:*",
+    "@veridoctor/typescript-config": "workspace:*",
+    "eslint": "^9.34.0",
+    "typescript": "^5"
+  }
+}

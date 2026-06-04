@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+     "target": "ES2017",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  },
+  "paths": {
+    "@/*": ["./*"]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

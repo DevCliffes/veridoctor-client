@@ -16,7 +16,6 @@ import {
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ReactNode, useState } from "react";
-import { useAppSelector } from "../hooks";
 
 /**  A list of features to be shown in the feature section */
 const features: { name: string; description: string; icon: ReactNode }[] = [

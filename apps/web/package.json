@@ -13,7 +13,7 @@
     "@veridoctor/api-client": "workspace:*",
     "@veridoctor/design": "workspace:*",
     "@veridoctor/store": "workspace:*",
-    "next": "15.2.4",
+    "next": "14.2.29",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-redux": "^9.2.0",
@@ -26,7 +26,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.2.4",
+    "eslint-config-next": "14.2.29",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -30,7 +30,7 @@ export default async function AccountsPage({
   params,
   searchParams,
 }: {
-  params: { userId: string };
+  params: Promise<{ userId: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   let accountsData: AccountsResponse | null = null;

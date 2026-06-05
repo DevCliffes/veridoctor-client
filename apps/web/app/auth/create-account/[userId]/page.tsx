@@ -80,7 +80,7 @@ export default function RegisterAccount() {
    */
   const createPatientAccount = () => {
     axiosClient
-      .post("identity/accounts/create/patient", { identity: pathParams.userId })
+      .post(`identity/${pathParams.userId}/accounts`, { account_type: "patient" })
       .then((res) => {
         if (res.status === 201) {
           toast.success("Patient account created successfully");

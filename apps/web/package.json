@@ -13,7 +13,7 @@
     "@veridoctor/api-client": "workspace:*",
     "@veridoctor/design": "workspace:*",
     "@veridoctor/store": "workspace:*",
-    "next": "14.2.29",
+    "next": "14.2.35",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-redux": "^9.2.0",

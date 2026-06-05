@@ -36,9 +36,9 @@ export default async function AccountsPage({
   let accountsData: AccountsResponse | null = null;
   const pathParams = await params;
   const { auth_tkn } = await searchParams;
-  const PROVIDER_APP_URL = process.env.NEXT_PROVIDER_APP_URL ?? "/";
-  const PATIENT_APP_URL = process.env.NEXT_PATIENT_APP_URL ?? "/";
-  const FACILITY_APP_URL = process.env.NEXT_FACILITY_APP_URL ?? "/";
+  const PROVIDER_APP_URL = process.env.NEXT_PUBLIC_PROVIDER_APP_URL ?? "/";
+const PATIENT_APP_URL = process.env.NEXT_PUBLIC_PATIENT_APP_URL ?? "/";
+const FACILITY_APP_URL = process.env.NEXT_PUBLIC_FACILITY_APP_URL ?? "/";
   const accountDetails: Record<
     AccountType,
     { accountUrl: string; icon: React.ReactNode; accountName: string }

@@ -14,9 +14,7 @@ export default function FacilityForm() {
    */
   const createFacilityAccount = () => {
     axiosClient
-      .post("identity/accounts/create/facility_manager", {
-        identity: pathParams.userId,
-      })
+      .post(`identity/${pathParams.userId}/accounts`, { account_type: "facility_manager" })
       .then((res) => {
         if (res.status === 201) {
           toast.success("Healthcare facility account created successfully");

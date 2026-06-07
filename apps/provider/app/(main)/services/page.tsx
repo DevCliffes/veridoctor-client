@@ -1,4 +1,6 @@
 "use client";
+import { useSelector } from "react-redux";
+import { RootState } from "../store";
 import { DialogModal } from "@veridoctor/design/shared";
 import { axiosClient } from "@veridoctor/api-client";
 import { toast } from "sonner";
@@ -10,9 +12,10 @@ export default function Services() {
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("KES");
   const [description, setDescription] = useState("");
+  const userId = useSelector((state: RootState) => state.auth.userId);
 
   const handleSave = () => {
-    axiosClient
+    .post(`provider/${userId}/services`, {
       .post("provider/services", {
         name,
         estimated_duration: duration,

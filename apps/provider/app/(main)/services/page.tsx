@@ -12,7 +12,7 @@ export default function Services() {
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("KES");
   const [description, setDescription] = useState("");
-  const userId = useSelector((state: RootState) => state.auth.userId);
+  const userId = useSelector((state: RootState) => state.auth.user);
 
   const handleSave = () => {
     axiosClient

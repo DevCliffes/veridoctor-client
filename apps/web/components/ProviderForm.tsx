@@ -56,7 +56,7 @@ export default function ProviderForm() {
       sub_speciality: form.subSpeciality.value,
     };
     axiosClient
-      .post("identity/accounts/create/healthcare_provider", payload)
+      .post(`identity/${pathParams.userId}/accounts`, { ...payload, account_type: "healthcare_provider" })
       .then((res) => {
         if (res.status === 201) {
           toast.success("Healthcare provider account created successfully");

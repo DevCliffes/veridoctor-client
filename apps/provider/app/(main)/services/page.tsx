@@ -1,8 +1,35 @@
 "use client";
 import { DialogModal } from "@veridoctor/design/shared";
+import { axiosClient } from "@veridoctor/api-client";
 import { toast } from "sonner";
+import { useState } from "react";
 
 export default function Services() {
+  const [name, setName] = useState("");
+  const [duration, setDuration] = useState("");
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState("KES");
+  const [description, setDescription] = useState("");
+
+  const handleSave = () => {
+    axiosClient
+      .post("provider/services", {
+        name,
+        estimated_duration: duration,
+        price,
+        currency,
+        description,
+      })
+      .then((res) => {
+        if (res.status === 201) {
+          toast.success("Service added successfully");
+        }
+      })
+      .catch(() => {
+        toast.error("There was a problem adding the service");
+      });
+  };
+
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
       <div className="flex justify-between">
@@ -14,35 +41,26 @@ export default function Services() {
           title="Add a new service"
           description="Add a new service to your service listing"
           trigger={<p>Add service</p>}
-          onSave={() => {
-            toast.error("There was a problem adding the service");
-          }}
+          onSave={handleSave}
         >
-          <form>
+          <div className="flex flex-col gap-2">
             <label>Name of service</label>
-            <input className="w-full p-2 border border-gray-300 rounded"></input>
+            <input onChange={(e) => setName(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
             <label>Estimated duration (minutes)</label>
-            <input
-              type="number"
-              className="w-full p-2 border border-gray-300 rounded"
-              placeholder="An estimated duration this service will take"
-            ></input>
+            <input onChange={(e) => setDuration(e.target.value)} type="number" className="w-full p-2 border border-gray-300 rounded" placeholder="An estimated duration this service will take" />
             <div className="flex gap-4">
-              <div>
+              <div className="flex-1">
                 <label>Price</label>
-                <input className="w-full p-2 border border-gray-300 rounded"></input>
+                <input onChange={(e) => setPrice(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
               </div>
-              <div>
+              <div className="flex-1">
                 <label>Currency</label>
-                <input
-                  className="w-full p-2 border border-gray-300 rounded"
-                  placeholder="KES"
-                ></input>
+                <input onChange={(e) => setCurrency(e.target.value)} defaultValue="KES" className="w-full p-2 border border-gray-300 rounded" />
               </div>
             </div>
             <label>Description</label>
-            <textarea className="w-full p-2 border border-gray-300 rounded"></textarea>
-          </form>
+            <textarea onChange={(e) => setDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
+          </div>
         </DialogModal>
       </div>
     </div>

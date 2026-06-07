@@ -15,8 +15,8 @@ export default function Services() {
   const userId = useSelector((state: RootState) => state.auth.userId);
 
   const handleSave = () => {
-    .post(`provider/${userId}/services`, {
-      .post("provider/services", {
+    axiosClient
+      .post(`provider/${userId}/services`, {
         name,
         estimated_duration: duration,
         price,

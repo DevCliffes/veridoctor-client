@@ -15,7 +15,7 @@ export default function Calls() {
               Build forms you&apos;ll use to serve your patients.
             </p>
           </div>
-          <Button onClick={() => router.push("forms/build")}>New form</Button>
+          <Button onClick={() => router.push("forms/new")}>New form</Button>
         </div>
         <div>
           <p>You have no forms yet</p>

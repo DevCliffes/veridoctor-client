@@ -12,7 +12,7 @@ export default function Services() {
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("KES");
   const [description, setDescription] = useState("");
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<{id: string; name: string; description: string; estimated_duration: number; currency: string; price: string}[]>([]);
   const [open, setOpen] = useState(false);
   const userId = useSelector((state: RootState) => state.auth.identity);
 

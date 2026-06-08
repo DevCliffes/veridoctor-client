@@ -10,7 +10,7 @@ type Form = {
   id: string;
   name: string;
   created_at: string;
-  sections: any[];
+  sections: unknown[];
 };
 
 export default function FormsPage() {

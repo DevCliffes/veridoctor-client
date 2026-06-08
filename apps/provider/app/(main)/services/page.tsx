@@ -6,13 +6,23 @@ import { axiosClient } from "@veridoctor/api-client";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
+type Service = {
+  id: string;
+  name: string;
+  description: string;
+  estimated_duration: number;
+  currency: string;
+  price: string;
+};
+
 export default function Services() {
   const [name, setName] = useState("");
   const [duration, setDuration] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("KES");
   const [description, setDescription] = useState("");
-  const [services, setServices] = useState<{id: string; name: string; description: string; estimated_duration: number; currency: string; price: string}[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const userId = useSelector((state: RootState) => state.auth.identity);
 
   const fetchServices = () => {
@@ -27,23 +37,44 @@ export default function Services() {
   }, [userId]);
 
   const handleSave = () => {
-    axiosClient
-      .post(`provider/${userId}/services`, {
-        name,
-        estimated_duration: duration,
-        price,
-        currency,
-        description,
-      })
+    const request = editingService
+      ? axiosClient.patch(`provider/${userId}/services/${editingService.id}`, {
+          name, estimated_duration: duration, price, currency, description,
+        })
+      : axiosClient.post(`provider/${userId}/services`, {
+          name, estimated_duration: duration, price, currency, description,
+        });
+
+    request
       .then((res) => {
-        if (res.status === 201) {
-          toast.success("Service added successfully");
+        if (res.status === 201 || res.status === 200) {
+          toast.success(editingService ? "Service updated successfully" : "Service added successfully");
+          setEditingService(null);
           fetchServices();
         }
       })
       .catch(() => {
-        toast.error("There was a problem adding the service");
+        toast.error("There was a problem saving the service");
       });
+  };
+
+  const handleDelete = (serviceId: string) => {
+    axiosClient
+      .delete(`provider/${userId}/services/${serviceId}`)
+      .then(() => {
+        toast.success("Service deleted");
+        fetchServices();
+      })
+      .catch(() => toast.error("Could not delete service"));
+  };
+
+  const handleEdit = (service: Service) => {
+    setEditingService(service);
+    setName(service.name);
+    setDuration(String(service.estimated_duration));
+    setPrice(service.price);
+    setCurrency(service.currency);
+    setDescription(service.description);
   };
 
   return (
@@ -54,28 +85,28 @@ export default function Services() {
           <p className="text-gray-600 mt-2">Manage services.</p>
         </div>
         <DialogModal
-          title="Add a new service"
+          title={editingService ? "Edit service" : "Add a new service"}
           description="Add a new service to your service listing"
           trigger={<p>Add service</p>}
           onSave={handleSave}
         >
           <div className="flex flex-col gap-2">
             <label>Name of service</label>
-            <input onChange={(e) => setName(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
+            <input defaultValue={editingService?.name} onChange={(e) => setName(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
             <label>Estimated duration (minutes)</label>
-            <input onChange={(e) => setDuration(e.target.value)} type="number" className="w-full p-2 border border-gray-300 rounded" placeholder="An estimated duration this service will take" />
+            <input defaultValue={editingService?.estimated_duration} onChange={(e) => setDuration(e.target.value)} type="number" className="w-full p-2 border border-gray-300 rounded" />
             <div className="flex gap-4">
               <div className="flex-1">
                 <label>Price</label>
-                <input onChange={(e) => setPrice(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
+                <input defaultValue={editingService?.price} onChange={(e) => setPrice(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
               </div>
               <div className="flex-1">
                 <label>Currency</label>
-                <input onChange={(e) => setCurrency(e.target.value)} defaultValue="KES" className="w-full p-2 border border-gray-300 rounded" />
+                <input defaultValue={editingService?.currency ?? "KES"} onChange={(e) => setCurrency(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
               </div>
             </div>
             <label>Description</label>
-            <textarea onChange={(e) => setDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
+            <textarea defaultValue={editingService?.description} onChange={(e) => setDescription(e.target.value)} className="w-full p-2 border border-gray-300 rounded" />
           </div>
         </DialogModal>
       </div>
@@ -85,6 +116,10 @@ export default function Services() {
             <h3 className="font-bold">{service.name}</h3>
             <p className="text-sm text-gray-600">{service.description}</p>
             <p className="text-sm mt-2">{service.estimated_duration} mins • {service.currency} {service.price}</p>
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => handleEdit(service)} className="text-xs px-3 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100">Edit</button>
+              <button onClick={() => handleDelete(service.id)} className="text-xs px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100">Delete</button>
+            </div>
           </div>
         ))}
       </div>

@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../store";
@@ -105,8 +105,10 @@ const fieldTypes: { value: FieldType; label: string }[] = [
   { value: "date", label: "Date" },
 ];
 
-export default function FormBuilder() {
+function FormBuilderInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
   const userId = useSelector((state: RootState) => state.auth.identity);
   const [formName, setFormName] = useState("Universal Patient Form");
   const [sections, setSections] = useState<Section[]>(defaultSections);
@@ -114,6 +116,17 @@ export default function FormBuilder() {
   const [addingFieldTo, setAddingFieldTo] = useState<string | null>(null);
   const [newField, setNewField] = useState<Partial<FormField>>({ type: "text", required: false });
   const [editingField, setEditingField] = useState<{ sectionId: string; field: FormField } | null>(null);
+
+  useEffect(() => {
+    if (!editId || !userId) return;
+    axiosClient
+      .get(`provider/${userId}/forms/${editId}`)
+      .then((res) => {
+        setFormName(res.data.name);
+        setSections(res.data.sections);
+      })
+      .catch(() => toast.error("Could not load form"));
+  }, [editId, userId]);
 
   const addField = (sectionId: string) => {
     if (!newField.label) { toast.error("Field label is required"); return; }
@@ -125,17 +138,17 @@ export default function FormBuilder() {
       options: newField.options,
       section: sectionId,
     };
-    setSections(sections.map(s => s.id === sectionId ? { ...s, fields: [...s.fields, field] } : s));
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, fields: [...s.fields, field] } : s));
     setAddingFieldTo(null);
     setNewField({ type: "text", required: false });
   };
 
   const deleteField = (sectionId: string, fieldId: string) => {
-    setSections(sections.map(s => s.id === sectionId ? { ...s, fields: s.fields.filter(f => f.id !== fieldId) } : s));
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, fields: s.fields.filter(f => f.id !== fieldId) } : s));
   };
 
   const updateField = (sectionId: string, fieldId: string, updates: Partial<FormField>) => {
-    setSections(sections.map(s => s.id === sectionId ? {
+    setSections(prev => prev.map(s => s.id === sectionId ? {
       ...s, fields: s.fields.map(f => f.id === fieldId ? { ...f, ...updates } : f)
     } : s));
     setEditingField(null);
@@ -143,11 +156,11 @@ export default function FormBuilder() {
 
   const addSection = () => {
     const id = `section_${Date.now()}`;
-    setSections([...sections, { id, title: "New Section", fields: [] }]);
+    setSections(prev => [...prev, { id, title: "New Section", fields: [] }]);
   };
 
   const deleteSection = (sectionId: string) => {
-    setSections(sections.filter(s => s.id !== sectionId));
+    setSections(prev => prev.filter(s => s.id !== sectionId));
   };
 
   const handleDragStart = (sectionId: string, fieldId: string) => {
@@ -159,7 +172,7 @@ export default function FormBuilder() {
     const sourceSection = sections.find(s => s.id === draggedField.sectionId);
     const field = sourceSection?.fields.find(f => f.id === draggedField.fieldId);
     if (!field) return;
-    setSections(sections.map(s => {
+    setSections(prev => prev.map(s => {
       if (s.id === draggedField.sectionId && s.id === targetSectionId) {
         const fields = [...s.fields];
         const fromIdx = fields.findIndex(f => f.id === draggedField.fieldId);
@@ -174,13 +187,13 @@ export default function FormBuilder() {
   };
 
   const handleSave = () => {
-    axiosClient
-      .post(`provider/${userId}/forms`, {
-        name: formName,
-        sections: sections,
-      })
+    const request = editId
+      ? axiosClient.patch(`provider/${userId}/forms/${editId}`, { name: formName, sections })
+      : axiosClient.post(`provider/${userId}/forms`, { name: formName, sections });
+
+    request
       .then((res) => {
-        if (res.status === 201) {
+        if (res.status === 200 || res.status === 201) {
           toast.success("Form saved successfully!");
           router.push("/forms");
         }
@@ -231,7 +244,7 @@ export default function FormBuilder() {
         </div>
         <div className="flex gap-3">
           <button onClick={addSection} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">+ Add Section</button>
-          <button onClick={handleSave} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Form</button>
+          <button onClick={handleSave} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">{editId ? "Update Form" : "Save Form"}</button>
         </div>
       </div>
 
@@ -241,7 +254,7 @@ export default function FormBuilder() {
             <div className="bg-gray-50 border-b px-4 py-3 flex items-center justify-between">
               <input
                 value={section.title}
-                onChange={(e) => setSections(sections.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))}
+                onChange={(e) => setSections(prev => prev.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))}
                 className="font-semibold text-gray-800 bg-transparent border-none outline-none focus:ring-2 focus:ring-blue-200 rounded px-1"
               />
               <button onClick={() => deleteSection(section.id)} className="text-red-400 hover:text-red-600 text-sm">Remove section</button>
@@ -301,5 +314,13 @@ export default function FormBuilder() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function FormBuilder() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading...</div>}>
+      <FormBuilderInner />
+    </Suspense>
   );
 }

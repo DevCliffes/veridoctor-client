@@ -2,6 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../store";
+import { axiosClient } from "@veridoctor/api-client";
 
 type FieldType = "text" | "textarea" | "number" | "select" | "checkbox" | "date";
 
@@ -104,6 +107,7 @@ const fieldTypes: { value: FieldType; label: string }[] = [
 
 export default function FormBuilder() {
   const router = useRouter();
+  const userId = useSelector((state: RootState) => state.auth.identity);
   const [formName, setFormName] = useState("Universal Patient Form");
   const [sections, setSections] = useState<Section[]>(defaultSections);
   const [draggedField, setDraggedField] = useState<{ sectionId: string; fieldId: string } | null>(null);
@@ -155,7 +159,6 @@ export default function FormBuilder() {
     const sourceSection = sections.find(s => s.id === draggedField.sectionId);
     const field = sourceSection?.fields.find(f => f.id === draggedField.fieldId);
     if (!field) return;
-
     setSections(sections.map(s => {
       if (s.id === draggedField.sectionId && s.id === targetSectionId) {
         const fields = [...s.fields];
@@ -171,13 +174,22 @@ export default function FormBuilder() {
   };
 
   const handleSave = () => {
-    toast.success("Form saved successfully!");
-    router.push("/forms");
+    axiosClient
+      .post(`provider/${userId}/forms`, {
+        name: formName,
+        sections: sections,
+      })
+      .then((res) => {
+        if (res.status === 201) {
+          toast.success("Form saved successfully!");
+          router.push("/forms");
+        }
+      })
+      .catch(() => toast.error("Could not save form"));
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Edit field modal */}
       {editingField && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -212,7 +224,6 @@ export default function FormBuilder() {
         </div>
       )}
 
-      {/* Header */}
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <button onClick={() => router.push("/forms")} className="text-gray-500 hover:text-gray-700">← Back</button>
@@ -224,11 +235,9 @@ export default function FormBuilder() {
         </div>
       </div>
 
-      {/* Form Builder */}
       <div className="max-w-3xl mx-auto py-8 px-4 flex flex-col gap-6">
         {sections.map((section) => (
           <div key={section.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            {/* Section header */}
             <div className="bg-gray-50 border-b px-4 py-3 flex items-center justify-between">
               <input
                 value={section.title}
@@ -237,8 +246,6 @@ export default function FormBuilder() {
               />
               <button onClick={() => deleteSection(section.id)} className="text-red-400 hover:text-red-600 text-sm">Remove section</button>
             </div>
-
-            {/* Fields */}
             <div className="p-4 flex flex-col gap-3">
               {section.fields.map((field) => (
                 <div
@@ -261,8 +268,6 @@ export default function FormBuilder() {
                   </div>
                 </div>
               ))}
-
-              {/* Add field */}
               {addingFieldTo === section.id ? (
                 <div className="border border-dashed border-blue-300 rounded-lg p-4 bg-blue-50 flex flex-col gap-3">
                   <div className="flex gap-3">
@@ -291,7 +296,6 @@ export default function FormBuilder() {
             </div>
           </div>
         ))}
-
         <button onClick={addSection} className="w-full py-3 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors">
           + Add new section
         </button>

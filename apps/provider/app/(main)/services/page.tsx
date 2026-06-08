@@ -13,7 +13,6 @@ export default function Services() {
   const [currency, setCurrency] = useState("KES");
   const [description, setDescription] = useState("");
   const [services, setServices] = useState<{id: string; name: string; description: string; estimated_duration: number; currency: string; price: string}[]>([]);
-  const [open, setOpen] = useState(false);
   const userId = useSelector((state: RootState) => state.auth.identity);
 
   const fetchServices = () => {
@@ -39,7 +38,6 @@ export default function Services() {
       .then((res) => {
         if (res.status === 201) {
           toast.success("Service added successfully");
-          setOpen(false);
           fetchServices();
         }
       })
@@ -56,8 +54,6 @@ export default function Services() {
           <p className="text-gray-600 mt-2">Manage services.</p>
         </div>
         <DialogModal
-          open={open}
-          onOpenChange={setOpen}
           title="Add a new service"
           description="Add a new service to your service listing"
           trigger={<p>Add service</p>}

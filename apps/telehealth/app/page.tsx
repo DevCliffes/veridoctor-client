@@ -32,7 +32,9 @@ export default function Home() {
   const router = useRouter();
 
   const joinCall = () => {
-    router.push(`/${meetLink}?userId=KISLDKSDIK`);
+    const meetingCode = meetLink.trim();
+    if (!meetingCode) return;
+    router.push(`/${meetingCode}?userId=guest`);
   };
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {

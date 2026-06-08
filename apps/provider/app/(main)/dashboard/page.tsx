@@ -1,19 +1,24 @@
-"use client"
+"use client";
 import { Button } from "@veridoctor/design/components";
+import { axiosClient } from "@veridoctor/api-client";
 import {
   LucideArrowUpRight,
   LucidePlus,
   LucideVideo,
 } from "@veridoctor/design/icons";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import { toast } from "sonner";
+import { RootState } from "../../store";
 
 interface GotoSectionButtonProps {
   onClick?: () => void;
 }
 
-const GotoSectionButton: React.FunctionComponent<GotoSectionButtonProps> = ({
+const GotoSectionButton = ({
   onClick,
-}) => {
+}: GotoSectionButtonProps) => {
   return (
     <Button
       onClick={onClick}
@@ -27,8 +32,35 @@ const GotoSectionButton: React.FunctionComponent<GotoSectionButtonProps> = ({
 
 export default function Dashboard() {
   const router = useRouter();
+  const userId = useSelector((state: RootState) => state.auth.identity);
+  const [nextVirtualAppointment, setNextVirtualAppointment] = useState<{
+    patient_name: string;
+    start_time: string;
+    meet_id: string;
+  } | null>(null);
+
   const navigateTo = (path: string) => {
     router.push(path);
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    axiosClient
+      .get(
+        `provider/${userId}/appointments?appointment_type=virtual&filter=upcoming`,
+      )
+      .then((res) => setNextVirtualAppointment(res.data?.[0] ?? null))
+      .catch(() => setNextVirtualAppointment(null));
+  }, [userId]);
+
+  const joinNextCall = () => {
+    if (!nextVirtualAppointment?.meet_id) {
+      toast.info("Create a virtual appointment first");
+      router.push("/appointments?appointment_type=virtual");
+      return;
+    }
+
+    router.push(`/calls/${nextVirtualAppointment.meet_id}`);
   };
 
   return (
@@ -39,7 +71,7 @@ export default function Dashboard() {
           <p className="text-xl font-bold">Dashboard</p>
           <p>Plan and care for your patients with ease.</p>
         </div>
-        <Button>
+        <Button onClick={() => router.push("/appointments")}>
           <LucidePlus /> New appointment
         </Button>
       </div>
@@ -77,9 +109,16 @@ export default function Dashboard() {
               />
             </div>
             <div>
-              <p>Michael Kamau</p>
-              <p>Today 12:30PM - 12:40PM</p>
-              <Button variant="rounded">
+              <p>
+                {nextVirtualAppointment?.patient_name ??
+                  "No upcoming virtual appointment"}
+              </p>
+              <p>
+                {nextVirtualAppointment
+                  ? new Date(nextVirtualAppointment.start_time).toLocaleString()
+                  : "Create an appointment to start a call"}
+              </p>
+              <Button variant="rounded" onClick={joinNextCall}>
                 <LucideVideo /> Join call
               </Button>
             </div>

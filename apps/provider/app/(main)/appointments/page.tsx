@@ -1,6 +1,9 @@
 "use client";
 
-import AppointmentForm from "@/components/AppointmentForm";
+import AppointmentForm, {
+  AppointmentFormValues,
+} from "@/components/AppointmentForm";
+import { Button } from "@veridoctor/design/components";
 import {
   Tabs,
   TabsContent,
@@ -14,34 +17,82 @@ import {
   DatatableFilterTabs,
   DialogModal,
 } from "@veridoctor/design/shared";
+import { axiosClient } from "@veridoctor/api-client";
+import { LucideVideo } from "@veridoctor/design/icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { useSelector } from "react-redux";
 import { toast } from "sonner";
+import { RootState } from "../../store";
+
+type Appointment = {
+  id: string;
+  patient_name: string;
+  patient_first_name: string;
+  patient_last_name: string;
+  patient_email: string;
+  patient_phone_number: string;
+  appointment_type: "virtual" | "physical";
+  start_time: string;
+  end_time: string;
+  status: string;
+  meet_id: string;
+};
+
+const emptyForm: AppointmentFormValues = {
+  patient_first_name: "",
+  patient_last_name: "",
+  patient_phone_number: "",
+  patient_email: "",
+  date: "",
+  time: "",
+  message: "",
+};
 
 export default function Appointments() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const userId = useSelector((state: RootState) => state.auth.identity);
   // appointments Loading state
-  const [loading, setLoding] = useState(false);
-  // mock table data
-  const tableRows: { name: string; date: string; status: string }[] = [
-    {
-      name: "john Kamau",
-      date: "12/13/2020",
-      status: "pending",
-    },
-    {
-      name: "john Kamau",
-      date: "12/13/2020",
-      status: "pending",
-    },
-    {
-      name: "Mwirigi",
-      date: "12/13/2020",
-      status: "pending",
-    },
-  ];
+  const [loading, setLoading] = useState(false);
+  const [appointmentTime, setAppointmentTime] = useState<"now" | "later">(
+    "now",
+  );
+  const [formValues, setFormValues] = useState<AppointmentFormValues>(emptyForm);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+
+  const filter = searchParams.get("filter") ?? "today";
+  const appointmentType = searchParams.get("appointment_type") ?? "";
+
+  const joinCall = (meetId: string) => {
+    router.push(`/calls/${meetId}`);
+  };
+
+  const tableRows: {
+    name: string;
+    date: string;
+    status: string;
+    call: ReactNode;
+  }[] = appointments.map((appointment) => ({
+    name: appointment.patient_name,
+    date: new Date(appointment.start_time).toLocaleString(),
+    status: appointment.status,
+    call:
+      appointment.appointment_type === "virtual" ? (
+        <Button
+          size="sm"
+          variant="rounded"
+          onClick={() => joinCall(appointment.meet_id)}
+        >
+          <LucideVideo /> Join call
+        </Button>
+      ) : (
+        "Physical"
+      ),
+  }));
+
   const tableColumns: DatatableColumnHeader[] = [
     {
       name: "Patient Name",
@@ -58,34 +109,49 @@ export default function Appointments() {
       type: "string",
       key: "status",
     },
+    {
+      name: "Call",
+      type: "string",
+      key: "call",
+    },
   ];
+
+  const fetchAppointments = useCallback(() => {
+    if (!userId) return;
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set("filter", filter);
+    if (appointmentType) params.set("appointment_type", appointmentType);
+
+    axiosClient
+      .get(`provider/${userId}/appointments?${params.toString()}`)
+      .then((res) => setAppointments(res.data))
+      .catch(() => toast.error("Could not load appointments"))
+      .finally(() => setLoading(false));
+  }, [appointmentType, filter, userId]);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const filterTabs: DatatableFilterTabs = {
     tabs: [
       {
         name: "Today",
-        value: "pending",
+        value: "today",
         action: (filter) => {
-          setLoding(true);
-          setTimeout(() => {
-            setLoding(false);
-            updateQueryParams("filter", filter);
-          }, 1000);
+          updateQueryParams("filter", filter);
         },
       },
       {
         name: "Upcoming",
         value: "upcoming",
         action: (filter) => {
-          setLoding(true);
-          setTimeout(() => {
-            setLoding(false);
-            updateQueryParams("filter", filter);
-          }, 1000);
+          updateQueryParams("filter", filter);
         },
       },
     ],
-    defaultTab: searchParams.get("filter") ?? "pending",
+    defaultTab: filter,
   };
 
   const actions: DatatableActions = {
@@ -93,13 +159,7 @@ export default function Appointments() {
       {
         name: "view",
         action: () => {
-          setLoding(true);
-          setTimeout(() => {
-            setLoding(false);
-            toast.error(
-              "An error occurred while retrieving branch information, please try again later",
-            );
-          }, 1000);
+          toast.info("Appointment details are not available yet");
         },
       },
     ],
@@ -107,25 +167,13 @@ export default function Appointments() {
       {
         name: "cancel",
         action: () => {
-          setLoding(true);
-          setTimeout(() => {
-            setLoding(false);
-            toast.error(
-              "An error occurred while retrieving branch information, please try again later",
-            );
-          }, 1000);
+          toast.info("Cancel appointment is not available yet");
         },
       },
       {
         name: "reschedule",
         action: () => {
-          setLoding(true);
-          setTimeout(() => {
-            setLoding(false);
-            toast.error(
-              "An error occurred while retrieving branch information, please try again later",
-            );
-          }, 1000);
+          toast.info("Reschedule appointment is not available yet");
         },
       },
     ],
@@ -135,6 +183,58 @@ export default function Appointments() {
     const params = new URLSearchParams(searchParams.toString());
     params.set(name, value);
     router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  const getStartTime = () => {
+    if (appointmentTime === "now") {
+      return new Date().toISOString();
+    }
+
+    if (!formValues.date || !formValues.time) {
+      return "";
+    }
+
+    return new Date(`${formValues.date}T${formValues.time}`).toISOString();
+  };
+
+  const handleSaveAppointment = () => {
+    if (!userId) {
+      toast.error("Please sign in before creating an appointment");
+      return;
+    }
+
+    const startTime = getStartTime();
+    if (!formValues.patient_first_name || !formValues.patient_last_name) {
+      toast.error("Patient first and last name are required");
+      return;
+    }
+    if (!startTime) {
+      toast.error("Please choose the appointment date and time");
+      return;
+    }
+
+    setLoading(true);
+    axiosClient
+      .post(`provider/${userId}/appointments`, {
+        patient_first_name: formValues.patient_first_name,
+        patient_last_name: formValues.patient_last_name,
+        patient_phone_number: formValues.patient_phone_number,
+        patient_email: formValues.patient_email,
+        appointment_type: "virtual",
+        start_time: startTime,
+        message: formValues.message,
+      })
+      .then((res) => {
+        toast.success("Appointment created");
+        setFormValues(emptyForm);
+        setAppointments((current) => [res.data, ...current]);
+      })
+      .catch(() =>
+        toast.error(
+          "An error occurred while submitting your appointment. Please try again later",
+        ),
+      )
+      .finally(() => setLoading(false));
   };
 
   return (
@@ -148,23 +248,32 @@ export default function Appointments() {
           title="Add a new appointment"
           description="Create a new appointment"
           trigger={<p>New appointment</p>}
-          onSave={() =>
-            toast.error(
-              "An error occured while submitting your appointment. Please try again later",
-            )
-          }
+          onSave={handleSaveAppointment}
         >
           <div>
-            <Tabs defaultValue="now">
+            <Tabs
+              defaultValue="now"
+              onValueChange={(value) =>
+                setAppointmentTime(value === "schedule" ? "later" : "now")
+              }
+            >
               <TabsList variant="line">
                 <TabsTrigger value="now">now</TabsTrigger>
                 <TabsTrigger value="schedule">Later</TabsTrigger>
               </TabsList>
               <TabsContent value="now">
-                <AppointmentForm time="now" />
+                <AppointmentForm
+                  time="now"
+                  values={formValues}
+                  setValues={setFormValues}
+                />
               </TabsContent>
               <TabsContent value="schedule">
-                <AppointmentForm time="later" />
+                <AppointmentForm
+                  time="later"
+                  values={formValues}
+                  setValues={setFormValues}
+                />
               </TabsContent>
             </Tabs>
           </div>

@@ -32,7 +32,8 @@ export default function TelehealthVideoPlayer() {
   const [localMediaAvailable, setLocalMediaAvailable] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const TELEHEALTH_BACKEND_URL = "http://localhost:4000"; // TODO: move to env variable
+  const TELEHEALTH_BACKEND_URL =
+    process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
 
   // Get audio file
   useEffect(() => {

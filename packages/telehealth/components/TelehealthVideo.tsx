@@ -47,7 +47,8 @@ function TelehealthVideo({
   const [remoteStream, setRemoteStream] = React.useState<MediaStream | null>(
     null,
   );
-  const TELEHEALTH_BACKEND_URL = "http://localhost:4000"; // TODO: move to env variable
+  const TELEHEALTH_BACKEND_URL =
+    process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
 
   // Get audio file
   React.useEffect(() => {

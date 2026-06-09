@@ -1,144 +1,157 @@
 "use client";
-import { Button } from "@veridoctor/design/components";
 import { axiosClient } from "@veridoctor/api-client";
-import {
-  LucideArrowUpRight,
-  LucidePlus,
-  LucideVideo,
-} from "@veridoctor/design/icons";
+import { Button } from "@veridoctor/design/components";
+import { LucidePlus } from "@veridoctor/design/icons";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { toast } from "sonner";
 import { RootState } from "../../store";
+import { MetricsRow } from "../../../components/dashboard/MetricsRow";
+import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
+import { PendingActions } from "../../../components/dashboard/PendingActions";
+import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
 
-interface GotoSectionButtonProps {
-  onClick?: () => void;
+export interface Appointment {
+  id: string;
+  patient_name: string;
+  start_time: string;
+  meet_id?: string;
+  appointment_type: "virtual" | "physical";
+  status: "confirmed" | "pending" | "cancelled";
 }
-
-const GotoSectionButton = ({
-  onClick,
-}: GotoSectionButtonProps) => {
-  return (
-    <Button
-      onClick={onClick}
-      variant="roundedOutline"
-      className="border-black w-10 h-10"
-    >
-      <LucideArrowUpRight />
-    </Button>
-  );
-};
 
 export default function Dashboard() {
   const router = useRouter();
   const userId = useSelector((state: RootState) => state.auth.identity);
-  const [nextVirtualAppointment, setNextVirtualAppointment] = useState<{
-    patient_name: string;
-    start_time: string;
-    meet_id: string;
-  } | null>(null);
 
-  const navigateTo = (path: string) => {
-    router.push(path);
-  };
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [totalPatients, setTotalPatients] = useState<number>(0);
+  const [weeklyCount, setWeeklyCount] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   useEffect(() => {
     if (!userId) return;
-    axiosClient
-      .get(
-        `provider/${userId}/appointments?appointment_type=virtual&filter=upcoming`,
-      )
-      .then((res) => setNextVirtualAppointment(res.data?.[0] ?? null))
-      .catch(() => setNextVirtualAppointment(null));
+
+    const fetchAll = async () => {
+      setLoading(true);
+      try {
+        const [apptRes, statsRes] = await Promise.allSettled([
+          axiosClient.get(
+            `provider/${userId}/appointments?filter=upcoming&limit=10`
+          ),
+          axiosClient.get(`provider/${userId}/stats`),
+        ]);
+
+        if (apptRes.status === "fulfilled") {
+          setAppointments(apptRes.value.data ?? []);
+        }
+        if (statsRes.status === "fulfilled") {
+          setTotalPatients(statsRes.value.data?.total_patients ?? 0);
+          setWeeklyCount(statsRes.value.data?.weekly_count ?? 0);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAll();
   }, [userId]);
 
-  const joinNextCall = () => {
-    if (!nextVirtualAppointment?.meet_id) {
-      toast.info("Create a virtual appointment first");
-      router.push("/appointments?appointment_type=virtual");
-      return;
-    }
+  const todayAppointments = appointments.filter((a) => {
+    const d = new Date(a.start_time);
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  });
 
-    router.push(`/calls/${nextVirtualAppointment.meet_id}`);
-  };
+  const nextVirtual = appointments.find(
+    (a) => a.appointment_type === "virtual" && new Date(a.start_time) > now
+  );
 
   return (
-    <div className="p-4 rounded-lg mx-4">
-      {/* top section */}
-      <div className="flex justify-between mb-4">
+    <div className="p-4 mx-4 space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
-          <p className="text-xl font-bold">Dashboard</p>
-          <p>Plan and care for your patients with ease.</p>
+          <p className="text-xl font-bold">
+            {greeting} 👋
+          </p>
+          <p className="text-gray-500 text-sm">
+            {now.toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}{" "}
+            &nbsp;·&nbsp; {todayAppointments.length} patients today
+          </p>
         </div>
-        <Button onClick={() => router.push("/appointments")}>
-          <LucidePlus /> New appointment
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="roundedOutline"
+            onClick={() => router.push("/appointments?appointment_type=virtual")}
+          >
+            New virtual
+          </Button>
+          <Button onClick={() => router.push("/appointments")}>
+            <LucidePlus /> New appointment
+          </Button>
+        </div>
       </div>
-      {/* main dashboard section */}
-      <div className="grid lg:grid-cols-4 gap-4">
-        <div className="lg:col-span-3 grid md:grid-cols-2 lg:grid-cols-3 gap-4 container">
-          {/* total patients served card */}
-          <div className="bg-white shadow-md p-4 rounded-lg h-32 h-full flex flex-col gap-4">
-            <p className="font-bold">Patients served.</p>
-            <p className="text-4xl">23</p>
-          </div>
-          {/* upcoming appointments card */}
-          <div className="shadow-md p-4 rounded-lg bg-white flex flex-col gap-4">
-            <div className="flex justify-between items-center">
-              <p className="font-bold">Physical appointments.</p>
-              <GotoSectionButton
-                onClick={() =>
-                  navigateTo("/appointments?appointment_type=physical")
-                }
-              />
-            </div>
-            <p>
-              Appointment with <span className="font-bold">Michael B.</span>
-            </p>
-            <p>Today 8:30 PM</p>
-          </div>
-          {/* virtual appointments card */}
-          <div className="shadow-md p-4 rounded-lg bg-white">
-            <div className="flex justify-between items-center">
-              <p className="font-bold">Virtual appointments.</p>
-              <GotoSectionButton
-                onClick={() =>
-                  navigateTo("/appointments?appointment_type=virtual")
-                }
-              />
-            </div>
-            <div>
-              <p>
-                {nextVirtualAppointment?.patient_name ??
-                  "No upcoming virtual appointment"}
-              </p>
-              <p>
-                {nextVirtualAppointment
-                  ? new Date(nextVirtualAppointment.start_time).toLocaleString()
-                  : "Create an appointment to start a call"}
-              </p>
-              <Button variant="rounded" onClick={joinNextCall}>
-                <LucideVideo /> Join call
-              </Button>
-            </div>
-          </div>
-          <div className="lg:col-span-2 shadow-md p-4 rounded-lg bg-white">
-            <p className="font-bold">Weekly analysis</p>
-            {/* TODO: Add bar chart here */}
-            <p>43</p>
-          </div>
-          <div className="shadow-md p-4 rounded-lg bg-white">
-            <div className="flex justify-between items-center">
-              <p className="font-bold">Schedule.</p>
-              <GotoSectionButton onClick={() => navigateTo("/schedule")} />
-            </div>
-            <p>Working today</p>
-          </div>
+
+      {/* Metrics Row */}
+      <MetricsRow
+        totalPatients={totalPatients}
+        todayCount={todayAppointments.length}
+        weeklyCount={weeklyCount}
+        loading={loading}
+      />
+
+      {/* Main Grid */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        {/* Schedule — takes 2 cols */}
+        <div className="lg:col-span-2 space-y-4">
+          <TodaySchedule
+            appointments={todayAppointments}
+            nextVirtual={nextVirtual}
+            loading={loading}
+            onNavigate={(path) => router.push(path)}
+          />
+          <WeeklyChart weeklyCount={weeklyCount} loading={loading} />
         </div>
-        {/* Appointments calendar card */}
-        <div className="shadow-md p-4 bg-white row-span-2">
-          <p className="font-bold">Appointment calendar</p>
+
+        {/* Right column */}
+        <div className="space-y-4">
+          <PendingActions onNavigate={(path) => router.push(path)} />
+
+          {/* Quick actions */}
+          <div className="bg-white shadow-md rounded-lg p-4 space-y-2">
+            <p className="font-bold text-sm text-gray-500 uppercase tracking-wide">
+              Quick actions
+            </p>
+            {[
+              { label: "View lab results", path: "/services" },
+              { label: "Patient messages", path: "/patients" },
+              { label: "My schedule", path: "/schedule" },
+              { label: "Settings", path: "/settings" },
+            ].map((item) => (
+              <button
+                key={item.path}
+                onClick={() => router.push(item.path)}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 transition-colors flex justify-between items-center"
+              >
+                {item.label}
+                <span className="text-gray-400">→</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

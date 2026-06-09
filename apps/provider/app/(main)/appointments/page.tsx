@@ -57,9 +57,7 @@ export default function Appointments() {
   const searchParams = useSearchParams();
   const userId = useSelector((state: RootState) => state.auth.identity);
   const [loading, setLoading] = useState(false);
-  const [appointmentTime, setAppointmentTime] = useState<"now" | "later">(
-    "now",
-  );
+  const [appointmentTime, setAppointmentTime] = useState<"now" | "later">("now");
   const [formValues, setFormValues] = useState<AppointmentFormValues>(emptyForm);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
@@ -68,6 +66,14 @@ export default function Appointments() {
 
   const joinCall = (meetId: string) => {
     router.push(`/calls/${meetId}`);
+  };
+
+  const isJoinEnabled = (startTime: string) => {
+    const appointmentDate = new Date(startTime);
+    const now = new Date();
+    const isToday = appointmentDate.toDateString() === now.toDateString();
+    const isFuture = appointmentDate > now;
+    return isToday && isFuture;
   };
 
   const tableRows: {
@@ -85,10 +91,8 @@ export default function Appointments() {
           size="sm"
           variant="rounded"
           onClick={() => joinCall(appointment.meet_id)}
-          disabled={
-          new Date(appointment.start_time).toDateString() !== new Date().toDateString() ||
-          new Date(appointment.start_time) < new Date()
-      }
+          disabled={!isJoinEnabled(appointment.start_time)}
+        >
           <LucideVideo /> Join call
         </Button>
       ) : (

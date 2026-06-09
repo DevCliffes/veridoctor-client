@@ -48,6 +48,7 @@ const emptyForm: AppointmentFormValues = {
   date: "",
   time: "",
   message: "",
+  appointment_type: "virtual",
 };
 
 export default function Appointments() {
@@ -55,7 +56,6 @@ export default function Appointments() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const userId = useSelector((state: RootState) => state.auth.identity);
-  // appointments Loading state
   const [loading, setLoading] = useState(false);
   const [appointmentTime, setAppointmentTime] = useState<"now" | "later">(
     "now",
@@ -94,26 +94,10 @@ export default function Appointments() {
   }));
 
   const tableColumns: DatatableColumnHeader[] = [
-    {
-      name: "Patient Name",
-      type: "string",
-      key: "name",
-    },
-    {
-      name: "Date/Time",
-      type: "string",
-      key: "date",
-    },
-    {
-      name: "Status",
-      type: "string",
-      key: "status",
-    },
-    {
-      name: "Call",
-      type: "string",
-      key: "call",
-    },
+    { name: "Patient Name", type: "string", key: "name" },
+    { name: "Date/Time", type: "string", key: "date" },
+    { name: "Status", type: "string", key: "status" },
+    { name: "Call", type: "string", key: "call" },
   ];
 
   const fetchAppointments = useCallback(() => {
@@ -139,16 +123,12 @@ export default function Appointments() {
       {
         name: "Today",
         value: "today",
-        action: (filter) => {
-          updateQueryParams("filter", filter);
-        },
+        action: (filter) => updateQueryParams("filter", filter),
       },
       {
         name: "Upcoming",
         value: "upcoming",
-        action: (filter) => {
-          updateQueryParams("filter", filter);
-        },
+        action: (filter) => updateQueryParams("filter", filter),
       },
     ],
     defaultTab: filter,
@@ -158,23 +138,17 @@ export default function Appointments() {
     primary: [
       {
         name: "view",
-        action: () => {
-          toast.info("Appointment details are not available yet");
-        },
+        action: () => toast.info("Appointment details are not available yet"),
       },
     ],
     secondary: [
       {
         name: "cancel",
-        action: () => {
-          toast.info("Cancel appointment is not available yet");
-        },
+        action: () => toast.info("Cancel appointment is not available yet"),
       },
       {
         name: "reschedule",
-        action: () => {
-          toast.info("Reschedule appointment is not available yet");
-        },
+        action: () => toast.info("Reschedule appointment is not available yet"),
       },
     ],
   };
@@ -186,14 +160,8 @@ export default function Appointments() {
   };
 
   const getStartTime = () => {
-    if (appointmentTime === "now") {
-      return new Date().toISOString();
-    }
-
-    if (!formValues.date || !formValues.time) {
-      return "";
-    }
-
+    if (appointmentTime === "now") return new Date().toISOString();
+    if (!formValues.date || !formValues.time) return "";
     return new Date(`${formValues.date}T${formValues.time}`).toISOString();
   };
 
@@ -220,7 +188,7 @@ export default function Appointments() {
         patient_last_name: formValues.patient_last_name,
         patient_phone_number: formValues.patient_phone_number,
         patient_email: formValues.patient_email,
-        appointment_type: "virtual",
+        appointment_type: formValues.appointment_type,
         start_time: startTime,
         message: formValues.message,
       })

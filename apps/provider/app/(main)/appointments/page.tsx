@@ -130,6 +130,11 @@ export default function Appointments() {
         value: "upcoming",
         action: (filter) => updateQueryParams("filter", filter),
       },
+      {
+        name: "Past",
+        value: "past",
+        action: (filter) => updateQueryParams("filter", filter),
+      },
     ],
     defaultTab: filter,
   };

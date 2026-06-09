@@ -52,11 +52,11 @@ export default function Calls() {
               <p>New call</p>
             </div>
           }
-          onSave={() =>
+          onSave={() => {
             toast.error(
               "an error occurred while creating your call. Please try again later",
-            )
-          }
+            );
+          }}
         >
           <div>
             <Tabs defaultValue="instant">
@@ -123,7 +123,6 @@ export default function Calls() {
                 <p className="text-gray-600">
                   {call.date} at {call.time}
                 </p>
-
                 <Badge
                   className={`inline-block px-2 py-1 rounded-full text-xs font-semibold ${
                     call.status === "Scheduled"

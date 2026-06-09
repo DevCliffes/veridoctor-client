@@ -69,6 +69,7 @@ export default function Appointments() {
   };
 
 const isJoinEnabled = (startTime: string) => {
+  if (filter === "past" || filter === "upcoming") return false;
   const appointmentDate = new Date(startTime);
   const now = new Date();
   return appointmentDate.toDateString() === now.toDateString();

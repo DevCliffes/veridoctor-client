@@ -68,19 +68,21 @@ export default function Appointments() {
     router.push(`/calls/${meetId}`);
   };
 
-const isJoinEnabled = (startTime: string) => {
-  if (filter === "past" || filter === "upcoming") return false;
-  const appointmentDate = new Date(startTime);
-  const now = new Date();
-  return appointmentDate.toDateString() === now.toDateString();
-};
+  const isJoinEnabled = (startTime: string) => {
+    if (filter === "past" || filter === "upcoming") return false;
+    const appointmentDate = new Date(startTime);
+    const now = new Date();
+    return appointmentDate.toDateString() === now.toDateString();
+  };
 
   const tableRows: {
+    id: string;
     name: string;
     date: string;
     status: string;
     call: ReactNode;
   }[] = appointments.map((appointment) => ({
+    id: appointment.id,
     name: appointment.patient_name,
     date: new Date(appointment.start_time).toLocaleString(),
     status: appointment.status,
@@ -149,7 +151,7 @@ const isJoinEnabled = (startTime: string) => {
     primary: [
       {
         name: "view",
-        action: () => toast.info("Appointment details are not available yet"),
+        action: (row) => router.push(`/patients/${row.id}`),
       },
     ],
     secondary: [

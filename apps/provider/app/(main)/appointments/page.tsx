@@ -85,6 +85,7 @@ export default function Appointments() {
           size="sm"
           variant="rounded"
           onClick={() => joinCall(appointment.meet_id)}
+          disabled={new Date(appointment.start_time) < new Date()}
         >
           <LucideVideo /> Join call
         </Button>

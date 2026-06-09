@@ -68,13 +68,11 @@ export default function Appointments() {
     router.push(`/calls/${meetId}`);
   };
 
-  const isJoinEnabled = (startTime: string) => {
-    const appointmentDate = new Date(startTime);
-    const now = new Date();
-    const isToday = appointmentDate.toDateString() === now.toDateString();
-    const isFuture = appointmentDate > now;
-    return isToday && isFuture;
-  };
+const isJoinEnabled = (startTime: string) => {
+  const appointmentDate = new Date(startTime);
+  const now = new Date();
+  return appointmentDate.toDateString() === now.toDateString();
+};
 
   const tableRows: {
     name: string;

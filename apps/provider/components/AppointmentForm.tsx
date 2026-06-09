@@ -8,6 +8,7 @@ export type AppointmentFormValues = {
   date: string;
   time: string;
   message: string;
+  appointment_type: "virtual" | "physical";
 };
 
 type AppointmentFormProps = {
@@ -87,6 +88,33 @@ export default function AppointmentForm({
           </div>
         </>
       )}
+      <div>
+        <label>Appointment type</label>
+        <div className="flex gap-2 mt-1">
+          <button
+            type="button"
+            onClick={() => updateValue("appointment_type", "virtual")}
+            className={`flex-1 p-2 rounded border text-sm font-medium transition-colors ${
+              values.appointment_type === "virtual"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+            }`}
+          >
+            🎥 Virtual
+          </button>
+          <button
+            type="button"
+            onClick={() => updateValue("appointment_type", "physical")}
+            className={`flex-1 p-2 rounded border text-sm font-medium transition-colors ${
+              values.appointment_type === "physical"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+            }`}
+          >
+            🏥 Physical
+          </button>
+        </div>
+      </div>
       <label>Message to recepient</label>
       <textarea
         className="w-full p-2 border border-gray-300 rounded"

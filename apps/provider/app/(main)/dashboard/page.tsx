@@ -1,81 +1,26 @@
 "use client";
-
-// updated
+import { useEffect, useState } from "react";
 import { axiosClient } from "@veridoctor/api-client";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store";
 import { Button } from "@veridoctor/design/components";
 import { LucidePlus } from "@veridoctor/design/icons";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
-import { RootState } from "../../store";
 import { MetricsRow } from "../../../components/dashboard/MetricsRow";
 import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
 import { PendingActions } from "../../../components/dashboard/PendingActions";
 import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
 
-export interface Appointment {
-  id: string;
-  patient_name: string;
-  start_time: string;
-  meet_id?: string;
-  appointment_type: "virtual" | "physical";
-  status: "confirmed" | "pending" | "cancelled";
-}
-
 export default function Dashboard() {
   const router = useRouter();
-  const userId = useSelector((state: RootState) => state.auth.identity);
-
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [totalPatients, setTotalPatients] = useState<number>(0);
-  const [weeklyCount, setWeeklyCount] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
+  const identity = useSelector((state: RootState) => state.auth.identity);
 
   const now = new Date();
   const hour = now.getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  useEffect(() => {
-    if (!userId) return;
-
-    const fetchAll = async () => {
-      setLoading(true);
-      try {
-        const [apptRes, statsRes] = await Promise.allSettled([
-          axiosClient.get(
-            `provider/${userId}/appointments?filter=upcoming&limit=10`
-          ),
-          axiosClient.get(`provider/${userId}/stats`),
-        ]);
-
-        if (apptRes.status === "fulfilled") {
-          setAppointments(apptRes.value.data ?? []);
-        }
-        if (statsRes.status === "fulfilled") {
-          setTotalPatients(statsRes.value.data?.total_patients ?? 0);
-          setWeeklyCount(statsRes.value.data?.weekly_count ?? 0);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAll();
-  }, [userId]);
-
-  const todayAppointments = appointments.filter((a) => {
-    const d = new Date(a.start_time);
-    return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
-    );
-  });
-
-  const nextVirtual = appointments.find(
-    (a) => a.appointment_type === "virtual" && new Date(a.start_time) > now
-  );
+  const firstName = identity?.first_name ?? "";
 
   return (
     <div className="p-4 mx-4 space-y-6">
@@ -83,7 +28,7 @@ export default function Dashboard() {
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <p className="text-xl font-bold">
-            {greeting} 👋
+            {greeting}{firstName ? `, ${firstName}` : ""} 👋
           </p>
           <p className="text-gray-500 text-sm">
             {now.toLocaleDateString("en-US", {
@@ -91,8 +36,7 @@ export default function Dashboard() {
               year: "numeric",
               month: "long",
               day: "numeric",
-            })}{" "}
-            &nbsp;·&nbsp; {todayAppointments.length} patients today
+            })}
           </p>
         </div>
         <div className="flex gap-2">
@@ -108,44 +52,33 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <MetricsRow
-        totalPatients={totalPatients}
-        todayCount={todayAppointments.length}
-        weeklyCount={weeklyCount}
-        loading={loading}
-      />
+      {/* Metrics — fetches its own data */}
+      <MetricsRow />
 
       {/* Main Grid */}
       <div className="grid lg:grid-cols-3 gap-4">
-        {/* Schedule — takes 2 cols */}
+        {/* Left 2 cols */}
         <div className="lg:col-span-2 space-y-4">
-          <TodaySchedule
-            appointments={todayAppointments}
-            nextVirtual={nextVirtual}
-            loading={loading}
-            onNavigate={(path) => router.push(path)}
-          />
-          <WeeklyChart weeklyCount={weeklyCount} loading={loading} />
+          <TodaySchedule />
+          <WeeklyChart />
         </div>
 
-        {/* Right column */}
+        {/* Right col */}
         <div className="space-y-4">
-          <PendingActions onNavigate={(path) => router.push(path)} />
+          <PendingActions />
 
-          {/* Quick actions */}
-          <div className="bg-white shadow-md rounded-lg p-4 space-y-2">
+          <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-4 space-y-2">
             <p className="font-bold text-sm text-gray-500 uppercase tracking-wide">
               Quick actions
             </p>
             {[
-              { label: "View lab results", path: "/services" },
-              { label: "Patient messages", path: "/patients" },
-              { label: "My schedule", path: "/schedule" },
-              { label: "Settings", path: "/settings" },
+              { label: "View services", path: "/services" },
+              { label: "Patient records", path: "/patients" },
+              { label: "My forms", path: "/forms" },
+              { label: "Prescriptions", path: "/forms" },
             ].map((item) => (
               <button
-                key={item.path}
+                key={item.path + item.label}
                 onClick={() => router.push(item.path)}
                 className="w-full text-left px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 transition-colors flex justify-between items-center"
               >
@@ -159,4 +92,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

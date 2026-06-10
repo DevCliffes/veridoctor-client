@@ -1,17 +1,12 @@
 "use client";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@veridoctor/design/components";
-import {
   DataTable,
   DatatableActions,
   DatatableColumnHeader,
   DatatableFilterTabs,
   DialogModal,
 } from "@veridoctor/design/shared";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@veridoctor/design/components";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -26,22 +21,16 @@ export default function Appointments() {
   const tableRows: { name: string; date: string; status: string }[] = [];
 
   const tableColumns: DatatableColumnHeader[] = [
-    {
-      name: "Patient Name",
-      type: "string",
-      key: "name",
-    },
-    {
-      name: "Date/Time",
-      type: "string",
-      key: "date",
-    },
-    {
-      name: "Status",
-      type: "string",
-      key: "status",
-    },
+    { name: "Patient Name", type: "string", key: "name" },
+    { name: "Date/Time", type: "string", key: "date" },
+    { name: "Status", type: "string", key: "status" },
   ];
+
+  const updateQueryParams = (name: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(name, value);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   const filterTabs: DatatableFilterTabs = {
     tabs: [
@@ -85,7 +74,7 @@ export default function Appointments() {
         name: "cancel",
         action: () => {
           toast.error(
-            "An error occurred while canceling the appointment, please try again later",
+            "An error occurred while canceling the appointment, please try again later"
           );
         },
       },
@@ -93,17 +82,11 @@ export default function Appointments() {
         name: "reschedule",
         action: () => {
           toast.error(
-            "An error occurred while rescheduling the appointment, please try again later",
+            "An error occurred while rescheduling the appointment, please try again later"
           );
         },
       },
     ],
-  };
-
-  const updateQueryParams = (name: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(name, value);
-    router.replace(`${pathname}?${params.toString()}`);
   };
 
   return (
@@ -119,14 +102,14 @@ export default function Appointments() {
           trigger={<p>New appointment</p>}
           onSave={() => {
             toast.error(
-              "An error occured while submitting your appointment. Please try again later",
+              "An error occured while submitting your appointment. Please try again later"
             );
           }}
         >
           <div>
             <Tabs defaultValue="now">
               <TabsList variant="line">
-                <TabsTrigger value="now">now</TabsTrigger>
+                <TabsTrigger value="now">Now</TabsTrigger>
                 <TabsTrigger value="schedule">Later</TabsTrigger>
               </TabsList>
               <TabsContent value="now">

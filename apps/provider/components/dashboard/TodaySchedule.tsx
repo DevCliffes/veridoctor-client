@@ -47,7 +47,7 @@ export function TodaySchedule() {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-        <h2 className="font-semibold text-gray-700 mb-3">Today's Schedule</h2>
+        <h2 className="font-semibold text-gray-700 mb-3">Today&apos;s Schedule</h2>
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />
@@ -60,7 +60,7 @@ export function TodaySchedule() {
   if (appointments.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-        <h2 className="font-semibold text-gray-700 mb-3">Today's Schedule</h2>
+        <h2 className="font-semibold text-gray-700 mb-3">Today&apos;s Schedule</h2>
         <p className="text-gray-400 text-sm text-center py-6">No appointments scheduled for today.</p>
       </div>
     );
@@ -69,7 +69,7 @@ export function TodaySchedule() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
       <h2 className="font-semibold text-gray-700 mb-3">
-        Today's Schedule <span className="text-gray-400 font-normal text-sm">({appointments.length})</span>
+        Today&apos;s Schedule <span className="text-gray-400 font-normal text-sm">({appointments.length})</span>
       </h2>
       <div className="space-y-2">
         {appointments.map((appt) => {
@@ -92,7 +92,7 @@ export function TodaySchedule() {
                   {appt.patient_first_name} {appt.patient_last_name}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {formatTime(appt.start_time)} – {formatTime(appt.end_time)}
+                  {formatTime(appt.start_time)} &ndash; {formatTime(appt.end_time)}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -115,7 +115,7 @@ export function TodaySchedule() {
                   {appt.status}
                 </span>
                 {isNext && appt.appointment_type === "virtual" && appt.meet_id && (
-                  <a
+                  
                     href={`/calls/${appt.meet_id}`}
                     className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700"
                   >

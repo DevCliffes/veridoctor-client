@@ -147,15 +147,11 @@ export default function Appointments() {
     defaultTab: filter,
   };
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
   const actions: DatatableActions = {
     primary: [
       {
         name: "view",
-        action: () => {
-          if (selectedId) router.push(`/patients/${selectedId}`);
-        },
+        action: () => toast.info("Select a patient to view their profile"),
       },
     ],
     secondary: [
@@ -272,7 +268,6 @@ export default function Appointments() {
         isLoading={loading}
         filterTabs={filterTabs}
         tableActions={actions}
-        onRowClick={(row) => setSelectedId(row.id)}
       />
     </div>
   );

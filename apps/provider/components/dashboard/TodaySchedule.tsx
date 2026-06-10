@@ -33,24 +33,26 @@ function minutesUntil(iso: string) {
   return Math.round((new Date(iso).getTime() - Date.now()) / 60000);
 }
 
-interface AppointmentRowProps {
+interface RowProps {
   appt: Appointment;
 }
 
-function AppointmentRow({ appt }: AppointmentRowProps) {
+function Row({ appt }: RowProps) {
   const router = useRouter();
   const mins = minutesUntil(appt.start_time);
   const isNext = mins > 0 && mins <= 60;
   const isPast = mins < 0;
-  const callPath = "/calls/" + appt.meet_id;
+
+  function handleJoin() {
+    router.push("/calls/" + appt.meet_id);
+  }
+
+  const borderClass = isNext ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50";
+  const typeClass = appt.appointment_type === "virtual" ? "bg-indigo-100 text-indigo-700" : "bg-green-100 text-green-700";
+  const statusClass = appt.status === "confirmed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700";
 
   return (
-    <div
-      className={
-        "flex items-center gap-3 p-3 rounded-lg border " +
-        (isNext ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50")
-      }
-    >
+    <div className={"flex items-center gap-3 p-3 rounded-lg border " + borderClass}>
       <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
         {getInitials(appt.patient_first_name, appt.patient_last_name)}
       </div>
@@ -63,29 +65,16 @@ function AppointmentRow({ appt }: AppointmentRowProps) {
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
-        <span
-          className={
-            "text-xs px-2 py-0.5 rounded-full font-medium " +
-            (appt.appointment_type === "virtual"
-              ? "bg-indigo-100 text-indigo-700"
-              : "bg-green-100 text-green-700")
-          }
-        >
+        <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + typeClass}>
           {appt.appointment_type}
         </span>
-        <span
-          className={
-            "text-xs px-2 py-0.5 rounded-full font-medium " +
-            (appt.status === "confirmed"
-              ? "bg-green-100 text-green-700"
-              : "bg-yellow-100 text-yellow-700")
-          }
-        >
+        <span className={"text-xs px-2 py-0.5 rounded-full font-medium " + statusClass}>
           {appt.status}
         </span>
         {isNext && appt.appointment_type === "virtual" && appt.meet_id && (
           <button
-            onClick={() => router.push(callPath)}
+            type="button"
+            onClick={handleJoin}
             className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700"
           >
             Join
@@ -145,7 +134,7 @@ export function TodaySchedule() {
       </h2>
       <div className="space-y-2">
         {appointments.map((appt) => (
-          <AppointmentRow key={appt.id} appt={appt} />
+          <Row key={appt.id} appt={appt} />
         ))}
       </div>
     </div>

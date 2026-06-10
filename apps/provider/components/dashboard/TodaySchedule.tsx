@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { axiosClient } from "@veridoctor/api-client";
 import { useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
 import { RootState } from "../../store";
 
 interface Appointment {
@@ -16,7 +17,9 @@ interface Appointment {
 }
 
 function getInitials(first: string, last: string) {
-  return (first[0] ?? "") + (last[0] ?? "").toUpperCase();
+  const f = first[0] ?? "";
+  const l = last[0] ?? "";
+  return (f + l).toUpperCase();
 }
 
 function formatTime(iso: string) {
@@ -28,6 +31,75 @@ function formatTime(iso: string) {
 
 function minutesUntil(iso: string) {
   return Math.round((new Date(iso).getTime() - Date.now()) / 60000);
+}
+
+interface AppointmentRowProps {
+  appt: Appointment;
+}
+
+function AppointmentRow({ appt }: AppointmentRowProps) {
+  const router = useRouter();
+  const mins = minutesUntil(appt.start_time);
+  const isNext = mins > 0 && mins <= 60;
+  const isPast = mins < 0;
+  const callPath = "/calls/" + appt.meet_id;
+
+  return (
+    <div
+      className={
+        "flex items-center gap-3 p-3 rounded-lg border " +
+        (isNext ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50")
+      }
+    >
+      <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
+        {getInitials(appt.patient_first_name, appt.patient_last_name)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800 truncate">
+          {appt.patient_first_name} {appt.patient_last_name}
+        </p>
+        <p className="text-xs text-gray-500">
+          {formatTime(appt.start_time)} &ndash; {formatTime(appt.end_time)}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className={
+            "text-xs px-2 py-0.5 rounded-full font-medium " +
+            (appt.appointment_type === "virtual"
+              ? "bg-indigo-100 text-indigo-700"
+              : "bg-green-100 text-green-700")
+          }
+        >
+          {appt.appointment_type}
+        </span>
+        <span
+          className={
+            "text-xs px-2 py-0.5 rounded-full font-medium " +
+            (appt.status === "confirmed"
+              ? "bg-green-100 text-green-700"
+              : "bg-yellow-100 text-yellow-700")
+          }
+        >
+          {appt.status}
+        </span>
+        {isNext && appt.appointment_type === "virtual" && appt.meet_id && (
+          <button
+            onClick={() => router.push(callPath)}
+            className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700"
+          >
+            Join
+          </button>
+        )}
+        {isNext && (
+          <span className="text-xs text-blue-600 font-medium">in {mins}m</span>
+        )}
+        {isPast && (
+          <span className="text-xs text-gray-400">done</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function TodaySchedule() {
@@ -72,69 +144,9 @@ export function TodaySchedule() {
         Today&apos;s Schedule <span className="text-gray-400 font-normal text-sm">({appointments.length})</span>
       </h2>
       <div className="space-y-2">
-        {appointments.map((appt) => {
-          const mins = minutesUntil(appt.start_time);
-          const isNext = mins > 0 && mins <= 60;
-          const isPast = mins < 0;
-
-          return (
-            <div
-              key={appt.id}
-              className={
-                "flex items-center gap-3 p-3 rounded-lg border " +
-                (isNext ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50")
-              }
-            >
-              <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
-                {getInitials(appt.patient_first_name, appt.patient_last_name)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">
-                  {appt.patient_first_name} {appt.patient_last_name}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {formatTime(appt.start_time)} &ndash; {formatTime(appt.end_time)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span
-                  className={
-                    "text-xs px-2 py-0.5 rounded-full font-medium " +
-                    (appt.appointment_type === "virtual"
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "bg-green-100 text-green-700")
-                  }
-                >
-                  {appt.appointment_type}
-                </span>
-                <span
-                  className={
-                    "text-xs px-2 py-0.5 rounded-full font-medium " +
-                    (appt.status === "confirmed"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-yellow-100 text-yellow-700")
-                  }
-                >
-                  {appt.status}
-                </span>
-                {isNext && appt.appointment_type === "virtual" && appt.meet_id && (
-                  
-                    href={"/calls/" + appt.meet_id}
-                    className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700"
-                  >
-                    Join
-                  </a>
-                )}
-                {isNext && (
-                  <span className="text-xs text-blue-600 font-medium">in {mins}m</span>
-                )}
-                {isPast && (
-                  <span className="text-xs text-gray-400">done</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {appointments.map((appt) => (
+          <AppointmentRow key={appt.id} appt={appt} />
+        ))}
       </div>
     </div>
   );

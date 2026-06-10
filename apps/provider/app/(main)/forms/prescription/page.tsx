@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
-import { RootState } from "../../store";
+import { RootState } from "../../../store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

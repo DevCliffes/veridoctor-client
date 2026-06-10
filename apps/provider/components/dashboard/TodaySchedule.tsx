@@ -16,7 +16,7 @@ interface Appointment {
 }
 
 function getInitials(first: string, last: string) {
-  return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
+  return (first[0] ?? "") + (last[0] ?? "").toUpperCase();
 }
 
 function formatTime(iso: string) {
@@ -38,7 +38,7 @@ export function TodaySchedule() {
   useEffect(() => {
     if (!identity?.id) return;
     axiosClient
-      .get(`/provider/${identity.id}/appointments?filter=today`)
+      .get("/provider/" + identity.id + "/appointments?filter=today")
       .then((res) => setAppointments(res.data ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -80,9 +80,10 @@ export function TodaySchedule() {
           return (
             <div
               key={appt.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border ${
-                isNext ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50"
-              }`}
+              className={
+                "flex items-center gap-3 p-3 rounded-lg border " +
+                (isNext ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50")
+              }
             >
               <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
                 {getInitials(appt.patient_first_name, appt.patient_last_name)}
@@ -97,26 +98,28 @@ export function TodaySchedule() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    appt.appointment_type === "virtual"
+                  className={
+                    "text-xs px-2 py-0.5 rounded-full font-medium " +
+                    (appt.appointment_type === "virtual"
                       ? "bg-indigo-100 text-indigo-700"
-                      : "bg-green-100 text-green-700"
-                  }`}
+                      : "bg-green-100 text-green-700")
+                  }
                 >
                   {appt.appointment_type}
                 </span>
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    appt.status === "confirmed"
+                  className={
+                    "text-xs px-2 py-0.5 rounded-full font-medium " +
+                    (appt.status === "confirmed"
                       ? "bg-green-100 text-green-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
+                      : "bg-yellow-100 text-yellow-700")
+                  }
                 >
                   {appt.status}
                 </span>
                 {isNext && appt.appointment_type === "virtual" && appt.meet_id && (
                   
-                    href={`/calls/${appt.meet_id}`}
+                    href={"/calls/" + appt.meet_id}
                     className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700"
                   >
                     Join

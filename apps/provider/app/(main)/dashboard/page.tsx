@@ -20,15 +20,13 @@ export default function Dashboard() {
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-  const firstName = identity?.first_name ?? "";
-
   return (
     <div className="p-4 mx-4 space-y-6">
       {/* Header */}
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <p className="text-xl font-bold">
-            {greeting}{firstName ? `, ${firstName}` : ""} 👋
+            {greeting} 👋
           </p>
           <p className="text-gray-500 text-sm">
             {now.toLocaleDateString("en-US", {

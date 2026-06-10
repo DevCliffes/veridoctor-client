@@ -1,5 +1,4 @@
 "use client";
-
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ChevronDown,
@@ -7,6 +6,7 @@ import {
   LucideBookUser,
   LucideCalendarCheck,
   LucideCircleUser,
+  LucideFileText,
   LucideLogOut,
   LucideUser,
 } from "@veridoctor/design/icons";
@@ -17,7 +17,7 @@ import {
   TokenPayload,
   TopNav,
 } from "@veridoctor/design/shared";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,11 +40,13 @@ export default function MainAppLayout({
     (store) => store.auth,
   );
   const dispatch = useAppDispatch();
+
   const authInfo = {
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
   };
+
   const navItems: navITem[] = [
     {
       linkTo: "/dashboard",
@@ -56,6 +58,11 @@ export default function MainAppLayout({
       icon: <LucideCalendarCheck />,
       name: "Appointments",
     },
+    {
+      linkTo: "/prescriptions",
+      icon: <LucideFileText />,
+      name: "Prescriptions",
+    },
   ];
 
   const setAuthInfo = (token: TokenPayload) => {
@@ -65,12 +72,12 @@ export default function MainAppLayout({
   };
 
   return (
-    // <AuthWrapper
-    //   authInfo={authInfo}
-    //   setAuthInfo={(token) => setAuthInfo(token)}
-    // >
+    <AuthWrapper
+      authInfo={authInfo}
+      setAuthInfo={(token) => setAuthInfo(token)}
+    >
       <div className="fixed bg-gray-50 top-0 left-0 h-svh w-full flex flex-col">
-        <TopNav center={<p>Health portal</p>} right={<ProfileDropdown />} />
+        <TopNav center={<p>Health portal</p>} right={<ProfileDropdown identityId={identity?.id} />} />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
           <div className="w-full overflow-y-scroll bg-gray-200 p-4 rounded-lg">
@@ -78,11 +85,20 @@ export default function MainAppLayout({
           </div>
         </div>
       </div>
-    // </AuthWrapper>
+    </AuthWrapper>
   );
 }
 
-function ProfileDropdown() {
+function ProfileDropdown({ identityId }: { identityId?: string }) {
+  const dispatch = useAppDispatch();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    dispatch(setAccessToken(""));
+    dispatch(setRefreshToken(""));
+    router.push("/auth/login");
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex gap-2 border-2 hover:cursor-pointer items-center p-1 md:border-2 md:rounded-full">
@@ -93,7 +109,7 @@ function ProfileDropdown() {
         <DropdownMenuItem className="cursor-pointer">
           <a
             className="flex gap-2"
-            href="http://localhost:3000/auth/accounts/94023355-9431-48e5-bcb1-2cf5d9dbe7a0"
+            href={identityId ? `/profile` : "#"}
           >
             <LucideUser />
             <p>Profile</p>
@@ -101,9 +117,9 @@ function ProfileDropdown() {
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">
           <LucideBookUser />
-          <p>accounts</p>
+          <p>Accounts</p>
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">
+        <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
           <LucideLogOut />
           <p>Logout</p>
         </DropdownMenuItem>

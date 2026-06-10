@@ -1,11 +1,5 @@
 "use client";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@veridoctor/design/components";
-import {
   DataTable,
   DatatableActions,
   DatatableColumnHeader,
@@ -20,28 +14,17 @@ export default function Users() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  // appointments Loading state
-  const [loading, setLoding] = useState(false);
-  // mock table data
-  const tableRows: { name: string; date: string; status: string }[] = [
-    // {
-    //   name: "Peter Ndegwa",
-    //   date: "12/13/2020",
-    //   status: "active",
-    // },
-    // {
-    //   name: "Phil Njoroge",
-    //   date: "12/13/2020",
-    //   status: "active",
-    // },
-  ];
+
+  const [loading, setLoading] = useState(false);
+
+  const tableRows: { name: string; status: string }[] = [];
+
   const tableColumns: DatatableColumnHeader[] = [
     {
       name: "Name",
       type: "string",
       key: "name",
     },
-
     {
       name: "Status",
       type: "string",
@@ -55,9 +38,9 @@ export default function Users() {
         name: "Active",
         value: "active",
         action: (filter) => {
-          setLoding(true);
+          setLoading(true);
           setTimeout(() => {
-            setLoding(false);
+            setLoading(false);
             updateQueryParams("filter", filter);
           }, 1000);
         },
@@ -66,15 +49,15 @@ export default function Users() {
         name: "Inactive",
         value: "inactive",
         action: (filter) => {
-          setLoding(true);
+          setLoading(true);
           setTimeout(() => {
-            setLoding(false);
+            setLoading(false);
             updateQueryParams("filter", filter);
           }, 1000);
         },
       },
     ],
-    defaultTab: searchParams.get("filter") ?? "pending",
+    defaultTab: searchParams.get("filter") ?? "active",
   };
 
   const actions: DatatableActions = {
@@ -109,14 +92,14 @@ export default function Users() {
           <p className="text-gray-600 mt-2">Manage system users.</p>
         </div>
         <DialogModal
-          title="Add a new appointment"
-          description="Create a new appointment"
+          title="Add a new user"
+          description="Create a new user"
           trigger={<p>Add user</p>}
-          onSave={() =>
+          onSave={() => {
             toast.error(
               "An error occured while creating the user. Please try again later",
-            )
-          }
+            );
+          }}
         >
           <form>
             <div className="flex gap-2">

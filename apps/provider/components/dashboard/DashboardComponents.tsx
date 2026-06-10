@@ -121,3 +121,4 @@ export function WeeklyChart({ weeklyCount, loading }: WeeklyChartProps) {
     </div>
   );
 }
+

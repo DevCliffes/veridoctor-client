@@ -1,173 +1,138 @@
-import { Button } from "@veridoctor/design/components";
-import { LucideVideo } from "@veridoctor/design/icons";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Appointment } from "../../app/(main)/dashboard/page";
+"use client";
+import { useEffect, useState } from "react";
+import { axiosClient } from "@veridoctor/api-client";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store";
 
-interface TodayScheduleProps {
-  appointments: Appointment[];
-  nextVirtual?: Appointment;
-  loading: boolean;
-  onNavigate: (path: string) => void;
+interface Appointment {
+  id: string;
+  patient_first_name: string;
+  patient_last_name: string;
+  start_time: string;
+  end_time: string;
+  appointment_type: "virtual" | "physical";
+  status: string;
+  meet_id?: string;
 }
 
-const statusBadge = (status: Appointment["status"]) => {
-  const styles: Record<Appointment["status"], string> = {
-    confirmed: "bg-green-100 text-green-800",
-    pending: "bg-amber-100 text-amber-800",
-    cancelled: "bg-red-100 text-red-800",
-  };
-  return (
-    <span
-      className={`text-xs px-2 py-0.5 rounded-full font-medium ${styles[status]}`}
-    >
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
-};
+function getInitials(first: string, last: string) {
+  return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
+}
 
-const typeBadge = (type: Appointment["appointment_type"]) =>
-  type === "virtual" ? (
-    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">
-      Virtual
-    </span>
-  ) : (
-    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-medium">
-      Physical
-    </span>
-  );
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-KE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-const getInitials = (name: string) =>
-  name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function minutesUntil(iso: string) {
+  return Math.round((new Date(iso).getTime() - Date.now()) / 60000);
+}
 
-const avatarColor = (name: string) => {
-  const colors = [
-    "bg-blue-100 text-blue-800",
-    "bg-teal-100 text-teal-800",
-    "bg-purple-100 text-purple-800",
-    "bg-amber-100 text-amber-800",
-  ];
-  return colors[name.charCodeAt(0) % colors.length];
-};
+export function TodaySchedule() {
+  const identity = useSelector((state: RootState) => state.auth.identity);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-const getCountdown = (startTime: string) => {
-  const diff = new Date(startTime).getTime() - Date.now();
-  if (diff < 0) return null;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `in ${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  return `in ${hrs}h`;
-};
+  useEffect(() => {
+    if (!identity?.id) return;
+    axiosClient
+      .get(`/provider/${identity.id}/appointments?filter=today`)
+      .then((res) => setAppointments(res.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [identity?.id]);
 
-export function TodaySchedule({
-  appointments,
-  nextVirtual,
-  loading,
-  onNavigate,
-}: TodayScheduleProps) {
-  const router = useRouter();
-
-  const joinCall = () => {
-    if (!nextVirtual?.meet_id) {
-      toast.info("No upcoming virtual appointment");
-      onNavigate("/appointments?appointment_type=virtual");
-      return;
-    }
-    onNavigate(`/calls/${nextVirtual.meet_id}`);
-  };
-
-  return (
-    <div className="bg-white shadow-md rounded-lg p-4">
-      <div className="flex justify-between items-center mb-4">
-        <p className="font-bold">Today&apos;s schedule</p>
-        <button
-          onClick={() => onNavigate("/schedule")}
-          className="text-xs text-blue-600 hover:underline"
-        >
-          View full schedule →
-        </button>
-      </div>
-
-      {loading ? (
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+        <h2 className="font-semibold text-gray-700 mb-3">Today's Schedule</h2>
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-12 bg-gray-100 animate-pulse rounded" />
+            <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />
           ))}
         </div>
-      ) : appointments.length === 0 ? (
-        <div className="text-center py-8 text-gray-400">
-          <p className="text-sm">No appointments today</p>
-          <Button
-            variant="roundedOutline"
-            className="mt-3"
-            onClick={() => onNavigate("/appointments")}
-          >
-            + Schedule one
-          </Button>
-        </div>
-      ) : (
-        <div className="divide-y divide-gray-100">
-          {appointments.map((appt) => {
-            const countdown = getCountdown(appt.start_time);
-            const isNext =
-              appt.appointment_type === "virtual" &&
-              appt.id === nextVirtual?.id;
+      </div>
+    );
+  }
 
-            return (
-              <div
-                key={appt.id}
-                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                {/* Avatar */}
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${avatarColor(appt.patient_name)}`}
+  if (appointments.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+        <h2 className="font-semibold text-gray-700 mb-3">Today's Schedule</h2>
+        <p className="text-gray-400 text-sm text-center py-6">No appointments scheduled for today.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+      <h2 className="font-semibold text-gray-700 mb-3">
+        Today's Schedule <span className="text-gray-400 font-normal text-sm">({appointments.length})</span>
+      </h2>
+      <div className="space-y-2">
+        {appointments.map((appt) => {
+          const mins = minutesUntil(appt.start_time);
+          const isNext = mins > 0 && mins <= 60;
+          const isPast = mins < 0;
+
+          return (
+            <div
+              key={appt.id}
+              className={`flex items-center gap-3 p-3 rounded-lg border ${
+                isNext ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-gray-50"
+              }`}
+            >
+              <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
+                {getInitials(appt.patient_first_name, appt.patient_last_name)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">
+                  {appt.patient_first_name} {appt.patient_last_name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {formatTime(appt.start_time)} – {formatTime(appt.end_time)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    appt.appointment_type === "virtual"
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-green-100 text-green-700"
+                  }`}
                 >
-                  {getInitials(appt.patient_name)}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {appt.patient_name}
-                  </p>
-                  <div className="flex gap-1 mt-0.5">
-                    {typeBadge(appt.appointment_type)}
-                    {statusBadge(appt.status)}
-                  </div>
-                </div>
-
-                {/* Time + action */}
-                <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-gray-500">
-                    {new Date(appt.start_time).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                  {countdown && (
-                    <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">
-                      {countdown}
-                    </span>
-                  )}
-                </div>
-
-                {/* Join button for next virtual */}
+                  {appt.appointment_type}
+                </span>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    appt.status === "confirmed"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
+                >
+                  {appt.status}
+                </span>
+                {isNext && appt.appointment_type === "virtual" && appt.meet_id && (
+                  <a
+                    href={`/calls/${appt.meet_id}`}
+                    className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full hover:bg-blue-700"
+                  >
+                    Join
+                  </a>
+                )}
                 {isNext && (
-                  <Button variant="rounded" onClick={joinCall} className="ml-1">
-                    <LucideVideo className="w-4 h-4" />
-                  </Button>
+                  <span className="text-xs text-blue-600 font-medium">in {mins}m</span>
+                )}
+                {isPast && (
+                  <span className="text-xs text-gray-400">done</span>
                 )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
-

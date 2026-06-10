@@ -20,11 +20,11 @@ export default function Appointments() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  // appointments Loading state
-  const [loading, setLoding] = useState(false);
-  // mock table data
-  const tableRows: { name: string; date: string; status: string }[] = [
-  ];
+
+  const [loading, setLoading] = useState(false);
+
+  const tableRows: { name: string; date: string; status: string }[] = [];
+
   const tableColumns: DatatableColumnHeader[] = [
     {
       name: "Patient Name",
@@ -49,9 +49,9 @@ export default function Appointments() {
         name: "Today",
         value: "pending",
         action: (filter) => {
-          setLoding(true);
+          setLoading(true);
           setTimeout(() => {
-            setLoding(false);
+            setLoading(false);
             updateQueryParams("filter", filter);
           }, 1000);
         },
@@ -60,9 +60,9 @@ export default function Appointments() {
         name: "Upcoming",
         value: "upcoming",
         action: (filter) => {
-          setLoding(true);
+          setLoading(true);
           setTimeout(() => {
-            setLoding(false);
+            setLoading(false);
             updateQueryParams("filter", filter);
           }, 1000);
         },
@@ -93,7 +93,7 @@ export default function Appointments() {
         name: "reschedule",
         action: () => {
           toast.error(
-            "An error occurred while rescheduling the appointment the appointment, please try again later",
+            "An error occurred while rescheduling the appointment, please try again later",
           );
         },
       },
@@ -117,11 +117,11 @@ export default function Appointments() {
           title="Add a new appointment"
           description="Create a new appointment"
           trigger={<p>New appointment</p>}
-          onSave={() =>
+          onSave={() => {
             toast.error(
               "An error occured while submitting your appointment. Please try again later",
-            )
-          }
+            );
+          }}
         >
           <div>
             <Tabs defaultValue="now">

@@ -1,29 +1,18 @@
 "use client";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@veridoctor/design/components";
-import {
   DataTable,
   DatatableActions,
   DatatableColumnHeader,
-  DatatableFilterTabs,
   DialogModal,
 } from "@veridoctor/design/shared";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export default function Appointments() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  // appointments Loading state
+export default function Branches() {
   const [loading, setLoading] = useState(false);
-  // mock table data
+
   const tableRows: { name: string; date: string; status: string }[] = [];
+
   const tableColumns: DatatableColumnHeader[] = [
     {
       name: "Branch name",
@@ -79,11 +68,11 @@ export default function Appointments() {
           title="Add branch"
           description="Create a new branch"
           trigger={<p>Add branch</p>}
-          onSave={() =>
+          onSave={() => {
             toast.error(
               "An error occured while creating the branch. Please try again later",
-            )
-          }
+            );
+          }}
         >
           <form>
             <label>Name</label>

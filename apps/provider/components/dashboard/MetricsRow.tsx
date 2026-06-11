@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { axiosClient } from "@veridoctor/api-client";
 import { useSelector } from "react-redux";
-import { RootState } from "../../store";
+import { RootState } from "../../app/store";
 
 interface MetricsData {
   total_patients: number;

@@ -20,42 +20,23 @@ export function MetricsRow() {
   const [todayCount, setTodayCount] = useState(0);
 
   useEffect(() => {
-    if (!identity?.id) return;
+    if (!identity) return;
     axiosClient
-      .get(`/provider/${identity.id}/stats`)
+      .get(`/provider/${identity}/stats`)
       .then((res) => setMetrics(res.data))
       .catch(() => {});
     axiosClient
-      .get(`/provider/${identity.id}/appointments?filter=today`)
+      .get(`/provider/${identity}/appointments?filter=today`)
       .then((res) => setTodayCount(res.data?.length ?? 0))
       .catch(() => {});
-  }, [identity?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity]);
 
   const cards = [
-    {
-      label: "Today's Appointments",
-      value: todayCount,
-      sub: "scheduled for today",
-      color: "bg-blue-50 text-blue-700",
-    },
-    {
-      label: "This Week",
-      value: metrics.weekly_count,
-      sub: "consultations this week",
-      color: "bg-green-50 text-green-700",
-    },
-    {
-      label: "Total Patients",
-      value: metrics.total_patients,
-      sub: "patients served",
-      color: "bg-purple-50 text-purple-700",
-    },
-    {
-      label: "Avg. Duration",
-      value: `${metrics.avg_duration || 30}m`,
-      sub: "per consultation",
-      color: "bg-orange-50 text-orange-700",
-    },
+    { label: "Today's Appointments", value: todayCount, sub: "scheduled for today", color: "bg-blue-50 text-blue-700" },
+    { label: "This Week", value: metrics.weekly_count, sub: "consultations this week", color: "bg-green-50 text-green-700" },
+    { label: "Total Patients", value: metrics.total_patients, sub: "patients served", color: "bg-purple-50 text-purple-700" },
+    { label: "Avg. Duration", value: `${metrics.avg_duration || 30}m`, sub: "per consultation", color: "bg-orange-50 text-orange-700" },
   ];
 
   return (

@@ -1,7 +1,6 @@
 "use client";
 
 import { axiosClient } from "@veridoctor/api-client";
-import { Button } from "@veridoctor/design/components";
 import {
   DataTable,
   DatatableColumnHeader,

@@ -1,6 +1,4 @@
 "use client";
-// updated
-
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, Suspense } from "react";
 import { useDispatch } from "react-redux";
@@ -16,6 +14,7 @@ function HomeContent() {
     dispatch(setAuthCode(searchParams.get("auth_tkn")));
     dispatch(setUserId(searchParams.get("identity")));
     router.push("/dashboard");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <PageLoader />;

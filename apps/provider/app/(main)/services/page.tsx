@@ -38,6 +38,7 @@ export default function Services() {
 
   useEffect(() => {
     if (userId) fetchServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   useEffect(() => {
@@ -106,7 +107,6 @@ export default function Services() {
 
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
-      {/* Delete confirmation dialog */}
       {deletingService && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
@@ -120,7 +120,6 @@ export default function Services() {
         </div>
       )}
 
-      {/* Edit modal */}
       {showEditModal && editingService && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -192,7 +191,6 @@ export default function Services() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {services.map((service) => (
           <div key={service.id} className="border border-gray-200 rounded-lg p-4 relative">
-            {/* 3-dot menu */}
             <div className="absolute top-3 right-3" ref={openMenuId === service.id ? menuRef : null}>
               <button
                 onClick={() => setOpenMenuId(openMenuId === service.id ? null : service.id)}

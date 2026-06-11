@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { axiosClient } from "@veridoctor/api-client";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import { RootState } from "../../store";
+import { RootState } from "../../app/store";
 
 interface Appointment {
   id: string;

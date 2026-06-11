@@ -97,13 +97,14 @@ export function TodaySchedule() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!identity?.id) return;
+    if (!identity) return;
     axiosClient
-      .get("/provider/" + identity.id + "/appointments?filter=today")
+      .get("/provider/" + identity + "/appointments?filter=today")
       .then((res) => setAppointments(res.data ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [identity?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity]);
 
   if (loading) {
     return (

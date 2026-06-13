@@ -7,13 +7,14 @@ import { axiosClient } from "@veridoctor/api-client";
 import { toast } from "sonner";
 import {
   LucideCalendarCheck,
-  LucideUser,
   LucidePhone,
   LucideMail,
   LucideVideo,
   LucideMapPin,
   LucideClipboardPen,
   LucideChevronDown,
+  LucideFileText,
+  LucideHistory,
 } from "@veridoctor/design/icons";
 
 type Appointment = {
@@ -36,6 +37,18 @@ type Form = {
   created_at: string;
 };
 
+type Capture = {
+  id: string;
+  form_name: string;
+  created_at: string;
+};
+
+type PatientAppointment = {
+  id: string;
+  start_time: string;
+  status: string;
+};
+
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -43,8 +56,9 @@ export default function AppointmentDetailPage() {
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showFormPicker, setShowFormPicker] = useState(false);
   const [selectedFormId, setSelectedFormId] = useState<string>("");
+  const [cancelling, setCancelling] = useState(false);
+  const [activeTab, setActiveTab] = useState<"details" | "records">("details");
 
   useEffect(() => {
     if (!userId || !id) return;
@@ -69,9 +83,25 @@ export default function AppointmentDetailPage() {
     router.push(`/appointments/${id}/capture?form=${selectedFormId}`);
   };
 
-  // Check if a draft already exists for this appointment
+  const handleCancel = async () => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    setCancelling(true);
+    try {
+      await axiosClient.patch(`provider/${userId}/appointments/${id}`, {
+        status: "cancelled",
+      });
+      toast.success("Appointment cancelled");
+      setAppointment((prev) => prev ? { ...prev, status: "cancelled" } : prev);
+    } catch {
+      toast.error("Could not cancel appointment");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const draftKey = `vd_capture_${id}`;
-  const hasDraft = typeof window !== "undefined" && !!localStorage.getItem(draftKey);
+  const hasDraft =
+    typeof window !== "undefined" && !!localStorage.getItem(draftKey);
 
   if (loading) {
     return (
@@ -86,7 +116,12 @@ export default function AppointmentDetailPage() {
     return (
       <div className="p-6 mx-4">
         <p className="text-gray-500">Appointment not found.</p>
-        <button onClick={() => router.push("/appointments")} className="mt-4 text-blue-600 text-sm hover:underline">← Back to appointments</button>
+        <button
+          onClick={() => router.push("/appointments")}
+          className="mt-4 text-blue-600 text-sm hover:underline"
+        >
+          ← Back to appointments
+        </button>
       </div>
     );
   }
@@ -95,6 +130,7 @@ export default function AppointmentDetailPage() {
   const endTime = new Date(appointment.end_time);
   const isToday = startTime.toDateString() === new Date().toDateString();
   const isPast = startTime < new Date();
+  const isCancelled = appointment.status === "cancelled";
 
   return (
     <div className="p-4 mx-4 space-y-4 max-w-3xl">
@@ -111,33 +147,47 @@ export default function AppointmentDetailPage() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold shrink-0">
-              {appointment.patient_first_name?.[0]}{appointment.patient_last_name?.[0]}
+              {appointment.patient_first_name?.[0]}
+              {appointment.patient_last_name?.[0]}
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-800">
                 {appointment.patient_first_name} {appointment.patient_last_name}
               </h1>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${
-                appointment.status === "confirmed"
-                  ? "bg-green-100 text-green-700"
-                  : appointment.status === "cancelled"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${
+                  appointment.status === "confirmed"
+                    ? "bg-green-100 text-green-700"
+                    : appointment.status === "cancelled"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-yellow-100 text-yellow-700"
+                }`}
+              >
                 {appointment.status}
               </span>
             </div>
           </div>
 
-          {/* Start Consultation CTA */}
+          {/* Actions */}
           <div className="flex flex-col items-end gap-2">
             {hasDraft && (
               <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
                 📝 Draft saved — click to resume
               </span>
             )}
-            <div className="flex items-center gap-2">
-              {/* Form selector */}
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {/* Cancel button — only for non-cancelled, non-past */}
+              {!isCancelled && !isPast && (
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {cancelling ? "Cancelling…" : "Cancel appointment"}
+                </button>
+              )}
+
+              {/* Form selector + capture */}
               <div className="relative">
                 <select
                   value={selectedFormId}
@@ -148,11 +198,16 @@ export default function AppointmentDetailPage() {
                     <option value="">No forms available</option>
                   ) : (
                     forms.map((f) => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
                     ))
                   )}
                 </select>
-                <LucideChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <LucideChevronDown
+                  size={14}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                />
               </div>
               <button
                 onClick={handleStartCapture}
@@ -175,83 +230,181 @@ export default function AppointmentDetailPage() {
         </div>
       </div>
 
-      {/* Appointment details */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
-        <h2 className="font-semibold text-gray-700">Appointment Details</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex items-start gap-3">
-            <LucideCalendarCheck size={16} className="text-blue-500 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Date</p>
-              <p className="text-sm text-gray-700 font-medium">
-                {startTime.toLocaleDateString("en-KE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-              </p>
-              {isToday && <span className="text-xs text-green-600 font-medium">Today</span>}
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <LucideCalendarCheck size={16} className="text-blue-500 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Time</p>
-              <p className="text-sm text-gray-700 font-medium">
-                {startTime.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })} –{" "}
-                {endTime.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            {appointment.appointment_type === "virtual" ? (
-              <LucideVideo size={16} className="text-indigo-500 mt-0.5 shrink-0" />
-            ) : (
-              <LucideMapPin size={16} className="text-green-500 mt-0.5 shrink-0" />
-            )}
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Type</p>
-              <p className="text-sm text-gray-700 font-medium capitalize">{appointment.appointment_type}</p>
-            </div>
-          </div>
-          {appointment.appointment_type === "virtual" && appointment.meet_id && (
-            <div className="flex items-start gap-3">
-              <LucideVideo size={16} className="text-indigo-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide">Call</p>
-                <button
-                  onClick={() => router.push(`/calls/${appointment.meet_id}`)}
-                  className="text-sm text-blue-600 hover:underline font-medium"
-                >
-                  Join video call →
-                </button>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setActiveTab("details")}
+          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${
+            activeTab === "details"
+              ? "bg-white text-gray-800 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Details
+        </button>
+        <button
+          onClick={() => setActiveTab("records")}
+          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${
+            activeTab === "records"
+              ? "bg-white text-gray-800 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Medical Records
+        </button>
+      </div>
+
+      {activeTab === "details" && (
+        <>
+          {/* Appointment details */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
+            <h2 className="font-semibold text-gray-700">Appointment Details</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-start gap-3">
+                <LucideCalendarCheck
+                  size={16}
+                  className="text-blue-500 mt-0.5 shrink-0"
+                />
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">
+                    Date
+                  </p>
+                  <p className="text-sm text-gray-700 font-medium">
+                    {startTime.toLocaleDateString("en-KE", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                  {isToday && (
+                    <span className="text-xs text-green-600 font-medium">
+                      Today
+                    </span>
+                  )}
+                </div>
               </div>
+              <div className="flex items-start gap-3">
+                <LucideCalendarCheck
+                  size={16}
+                  className="text-blue-500 mt-0.5 shrink-0"
+                />
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">
+                    Time
+                  </p>
+                  <p className="text-sm text-gray-700 font-medium">
+                    {startTime.toLocaleTimeString("en-KE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    –{" "}
+                    {endTime.toLocaleTimeString("en-KE", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                {appointment.appointment_type === "virtual" ? (
+                  <LucideVideo
+                    size={16}
+                    className="text-indigo-500 mt-0.5 shrink-0"
+                  />
+                ) : (
+                  <LucideMapPin
+                    size={16}
+                    className="text-green-500 mt-0.5 shrink-0"
+                  />
+                )}
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">
+                    Type
+                  </p>
+                  <p className="text-sm text-gray-700 font-medium capitalize">
+                    {appointment.appointment_type}
+                  </p>
+                </div>
+              </div>
+              {appointment.appointment_type === "virtual" &&
+                appointment.meet_id && (
+                  <div className="flex items-start gap-3">
+                    <LucideVideo
+                      size={16}
+                      className="text-indigo-500 mt-0.5 shrink-0"
+                    />
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide">
+                        Call
+                      </p>
+                      <button
+                        onClick={() =>
+                          router.push(`/calls/${appointment.meet_id}`)
+                        }
+                        className="text-sm text-blue-600 hover:underline font-medium"
+                      >
+                        Join video call →
+                      </button>
+                    </div>
+                  </div>
+                )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Patient contact */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
-        <h2 className="font-semibold text-gray-700">Patient Contact</h2>
-        {appointment.patient_email && (
-          <div className="flex items-center gap-3">
-            <LucideMail size={15} className="text-gray-400 shrink-0" />
-            <span className="text-sm text-gray-700">{appointment.patient_email}</span>
           </div>
-        )}
-        {appointment.patient_phone_number && (
-          <div className="flex items-center gap-3">
-            <LucidePhone size={15} className="text-gray-400 shrink-0" />
-            <span className="text-sm text-gray-700">{appointment.patient_phone_number}</span>
-          </div>
-        )}
-      </div>
 
-      {/* Past captures for this appointment */}
-      <PastCaptures appointmentId={id} userId={userId} router={router} />
+          {/* Patient contact */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <h2 className="font-semibold text-gray-700">Patient Contact</h2>
+            {appointment.patient_email && (
+              <div className="flex items-center gap-3">
+                <LucideMail size={15} className="text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-700">
+                  {appointment.patient_email}
+                </span>
+              </div>
+            )}
+            {appointment.patient_phone_number && (
+              <div className="flex items-center gap-3">
+                <LucidePhone size={15} className="text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-700">
+                  {appointment.patient_phone_number}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Captures for this appointment */}
+          <PastCaptures
+            appointmentId={id}
+            userId={userId}
+            router={router}
+          />
+        </>
+      )}
+
+      {activeTab === "records" && appointment.patient_email && (
+        <MedicalRecords
+          patientEmail={appointment.patient_email}
+          patientName={`${appointment.patient_first_name} ${appointment.patient_last_name}`}
+          userId={userId}
+          router={router}
+        />
+      )}
     </div>
   );
 }
 
-function PastCaptures({ appointmentId, userId, router }: { appointmentId: string; userId: string | null; router: ReturnType<typeof useRouter> }) {
-  const [captures, setCaptures] = useState<{ id: string; form_name: string; created_at: string }[]>([]);
+// ─── Captures for this specific appointment ───────────────────────────────────
+function PastCaptures({
+  appointmentId,
+  userId,
+  router,
+}: {
+  appointmentId: string;
+  userId: string | null;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const [captures, setCaptures] = useState<Capture[]>([]);
 
   useEffect(() => {
     if (!userId || !appointmentId) return;
@@ -265,19 +418,26 @@ function PastCaptures({ appointmentId, userId, router }: { appointmentId: string
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
-      <h2 className="font-semibold text-gray-700">Previous Captures</h2>
+      <h2 className="font-semibold text-gray-700">Captures for this appointment</h2>
       <div className="space-y-2">
         {captures.map((c) => (
           <div
             key={c.id}
             className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
           >
-            <div>
-              <p className="text-sm font-medium text-gray-700">{c.form_name}</p>
-              <p className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString("en-KE")}</p>
+            <div className="flex items-center gap-3">
+              <LucideFileText size={15} className="text-blue-400 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-gray-700">{c.form_name}</p>
+                <p className="text-xs text-gray-400">
+                  {new Date(c.created_at).toLocaleString("en-KE")}
+                </p>
+              </div>
             </div>
             <button
-              onClick={() => router.push(`/appointments/${appointmentId}/capture/${c.id}`)}
+              onClick={() =>
+                router.push(`/appointments/${appointmentId}/capture/${c.id}`)
+              }
               className="text-xs text-blue-600 hover:underline"
             >
               View →
@@ -285,6 +445,157 @@ function PastCaptures({ appointmentId, userId, router }: { appointmentId: string
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ─── Full medical records for this patient across all appointments ─────────────
+function MedicalRecords({
+  patientEmail,
+  patientName,
+  userId,
+  router,
+}: {
+  patientEmail: string;
+  patientName: string;
+  userId: string | null;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const [records, setRecords] = useState
+    { appointment: PatientAppointment; captures: Capture[] }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId || !patientEmail) return;
+
+    // 1. Fetch all past appointments for this patient from this provider
+    axiosClient
+      .get(`provider/${userId}/appointments?filter=past`)
+      .then(async (res) => {
+        const allAppts: Appointment[] = res.data ?? [];
+        const patientAppts = allAppts.filter(
+          (a) => a.patient_email === patientEmail
+        );
+
+        // 2. For each appointment fetch its captures
+        const withCaptures = await Promise.all(
+          patientAppts.map(async (appt) => {
+            try {
+              const capRes = await axiosClient.get(
+                `provider/${userId}/appointments/${appt.id}/captures`
+              );
+              return {
+                appointment: appt,
+                captures: capRes.data ?? [],
+              };
+            } catch {
+              return { appointment: appt, captures: [] };
+            }
+          })
+        );
+
+        // Only show appointments that have captures
+        setRecords(withCaptures.filter((r) => r.captures.length > 0));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [userId, patientEmail]);
+
+  if (loading) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-20 bg-gray-100 rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (records.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+        <LucideHistory size={32} className="text-gray-300 mx-auto mb-3" />
+        <p className="text-sm text-gray-500">
+          No medical records found for {patientName}.
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Records appear here after appointment captures are saved.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-gray-500">
+        Showing all recorded visits for{" "}
+        <span className="font-medium text-gray-700">{patientName}</span>
+      </p>
+      {records.map(({ appointment, captures }) => (
+        <div
+          key={appointment.id}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-700">
+                {new Date(appointment.start_time).toLocaleDateString("en-KE", {
+                  weekday: "short",
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  appointment.status === "confirmed"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                {appointment.status}
+              </span>
+            </div>
+            <button
+              onClick={() => router.push(`/appointments/${appointment.id}`)}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              View appointment →
+            </button>
+          </div>
+          <div className="space-y-2">
+            {captures.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
+              >
+                <div className="flex items-center gap-3">
+                  <LucideFileText size={14} className="text-blue-400 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">
+                      {c.form_name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(c.created_at).toLocaleString("en-KE")}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() =>
+                    router.push(
+                      `/appointments/${appointment.id}/capture/${c.id}`
+                    )
+                  }
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  View →
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

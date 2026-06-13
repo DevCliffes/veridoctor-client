@@ -1,5 +1,4 @@
 "use client";
-
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ChevronDown,
@@ -22,7 +21,6 @@ import {
   TokenPayload,
   TopNav,
 } from "@veridoctor/design/shared";
-import { usePathname } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +32,7 @@ import {
   setAccessToken,
   setRefreshToken,
 } from "@veridoctor/store";
+import { usePathname } from "next/navigation";
 
 export default function MainAppLayout({
   children,
@@ -45,47 +44,21 @@ export default function MainAppLayout({
     (store) => store.auth,
   );
   const dispatch = useAppDispatch();
+
   const authInfo = {
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
   };
+
   const navItems: navITem[] = [
-    {
-      linkTo: "/dashboard",
-      name: "Dashboard",
-      icon: <LayoutDashboard />,
-    },
-    {
-      linkTo: "/appointments",
-      icon: <LucideCalendarCheck />,
-      name: "Appointments",
-    },
-    {
-      linkTo: "/calls",
-      icon: <Video />,
-      name: "Calls",
-    },
-    {
-      linkTo: "/schedule",
-      icon: <LucideClipboardClock />,
-      name: "Schedule",
-    },
-    {
-      linkTo: "/services",
-      icon: <LucideStethoscope />,
-      name: "Services",
-    },
-    {
-      linkTo: "/forms",
-      icon: <LucideClipboardPen />,
-      name: "Form studio",
-    },
-    {
-      linkTo: "/settings",
-      icon: <LucideCog />,
-      name: "Settings",
-    },
+    { linkTo: "/dashboard", name: "Dashboard", icon: <LayoutDashboard /> },
+    { linkTo: "/appointments", icon: <LucideCalendarCheck />, name: "Appointments" },
+    { linkTo: "/calls", icon: <Video />, name: "Calls" },
+    { linkTo: "/schedule", icon: <LucideClipboardClock />, name: "Schedule" },
+    { linkTo: "/services", icon: <LucideStethoscope />, name: "Services" },
+    { linkTo: "/forms", icon: <LucideClipboardPen />, name: "Form studio" },
+    { linkTo: "/settings", icon: <LucideCog />, name: "Settings" },
   ];
 
   const setAuthInfo = (token: TokenPayload) => {
@@ -100,11 +73,10 @@ export default function MainAppLayout({
       setAuthInfo={(token) => setAuthInfo(token)}
     >
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
-        {/* get user name from the state */}
         <TopNav center={<p>Dr. John Doe</p>} right={<ProfileDropdown />} />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
-          <div className="w-full overflow-y-scroll bg-netral-100 p-1">
+          <div className="w-full overflow-y-scroll bg-neutral-100 p-1">
             {children}
           </div>
         </div>
@@ -122,17 +94,12 @@ function ProfileDropdown() {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem className="cursor-pointer">
-          <a
-            className="flex gap-2"
-            href="http://localhost:3000/auth/accounts/94023355-9431-48e5-bcb1-2cf5d9dbe7a0"
-          >
-            <LucideUser />
-            <p>Profile</p>
-          </a>
+          <LucideUser />
+          <p>Profile</p>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">
           <LucideBookUser />
-          <p>accounts</p>
+          <p>Accounts</p>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">
           <LucideLogOut />

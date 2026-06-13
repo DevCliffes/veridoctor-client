@@ -43,10 +43,9 @@ type Capture = {
   created_at: string;
 };
 
-type PatientAppointment = {
-  id: string;
-  start_time: string;
-  status: string;
+type RecordEntry = {
+  appointment: Appointment;
+  captures: Capture[];
 };
 
 export default function AppointmentDetailPage() {
@@ -91,7 +90,9 @@ export default function AppointmentDetailPage() {
         status: "cancelled",
       });
       toast.success("Appointment cancelled");
-      setAppointment((prev) => prev ? { ...prev, status: "cancelled" } : prev);
+      setAppointment((prev) =>
+        prev ? { ...prev, status: "cancelled" } : prev
+      );
     } catch {
       toast.error("Could not cancel appointment");
     } finally {
@@ -176,7 +177,6 @@ export default function AppointmentDetailPage() {
               </span>
             )}
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              {/* Cancel button — only for non-cancelled, non-past */}
               {!isCancelled && !isPast && (
                 <button
                   onClick={handleCancel}
@@ -186,8 +186,6 @@ export default function AppointmentDetailPage() {
                   {cancelling ? "Cancelling…" : "Cancel appointment"}
                 </button>
               )}
-
-              {/* Form selector + capture */}
               <div className="relative">
                 <select
                   value={selectedFormId}
@@ -418,7 +416,9 @@ function PastCaptures({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
-      <h2 className="font-semibold text-gray-700">Captures for this appointment</h2>
+      <h2 className="font-semibold text-gray-700">
+        Captures for this appointment
+      </h2>
       <div className="space-y-2">
         {captures.map((c) => (
           <div
@@ -428,7 +428,9 @@ function PastCaptures({
             <div className="flex items-center gap-3">
               <LucideFileText size={15} className="text-blue-400 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-gray-700">{c.form_name}</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {c.form_name}
+                </p>
                 <p className="text-xs text-gray-400">
                   {new Date(c.created_at).toLocaleString("en-KE")}
                 </p>
@@ -436,7 +438,9 @@ function PastCaptures({
             </div>
             <button
               onClick={() =>
-                router.push(`/appointments/${appointmentId}/capture/${c.id}`)
+                router.push(
+                  `/appointments/${appointmentId}/capture/${c.id}`
+                )
               }
               className="text-xs text-blue-600 hover:underline"
             >
@@ -461,15 +465,12 @@ function MedicalRecords({
   userId: string | null;
   router: ReturnType<typeof useRouter>;
 }) {
-  const [records, setRecords] = useState
-    { appointment: PatientAppointment; captures: Capture[] }[]
-  >([]);
+  const [records, setRecords] = useState<RecordEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!userId || !patientEmail) return;
 
-    // 1. Fetch all past appointments for this patient from this provider
     axiosClient
       .get(`provider/${userId}/appointments?filter=past`)
       .then(async (res) => {
@@ -478,7 +479,6 @@ function MedicalRecords({
           (a) => a.patient_email === patientEmail
         );
 
-        // 2. For each appointment fetch its captures
         const withCaptures = await Promise.all(
           patientAppts.map(async (appt) => {
             try {
@@ -487,15 +487,14 @@ function MedicalRecords({
               );
               return {
                 appointment: appt,
-                captures: capRes.data ?? [],
+                captures: (capRes.data ?? []) as Capture[],
               };
             } catch {
-              return { appointment: appt, captures: [] };
+              return { appointment: appt, captures: [] as Capture[] };
             }
           })
         );
 
-        // Only show appointments that have captures
         setRecords(withCaptures.filter((r) => r.captures.length > 0));
       })
       .catch(() => {})
@@ -571,7 +570,10 @@ function MedicalRecords({
                 className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
               >
                 <div className="flex items-center gap-3">
-                  <LucideFileText size={14} className="text-blue-400 shrink-0" />
+                  <LucideFileText
+                    size={14}
+                    className="text-blue-400 shrink-0"
+                  />
                   <div>
                     <p className="text-sm font-medium text-gray-700">
                       {c.form_name}

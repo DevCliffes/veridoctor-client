@@ -29,7 +29,7 @@ type Form = {
 
 type FieldValues = Record<string, string | boolean>;
 
-const AUTOSAVE_INTERVAL = 5000; // 5 seconds
+const AUTOSAVE_INTERVAL = 5000;
 
 export default function CapturePage() {
   const { id: appointmentId } = useParams<{ id: string }>();
@@ -48,7 +48,6 @@ export default function CapturePage() {
   const draftKey = `vd_capture_${appointmentId}`;
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load form and restore any draft
   useEffect(() => {
     if (!userId || !formId) return;
     axiosClient
@@ -56,8 +55,6 @@ export default function CapturePage() {
       .then((res) => {
         setForm(res.data);
         setActiveSection(res.data.sections?.[0]?.id ?? "");
-
-        // Restore draft from localStorage
         try {
           const raw = localStorage.getItem(draftKey);
           if (raw) {
@@ -68,7 +65,7 @@ export default function CapturePage() {
             }
           }
         } catch {
-          // ignore corrupt drafts
+          // ignore
         }
       })
       .catch(() => toast.error("Could not load form"))
@@ -76,36 +73,37 @@ export default function CapturePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, formId]);
 
-  // Auto-save to localStorage whenever values change
-  const saveDraft = useCallback((currentValues: FieldValues) => {
-    try {
-      localStorage.setItem(draftKey, JSON.stringify({
-        formId,
-        appointmentId,
-        values: currentValues,
-        savedAt: new Date().toISOString(),
-      }));
-      setLastSaved(new Date());
-      setSaveStatus("saved");
-    } catch {
-      // ignore
-    }
-  }, [draftKey, formId, appointmentId]);
+  const saveDraft = useCallback(
+    (currentValues: FieldValues) => {
+      try {
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            formId,
+            appointmentId,
+            values: currentValues,
+            savedAt: new Date().toISOString(),
+          })
+        );
+        setLastSaved(new Date());
+        setSaveStatus("saved");
+      } catch {
+        // ignore
+      }
+    },
+    [draftKey, formId, appointmentId]
+  );
 
   const handleChange = (fieldId: string, value: string | boolean) => {
     setValues((prev) => {
       const next = { ...prev, [fieldId]: value };
-
-      // Debounced localStorage save
       setSaveStatus("saving");
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => saveDraft(next), AUTOSAVE_INTERVAL);
-
       return next;
     });
   };
 
-  // Also save on visibility change (tab close / switch)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
@@ -113,10 +111,10 @@ export default function CapturePage() {
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [values, saveDraft]);
 
-  // Validate required fields
   const validate = () => {
     if (!form) return false;
     for (const section of form.sections) {
@@ -135,11 +133,14 @@ export default function CapturePage() {
     if (!validate()) return;
     setSaving(true);
     try {
-      await axiosClient.post(`provider/${userId}/appointments/${appointmentId}/captures`, {
-        form_id: formId,
-        values,
-      });
-      // Clear draft on successful submit
+      await axiosClient.post(
+        `provider/${userId}/appointments/${appointmentId}/captures`,
+        {
+          form_id: formId,
+          form_name: form?.name ?? "",
+          values,
+        }
+      );
       localStorage.removeItem(draftKey);
       toast.success("Capture saved successfully!");
       router.push(`/appointments/${appointmentId}`);
@@ -163,30 +164,45 @@ export default function CapturePage() {
     return (
       <div className="p-6">
         <p className="text-gray-500">Form not found.</p>
-        <button onClick={() => router.back()} className="mt-3 text-blue-600 text-sm hover:underline">← Go back</button>
+        <button
+          onClick={() => router.back()}
+          className="mt-3 text-blue-600 text-sm hover:underline"
+        >
+          ← Go back
+        </button>
       </div>
     );
   }
 
   const completedFields = Object.keys(values).filter((k) => !!values[k]).length;
-  const totalFields = form.sections.reduce((acc, s) => acc + s.fields.length, 0);
-  const progressPct = totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
+  const totalFields = form.sections.reduce(
+    (acc, s) => acc + s.fields.length,
+    0
+  );
+  const progressPct =
+    totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Sticky header */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={() => router.back()} className="text-gray-500 hover:text-gray-700 shrink-0">←</button>
+          <button
+            onClick={() => router.back()}
+            className="text-gray-500 hover:text-gray-700 shrink-0"
+          >
+            ←
+          </button>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-800 truncate">{form.name}</p>
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {form.name}
+            </p>
             <p className="text-xs text-gray-400">
               {completedFields}/{totalFields} fields filled
             </p>
           </div>
         </div>
 
-        {/* Save status */}
         <div className="flex items-center gap-3 shrink-0">
           {saveStatus === "saving" && (
             <span className="text-xs text-gray-400 flex items-center gap-1">
@@ -195,7 +211,11 @@ export default function CapturePage() {
           )}
           {saveStatus === "saved" && lastSaved && (
             <span className="text-xs text-green-600 flex items-center gap-1">
-              <LucideCheckCircle size={12} /> Saved {lastSaved.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
+              <LucideCheckCircle size={12} /> Draft saved{" "}
+              {lastSaved.toLocaleTimeString("en-KE", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
           )}
           {saveStatus === "error" && (
@@ -206,7 +226,11 @@ export default function CapturePage() {
             disabled={saving}
             className="flex items-center gap-1.5 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-60 font-medium"
           >
-            {saving ? <LucideLoader2 size={14} className="animate-spin" /> : <LucideSave size={14} />}
+            {saving ? (
+              <LucideLoader2 size={14} className="animate-spin" />
+            ) : (
+              <LucideSave size={14} />
+            )}
             {saving ? "Saving…" : "Submit"}
           </button>
         </div>
@@ -221,17 +245,21 @@ export default function CapturePage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-6 flex gap-6">
-        {/* Section nav — desktop sidebar */}
+        {/* Section nav sidebar */}
         <nav className="hidden lg:flex flex-col gap-1 w-48 shrink-0 sticky top-24 self-start">
           {form.sections.map((section, idx) => {
-            const filledInSection = section.fields.filter((f) => !!values[f.id]).length;
+            const filledInSection = section.fields.filter(
+              (f) => !!values[f.id]
+            ).length;
             const isActive = activeSection === section.id;
             return (
               <button
                 key={section.id}
                 onClick={() => {
                   setActiveSection(section.id);
-                  document.getElementById(`section-${section.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  document
+                    .getElementById(`section-${section.id}`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
                 className={`text-left text-sm px-3 py-2 rounded-lg transition-colors ${
                   isActive
@@ -240,9 +268,13 @@ export default function CapturePage() {
                 }`}
               >
                 <span className="flex items-center justify-between">
-                  <span className="truncate">{idx + 1}. {section.title}</span>
+                  <span className="truncate">
+                    {idx + 1}. {section.title}
+                  </span>
                   {filledInSection > 0 && (
-                    <span className="text-xs text-gray-400 ml-1">{filledInSection}/{section.fields.length}</span>
+                    <span className="text-xs text-gray-400 ml-1">
+                      {filledInSection}/{section.fields.length}
+                    </span>
                   )}
                 </span>
               </button>
@@ -259,9 +291,12 @@ export default function CapturePage() {
               className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-24"
             >
               <div className="bg-gray-50 border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 className="font-semibold text-gray-800 text-sm">{section.title}</h2>
+                <h2 className="font-semibold text-gray-800 text-sm">
+                  {section.title}
+                </h2>
                 <span className="text-xs text-gray-400">
-                  {section.fields.filter((f) => !!values[f.id]).length}/{section.fields.length}
+                  {section.fields.filter((f) => !!values[f.id]).length}/
+                  {section.fields.length}
                 </span>
               </div>
               <div className="p-5 flex flex-col gap-4">
@@ -277,13 +312,16 @@ export default function CapturePage() {
             </div>
           ))}
 
-          {/* Submit button — bottom */}
           <button
             onClick={handleSubmit}
             disabled={saving}
             className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            {saving ? <LucideLoader2 size={16} className="animate-spin" /> : <LucideCheckCircle size={16} />}
+            {saving ? (
+              <LucideLoader2 size={16} className="animate-spin" />
+            ) : (
+              <LucideCheckCircle size={16} />
+            )}
             {saving ? "Saving…" : "Submit Capture"}
           </button>
         </div>
@@ -301,7 +339,8 @@ function FieldInput({
   value: string | boolean | undefined;
   onChange: (val: string | boolean) => void;
 }) {
-  const base = "w-full p-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50 focus:bg-white transition-colors";
+  const base =
+    "w-full p-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50 focus:bg-white transition-colors";
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -362,7 +401,9 @@ function FieldInput({
         >
           <option value="">Select…</option>
           {field.options?.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
           ))}
         </select>
       )}

@@ -9,9 +9,11 @@ import {
   LucideClipboardClock,
   LucideClipboardPen,
   LucideCog,
+  LucideFileText,
   LucideLogOut,
   LucideStethoscope,
   LucideUser,
+  LucideUsers,
   Video,
 } from "@veridoctor/design/icons";
 import {
@@ -54,9 +56,11 @@ export default function MainAppLayout({
   const navItems: navITem[] = [
     { linkTo: "/dashboard", name: "Dashboard", icon: <LayoutDashboard /> },
     { linkTo: "/appointments", icon: <LucideCalendarCheck />, name: "Appointments" },
+    { linkTo: "/patients", icon: <LucideUsers />, name: "Patients" },
     { linkTo: "/calls", icon: <Video />, name: "Calls" },
     { linkTo: "/schedule", icon: <LucideClipboardClock />, name: "Schedule" },
     { linkTo: "/services", icon: <LucideStethoscope />, name: "Services" },
+    { linkTo: "/prescriptions", icon: <LucideFileText />, name: "Prescriptions" },
     { linkTo: "/forms", icon: <LucideClipboardPen />, name: "Form studio" },
     { linkTo: "/settings", icon: <LucideCog />, name: "Settings" },
   ];

@@ -1,5 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store";
+import { axiosClient } from "@veridoctor/api-client";
 import { Button } from "@veridoctor/design/components";
 import { LucidePlus } from "@veridoctor/design/icons";
 import { MetricsRow } from "../../../components/dashboard/MetricsRow";
@@ -7,19 +11,42 @@ import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
 import { PendingActions } from "../../../components/dashboard/PendingActions";
 import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
 
+interface ProviderProfile {
+  first_name: string;
+  last_name: string;
+  title?: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
+  const identity = useSelector((state: RootState) => state.auth.identity);
+  const [profile, setProfile] = useState<ProviderProfile | null>(null);
 
   const now = new Date();
   const hour = now.getHours();
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
+  useEffect(() => {
+    if (!identity) return;
+    axiosClient
+      .get(`provider/${identity}/profile`)
+      .then((res) => setProfile(res.data))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity]);
+
+  const providerName = profile
+    ? `${profile.title ? profile.title + " " : ""}${profile.first_name} ${profile.last_name}`
+    : "";
+
   return (
     <div className="p-4 mx-4 space-y-6">
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
-          <p className="text-xl font-bold">{greeting} 👋</p>
+          <p className="text-xl font-bold">
+            {greeting}{providerName ? ` ${providerName}` : ""} 👋
+          </p>
           <p className="text-gray-500 text-sm">
             {now.toLocaleDateString("en-US", {
               weekday: "long",
@@ -29,21 +56,11 @@ export default function Dashboard() {
             })}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="roundedOutline"
-            onClick={() => router.push("/appointments?appointment_type=virtual")}
-          >
-            New virtual
-          </Button>
-          <Button onClick={() => router.push("/appointments")}>
-            <LucidePlus /> New appointment
-          </Button>
-        </div>
+        <Button onClick={() => router.push("/appointments")}>
+          <LucidePlus /> New appointment
+        </Button>
       </div>
-
       <MetricsRow />
-
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           <TodaySchedule />
@@ -57,9 +74,9 @@ export default function Dashboard() {
             </p>
             {[
               { label: "View services", path: "/services" },
-              { label: "Patient records", path: "/patients" },
+              { label: "Patient records", path: "/appointments?filter=past" },
               { label: "My forms", path: "/forms" },
-              { label: "Prescriptions", path: "/forms" },
+              { label: "Prescriptions", path: "/prescriptions" },
             ].map((item) => (
               <button
                 key={item.path + item.label}

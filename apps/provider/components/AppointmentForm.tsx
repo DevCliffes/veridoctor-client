@@ -7,6 +7,7 @@ export type AppointmentFormValues = {
   patient_email: string;
   date: string;
   time: string;
+  duration: number;
   message: string;
   appointment_type: "virtual" | "physical";
 };
@@ -17,12 +18,21 @@ type AppointmentFormProps = {
   setValues: Dispatch<SetStateAction<AppointmentFormValues>>;
 };
 
+const DURATIONS = [
+  { label: "15 minutes", value: 15 },
+  { label: "30 minutes", value: 30 },
+  { label: "45 minutes", value: 45 },
+  { label: "1 hour", value: 60 },
+  { label: "1.5 hours", value: 90 },
+  { label: "2 hours", value: 120 },
+];
+
 export default function AppointmentForm({
   time,
   values,
   setValues,
 }: AppointmentFormProps) {
-  const updateValue = (name: keyof AppointmentFormValues, value: string) => {
+  const updateValue = (name: keyof AppointmentFormValues, value: string | number) => {
     setValues((current) => ({ ...current, [name]: value }));
   };
 
@@ -35,10 +45,8 @@ export default function AppointmentForm({
             className="w-full p-2 border border-gray-300 rounded"
             placeholder="John"
             value={values.patient_first_name}
-            onChange={(event) =>
-              updateValue("patient_first_name", event.target.value)
-            }
-          ></input>
+            onChange={(e) => updateValue("patient_first_name", e.target.value)}
+          />
         </div>
         <div>
           <label>Last name</label>
@@ -46,29 +54,28 @@ export default function AppointmentForm({
             className="w-full p-2 border border-gray-300 rounded"
             placeholder="Doe"
             value={values.patient_last_name}
-            onChange={(event) =>
-              updateValue("patient_last_name", event.target.value)
-            }
-          ></input>
+            onChange={(e) => updateValue("patient_last_name", e.target.value)}
+          />
         </div>
       </div>
+
       <label>Phone number</label>
       <input
         className="w-full p-2 border border-gray-300 rounded"
         placeholder="0712345678"
         value={values.patient_phone_number}
-        onChange={(event) =>
-          updateValue("patient_phone_number", event.target.value)
-        }
-      ></input>
+        onChange={(e) => updateValue("patient_phone_number", e.target.value)}
+      />
+
       <label>Email</label>
       <input
         type="email"
         className="w-full p-2 border border-gray-300 rounded"
         placeholder="john@example.com"
         value={values.patient_email}
-        onChange={(event) => updateValue("patient_email", event.target.value)}
-      ></input>
+        onChange={(e) => updateValue("patient_email", e.target.value)}
+      />
+
       {time === "later" && (
         <>
           <label>Date/time for the appointment</label>
@@ -77,17 +84,31 @@ export default function AppointmentForm({
               type="date"
               className="w-full p-2 border border-gray-300 rounded"
               value={values.date}
-              onChange={(event) => updateValue("date", event.target.value)}
-            ></input>
+              onChange={(e) => updateValue("date", e.target.value)}
+            />
             <input
               type="time"
               className="w-full p-2 border border-gray-300 rounded"
               value={values.time}
-              onChange={(event) => updateValue("time", event.target.value)}
-            ></input>
+              onChange={(e) => updateValue("time", e.target.value)}
+            />
           </div>
         </>
       )}
+
+      <label>Duration</label>
+      <select
+        className="w-full p-2 border border-gray-300 rounded mt-1"
+        value={values.duration}
+        onChange={(e) => updateValue("duration", Number(e.target.value))}
+      >
+        {DURATIONS.map((d) => (
+          <option key={d.value} value={d.value}>
+            {d.label}
+          </option>
+        ))}
+      </select>
+
       <div>
         <label>Appointment type</label>
         <div className="flex gap-2 mt-1">
@@ -115,13 +136,14 @@ export default function AppointmentForm({
           </button>
         </div>
       </div>
-      <label>Message to recepient</label>
+
+      <label>Message to recipient</label>
       <textarea
         className="w-full p-2 border border-gray-300 rounded"
-        placeholder="Write a message to the recepient (optional)"
+        placeholder="Write a message to the recipient (optional)"
         value={values.message}
-        onChange={(event) => updateValue("message", event.target.value)}
-      ></textarea>
+        onChange={(e) => updateValue("message", e.target.value)}
+      />
     </form>
   );
 }

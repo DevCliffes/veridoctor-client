@@ -47,6 +47,7 @@ const emptyForm: AppointmentFormValues = {
   patient_email: "",
   date: "",
   time: "",
+  duration: 30,
   message: "",
   appointment_type: "virtual",
 };
@@ -83,7 +84,7 @@ export default function Appointments() {
     call: ReactNode;
   }[] = appointments.map((appointment) => ({
     id: appointment.id,
-    name: appointment.patient_name,
+    name: `${appointment.patient_first_name} ${appointment.patient_last_name}`,
     date: new Date(appointment.start_time).toLocaleString(),
     status: appointment.status,
     call:
@@ -117,7 +118,7 @@ export default function Appointments() {
 
     axiosClient
       .get(`provider/${userId}/appointments?${params.toString()}`)
-      .then((res) => setAppointments(res.data))
+      .then((res) => setAppointments(res.data ?? []))
       .catch(() => toast.error("Could not load appointments"))
       .finally(() => setLoading(false));
   }, [appointmentType, filter, userId]);
@@ -178,6 +179,12 @@ export default function Appointments() {
     return new Date(`${formValues.date}T${formValues.time}`).toISOString();
   };
 
+  const getEndTime = (startTime: string) => {
+    const end = new Date(startTime);
+    end.setMinutes(end.getMinutes() + (formValues.duration ?? 30));
+    return end.toISOString();
+  };
+
   const handleSaveAppointment = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (!userId) {
@@ -202,6 +209,7 @@ export default function Appointments() {
           patient_email: formValues.patient_email,
           appointment_type: formValues.appointment_type,
           start_time: startTime,
+          end_time: getEndTime(startTime),
           message: formValues.message,
         })
         .then((res) => {
@@ -241,7 +249,7 @@ export default function Appointments() {
               }
             >
               <TabsList variant="line">
-                <TabsTrigger value="now">now</TabsTrigger>
+                <TabsTrigger value="now">Now</TabsTrigger>
                 <TabsTrigger value="schedule">Later</TabsTrigger>
               </TabsList>
               <TabsContent value="now">

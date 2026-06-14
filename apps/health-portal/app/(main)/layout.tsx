@@ -8,6 +8,7 @@ import {
   LucideCircleUser,
   LucideFileText,
   LucideLogOut,
+  LucideSearch,
   LucideUser,
 } from "@veridoctor/design/icons";
 import {
@@ -37,7 +38,7 @@ export default function MainAppLayout({
 }) {
   const pathname = usePathname();
   const { access_token, identity, auth_code } = useAppSelector(
-    (store) => store.auth,
+    (store) => store.auth
   );
   const dispatch = useAppDispatch();
 
@@ -59,6 +60,11 @@ export default function MainAppLayout({
       name: "Appointments",
     },
     {
+      linkTo: "/book",
+      icon: <LucideSearch />,
+      name: "Find a Doctor",
+    },
+    {
       linkTo: "/prescriptions",
       icon: <LucideFileText />,
       name: "Prescriptions",
@@ -77,7 +83,10 @@ export default function MainAppLayout({
       setAuthInfo={(token) => setAuthInfo(token)}
     >
       <div className="fixed bg-gray-50 top-0 left-0 h-svh w-full flex flex-col">
-        <TopNav center={<p>Health portal</p>} right={<ProfileDropdown identityId={identity?.id} />} />
+        <TopNav
+          center={<p>Health portal</p>}
+          right={<ProfileDropdown identityId={identity?.id} />}
+        />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
           <div className="w-full overflow-y-scroll bg-gray-200 p-4 rounded-lg">
@@ -107,10 +116,7 @@ function ProfileDropdown({ identityId }: { identityId?: string }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem className="cursor-pointer">
-          <a
-            className="flex gap-2"
-            href={identityId ? `/profile` : "#"}
-          >
+          <a className="flex gap-2" href={identityId ? "/profile" : "#"}>
             <LucideUser />
             <p>Profile</p>
           </a>

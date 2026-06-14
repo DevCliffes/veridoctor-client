@@ -56,8 +56,11 @@ function expandToCalendarEvents(s: ScheduleBlock) {
   const [sh, sm] = s.start_time.split(":").map(Number);
   const [eh, em] = s.end_time.split(":").map(Number);
 
+  const maxEnd = s.recurrence !== "none"
+  ? new Date(Math.max(end.getTime(), start.getTime() + 90 * 24 * 60 * 60 * 1000))
+  : end;
   const cursor = new Date(start);
-  while (cursor <= end) {
+  while (cursor <= maxEnd) {
     const dow = DAY_ABBR[cursor.getDay()];
     let include = false;
 

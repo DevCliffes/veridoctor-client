@@ -601,3 +601,4 @@ function MedicalRecords({
     </div>
   );
 }
+

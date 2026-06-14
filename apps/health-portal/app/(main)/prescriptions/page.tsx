@@ -10,7 +10,6 @@ import {
   LucideChevronDown,
   LucideChevronUp,
 } from "@veridoctor/design/icons";
-import { toast } from "sonner";
 
 interface Drug {
   id: string;
@@ -41,12 +40,23 @@ function formatDate(iso: string) {
   });
 }
 
+function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+  return (
+    <div className={"fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " + (type === "success" ? "bg-green-600" : "bg-red-600")}>
+      {message}
+    </div>
+  );
+}
+
 function PrescriptionCard({ prescription }: { prescription: Prescription }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="border border-gray-100 rounded-xl overflow-hidden hover:border-blue-100 transition-colors">
-      {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-gray-50 transition-colors"
@@ -60,7 +70,7 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
             {prescription.provider && (
               <p className="text-xs text-gray-500 mt-0.5">
                 Dr. {prescription.provider.first_name} {prescription.provider.last_name}
-                {prescription.provider.speciality && ` · ${prescription.provider.speciality}`}
+                {prescription.provider.speciality && " · " + prescription.provider.speciality}
               </p>
             )}
             <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
@@ -81,10 +91,8 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
         </div>
       </button>
 
-      {/* Expanded content */}
       {expanded && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50 space-y-3">
-          {/* Drugs list */}
           <div className="space-y-2">
             {prescription.drugs.map((drug, i) => (
               <div
@@ -107,10 +115,9 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
             ))}
           </div>
 
-          {/* Notes */}
           {prescription.notes && (
             <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3">
-              <p className="text-xs font-medium text-yellow-700 mb-1">Doctor's Notes</p>
+              <p className="text-xs font-medium text-yellow-700 mb-1">Doctor&apos;s Notes</p>
               <p className="text-xs text-yellow-800">{prescription.notes}</p>
             </div>
           )}
@@ -124,21 +131,25 @@ export default function Prescriptions() {
   const { identity } = useAppSelector((store) => store.auth);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const patientEmail = identity?.email ?? "";
 
   useEffect(() => {
     if (!patientEmail) return;
     axiosClient
-      .get(`/prescriptions?patient_email=${patientEmail}`)
+      .get("/prescriptions?patient_email=" + patientEmail)
       .then((res) => setPrescriptions(res.data ?? []))
-      .catch(() => toast.error("Failed to load prescriptions"))
+      .catch(() => setToast({ message: "Failed to load prescriptions", type: "error" }))
       .finally(() => setLoading(false));
   }, [patientEmail]);
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+      )}
+
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
         <h1 className="text-xl font-bold text-gray-800">My Prescriptions</h1>
         <p className="text-sm text-gray-500 mt-0.5">
@@ -146,7 +157,6 @@ export default function Prescriptions() {
         </p>
       </div>
 
-      {/* List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">

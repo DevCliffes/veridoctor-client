@@ -52,15 +52,42 @@ const STATUS_STYLES: Record<string, string> = {
   "no-show": "bg-gray-100 text-gray-500",
 };
 
-function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
+function Toast({
+  message,
+  type,
+  onClose,
+}: {
+  message: string;
+  type: "success" | "error";
+  onClose: () => void;
+}) {
   useEffect(() => {
     const t = setTimeout(onClose, 3000);
     return () => clearTimeout(t);
   }, [onClose]);
   return (
-    <div className={"fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " + (type === "success" ? "bg-green-600" : "bg-red-600")}>
+    <div
+      className={
+        "fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " +
+        (type === "success" ? "bg-green-600" : "bg-red-600")
+      }
+    >
       {message}
     </div>
+  );
+}
+
+function JoinButton({ meetId, mins }: { meetId: string; mins: number }) {
+  function handleJoin() {
+    window.location.href = "/calls/" + meetId;
+  }
+  return (
+    <button
+      onClick={handleJoin}
+      className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-medium"
+    >
+      {mins <= 0 ? "Join Now" : "Join in " + mins + "m"}
+    </button>
   );
 }
 
@@ -70,7 +97,10 @@ export default function Appointments() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>("upcoming");
   const [cancelling, setCancelling] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
   const patientEmail = identity?.email ?? "";
 
@@ -78,9 +108,13 @@ export default function Appointments() {
     if (!patientEmail) return;
     setLoading(true);
     axiosClient
-      .get("/appointments?patient_email=" + patientEmail + "&filter=" + activeTab)
+      .get(
+        "/appointments?patient_email=" + patientEmail + "&filter=" + activeTab
+      )
       .then((res) => setAppointments(res.data ?? []))
-      .catch(() => setToast({ message: "Failed to load appointments", type: "error" }))
+      .catch(() =>
+        setToast({ message: "Failed to load appointments", type: "error" })
+      )
       .finally(() => setLoading(false));
   };
 
@@ -91,11 +125,16 @@ export default function Appointments() {
   const handleCancel = async (id: string) => {
     setCancelling(id);
     try {
-      await axiosClient.patch("/appointments/" + id, { status: "cancelled" });
+      await axiosClient.patch("/appointments/" + id, {
+        status: "cancelled",
+      });
       setToast({ message: "Appointment cancelled", type: "success" });
       fetchAppointments();
     } catch {
-      setToast({ message: "Failed to cancel appointment", type: "error" });
+      setToast({
+        message: "Failed to cancel appointment",
+        type: "error",
+      });
     } finally {
       setCancelling(null);
     }
@@ -120,7 +159,9 @@ export default function Appointments() {
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">My Appointments</h1>
-          <p className="text-sm text-gray-500 mt-0.5">View and manage your consultations</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            View and manage your consultations
+          </p>
         </div>
       </div>
 
@@ -129,7 +170,12 @@ export default function Appointments() {
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
-            className={"flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors " + (activeTab === tab.value ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-100")}
+            className={
+              "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors " +
+              (activeTab === tab.value
+                ? "bg-blue-600 text-white"
+                : "text-gray-500 hover:bg-gray-100")
+            }
           >
             {tab.label}
           </button>
@@ -143,18 +189,31 @@ export default function Appointments() {
           </div>
         ) : appointments.length === 0 ? (
           <div className="text-center py-12">
-            <LucideCalendarX size={36} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No {activeTab} appointments</p>
+            <LucideCalendarX
+              size={36}
+              className="mx-auto text-gray-300 mb-3"
+            />
+            <p className="text-gray-500 font-medium">
+              No {activeTab} appointments
+            </p>
             <p className="text-gray-400 text-sm mt-1">
-              {activeTab === "upcoming" ? "You have no upcoming appointments booked." : "No " + activeTab + " appointments found."}
+              {activeTab === "upcoming"
+                ? "You have no upcoming appointments booked."
+                : "No " + activeTab + " appointments found."}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
             {appointments.map((appt) => {
               const mins = minutesUntil(appt.start_time);
-              const canJoin = appt.appointment_type === "virtual" && appt.meet_id && mins > -30 && mins < 60;
-              const canCancel = ["scheduled", "confirmed"].includes(appt.status) && mins > 60;
+              const canJoin =
+                appt.appointment_type === "virtual" &&
+                appt.meet_id &&
+                mins > -30 &&
+                mins < 60;
+              const canCancel =
+                ["scheduled", "confirmed"].includes(appt.status) &&
+                mins > 60;
 
               return (
                 <div
@@ -163,38 +222,71 @@ export default function Appointments() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
-                      <div className={"w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5 " + (appt.appointment_type === "virtual" ? "bg-indigo-100 text-indigo-600" : "bg-green-100 text-green-600")}>
-                        {appt.appointment_type === "virtual" ? <LucideVideo size={18} /> : <LucideMapPin size={18} />}
+                      <div
+                        className={
+                          "w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5 " +
+                          (appt.appointment_type === "virtual"
+                            ? "bg-indigo-100 text-indigo-600"
+                            : "bg-green-100 text-green-600")
+                        }
+                      >
+                        {appt.appointment_type === "virtual" ? (
+                          <LucideVideo size={18} />
+                        ) : (
+                          <LucideMapPin size={18} />
+                        )}
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800 text-sm">
-                          {appt.appointment_type === "virtual" ? "Virtual" : "In-person"} Consultation
+                          {appt.appointment_type === "virtual"
+                            ? "Virtual"
+                            : "In-person"}{" "}
+                          Consultation
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5">{formatDate(appt.start_time)}</p>
-                        <p className="text-xs text-gray-500">{formatTime(appt.start_time)} – {formatTime(appt.end_time)}</p>
-                        {appt.message && <p className="text-xs text-gray-400 mt-1 italic">"{appt.message}"</p>}
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {formatDate(appt.start_time)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatTime(appt.start_time)} –{" "}
+                          {formatTime(appt.end_time)}
+                        </p>
+                        {appt.message && (
+                          <p className="text-xs text-gray-400 mt-1 italic">
+                            &quot;{appt.message}&quot;
+                          </p>
+                        )}
                       </div>
                     </div>
 
                     <div className="flex flex-col items-end gap-2 shrink-0">
-                      <span className={"text-xs px-2 py-0.5 rounded-full font-medium capitalize " + (STATUS_STYLES[appt.status] ?? "bg-gray-100 text-gray-500")}>
+                      <span
+                        className={
+                          "text-xs px-2 py-0.5 rounded-full font-medium capitalize " +
+                          (STATUS_STYLES[appt.status] ??
+                            "bg-gray-100 text-gray-500")
+                        }
+                      >
                         {appt.status}
                       </span>
-                      {canJoin && (
-                        
-                          href={"/calls/" + appt.meet_id}
-                          className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-medium"
-                        >
-                          {mins <= 0 ? "Join Now" : "Join in " + mins + "m"}
-                        </a>
+
+                      {canJoin && appt.meet_id && (
+                        <JoinButton meetId={appt.meet_id} mins={mins} />
                       )}
+
                       {canCancel && (
                         <button
                           onClick={() => handleCancel(appt.id)}
                           disabled={cancelling === appt.id}
                           className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
                         >
-                          {cancelling === appt.id ? <LucideLoader2 size={12} className="animate-spin" /> : <LucideCalendarX size={12} />}
+                          {cancelling === appt.id ? (
+                            <LucideLoader2
+                              size={12}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <LucideCalendarX size={12} />
+                          )}
                           Cancel
                         </button>
                       )}

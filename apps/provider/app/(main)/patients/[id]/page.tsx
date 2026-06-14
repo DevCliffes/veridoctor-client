@@ -2,15 +2,12 @@
 
 import { axiosClient } from "@veridoctor/api-client";
 import {
-  DataTable,
-  DatatableColumnHeader,
-} from "@veridoctor/design/shared";
-import {
   LucideArrowLeft,
   LucideCalendarCheck,
   LucideMail,
   LucidePhone,
   LucideUser,
+  LucideChevronRight,
 } from "@veridoctor/design/icons";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -48,18 +45,15 @@ export default function PatientPortal({
     if (!userId) return;
     setLoading(true);
 
-    // Fetch the specific appointment by id
     axiosClient
       .get(`provider/${userId}/appointments/${params.id}`)
       .then((res) => {
         const appt: Appointment = res.data;
         setAppointment(appt);
-
-        // Then fetch all appointments and filter by patient name
         return axiosClient.get(`provider/${userId}/appointments`);
       })
       .then((res) => {
-        setAllAppointments(res.data);
+        setAllAppointments(res.data ?? []);
       })
       .catch(() => toast.error("Could not load patient data"))
       .finally(() => setLoading(false));
@@ -69,24 +63,17 @@ export default function PatientPortal({
     fetchData();
   }, [fetchData]);
 
-  const patientAppointments = allAppointments.filter(
-    (a) =>
-      appointment &&
-      a.patient_first_name === appointment.patient_first_name &&
-      a.patient_last_name === appointment.patient_last_name
-  );
-
-  const tableColumns: DatatableColumnHeader[] = [
-    { name: "Date/Time", type: "string", key: "date" },
-    { name: "Type", type: "string", key: "type" },
-    { name: "Status", type: "string", key: "status" },
-  ];
-
-  const tableRows = patientAppointments.map((a) => ({
-    date: new Date(a.start_time).toLocaleString(),
-    type: a.appointment_type,
-    status: a.status,
-  }));
+  const patientAppointments = allAppointments
+    .filter(
+      (a) =>
+        appointment &&
+        a.patient_first_name === appointment.patient_first_name &&
+        a.patient_last_name === appointment.patient_last_name
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+    );
 
   if (loading) {
     return (
@@ -163,11 +150,79 @@ export default function PatientPortal({
       {/* Appointment History */}
       <div className="bg-white rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4">Appointment History</h2>
-        <DataTable
-          rows={tableRows}
-          columns={tableColumns}
-          isLoading={loading}
-        />
+
+        {patientAppointments.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">
+            No appointment history found.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="py-3 px-2 font-semibold text-gray-700">
+                    Date/Time
+                  </th>
+                  <th className="py-3 px-2 font-semibold text-gray-700">
+                    Type
+                  </th>
+                  <th className="py-3 px-2 font-semibold text-gray-700">
+                    Status
+                  </th>
+                  <th className="py-3 px-2 w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {patientAppointments.map((a, idx) => (
+                  <tr
+                    key={a.id}
+                    onClick={() => router.push(`/appointments/${a.id}`)}
+                    className={`cursor-pointer hover:bg-gray-50 transition-colors ${
+                      idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                    } ${idx !== patientAppointments.length - 1 ? "border-b border-gray-100" : ""}`}
+                  >
+                    <td className="py-3 px-2 text-gray-700">
+                      {new Date(a.start_time).toLocaleString("en-KE", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="py-3 px-2">
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                          a.appointment_type === "virtual"
+                            ? "bg-indigo-50 text-indigo-600"
+                            : "bg-green-50 text-green-600"
+                        }`}
+                      >
+                        {a.appointment_type}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2">
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                          a.status === "confirmed"
+                            ? "bg-green-50 text-green-600"
+                            : a.status === "cancelled"
+                            ? "bg-red-50 text-red-600"
+                            : "bg-yellow-50 text-yellow-600"
+                        }`}
+                      >
+                        {a.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-right">
+                      <LucideChevronRight size={14} className="text-gray-300" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

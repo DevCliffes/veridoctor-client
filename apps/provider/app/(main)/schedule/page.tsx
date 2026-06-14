@@ -314,3 +314,79 @@ export default function Schedule() {
                     <label className="flex items-center gap-2 text-sm text-gray-600">
                       <input type="radio" checked={endType === "after"} onChange={() => setEndType("after")} />
                       After
+                      <input type="number" min={1} disabled={endType !== "after"} value={endAfterCount}
+                        onChange={(e) => setEndAfterCount(Number(e.target.value))}
+                        className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50" />
+                      occurrence(s)
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="flex items-start gap-2">
+              <LucideMapPin size={18} className="text-gray-400 mt-2 shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Location</p>
+                <div className="flex gap-2">
+                  {locationOptions.map((opt) => (
+                    <button key={opt.key} type="button" onClick={() => setLocationType(opt.key)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                        locationType === opt.key
+                          ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
+                          : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                      }`}>
+                      {opt.icon}{opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogModal>
+      </div>
+
+      {/* Schedule list */}
+      <div className="mt-6 space-y-2">
+        {schedules.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">
+            No schedule blocks yet. Click "Add to calendar" to create one.
+          </p>
+        ) : (
+          schedules.map((s) => (
+            <div key={s.id}
+              className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50">
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  {s.service_name ?? "Untitled"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {s.start_date}{s.start_date !== s.end_date ? ` → ${s.end_date}` : ""} · {s.start_time}–{s.end_time}
+                  {s.recurrence !== "none" && ` · ${s.recurrence}`}
+                  {s.recurrence_days?.length > 0 && ` (${s.recurrence_days.join(", ")})`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                  s.location_type === "virtual" ? "bg-indigo-50 text-indigo-600"
+                  : s.location_type === "physical" ? "bg-green-50 text-green-600"
+                  : "bg-purple-50 text-purple-600"
+                }`}>
+                  {s.location_type}
+                </span>
+                <button onClick={() => handleDelete(s.id)}
+                  className="text-gray-300 hover:text-red-500 transition-colors">
+                  <LucideTrash2 size={15} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Calendar — receives real schedule events */}
+      <CalendarViewer appointments={calendarEvents} />
+    </div>
+  );
+}

@@ -52,11 +52,18 @@ function dateLabel(iso: string) {
   tomorrow.setDate(today.getDate() + 1);
   if (d.toDateString() === today.toDateString()) return "Today";
   if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-  return d.toLocaleDateString("en-KE", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-KE", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-KE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function getNext7Days() {
@@ -88,7 +95,9 @@ function ProviderCard({
         .get("/provider/" + provider.id + "/available-slots?date=" + day)
         .then((res) => setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] })))
         .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
-        .finally(() => setLoadingDays((prev) => ({ ...prev, [day]: false })));
+        .finally(() =>
+          setLoadingDays((prev) => ({ ...prev, [day]: false }))
+        );
     });
   }, [dayOffset, provider.id]);
 
@@ -98,12 +107,9 @@ function ProviderCard({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
       <div className="flex gap-4">
-        {/* Avatar */}
         <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold shrink-0">
           {initials.toUpperCase()}
         </div>
-
-        {/* Info */}
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-gray-800 text-base">
             Dr. {provider.first_name} {provider.last_name}
@@ -126,7 +132,6 @@ function ProviderCard({
         </div>
       </div>
 
-      {/* Date slot strip */}
       <div className="mt-4 flex gap-2 items-start">
         <button
           onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
@@ -146,9 +151,14 @@ function ProviderCard({
                   {dateLabel(day)}
                 </p>
                 {loading ? (
-                  <LucideLoader2 size={16} className="animate-spin text-gray-300 my-2" />
+                  <LucideLoader2
+                    size={16}
+                    className="animate-spin text-gray-300 my-2"
+                  />
                 ) : slots.length === 0 ? (
-                  <p className="text-xs text-gray-300 text-center py-2">No slots</p>
+                  <p className="text-xs text-gray-300 text-center py-2">
+                    No slots
+                  </p>
                 ) : (
                   <div className="flex flex-col gap-1 w-full">
                     {slots.slice(0, 3).map((slot) => (
@@ -173,7 +183,9 @@ function ProviderCard({
         </div>
 
         <button
-          onClick={() => setDayOffset(Math.min(days.length - 3, dayOffset + 3))}
+          onClick={() =>
+            setDayOffset(Math.min(days.length - 3, dayOffset + 3))
+          }
           disabled={dayOffset + 3 >= days.length}
           className="p-1 mt-1 rounded hover:bg-gray-100 disabled:opacity-30"
         >
@@ -215,16 +227,19 @@ function BookingModal({
   const handleConfirm = async () => {
     setSaving(true);
     try {
-      await axiosClient.post("/provider/" + booking.provider.id + "/appointments", {
-        patient_first_name: patientFirst,
-        patient_last_name: patientLast,
-        patient_email: patientEmail,
-        start_time: booking.slot.start_time,
-        end_time: booking.slot.end_time,
-        appointment_type: apptType,
-        message,
-        status: "scheduled",
-      });
+      await axiosClient.post(
+        "/provider/" + booking.provider.id + "/appointments",
+        {
+          patient_first_name: patientFirst,
+          patient_last_name: patientLast,
+          patient_email: patientEmail,
+          start_time: booking.slot.start_time,
+          end_time: booking.slot.end_time,
+          appointment_type: apptType,
+          message,
+          status: "scheduled",
+        }
+      );
       toast.success("Appointment booked!");
       onConfirmed();
     } catch {
@@ -242,7 +257,10 @@ function BookingModal({
             <LucideCalendarCheck size={18} className="text-blue-600" />
             <h2 className="font-semibold text-gray-800">Confirm booking</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <LucideX size={18} />
           </button>
         </div>
@@ -256,9 +274,8 @@ function BookingModal({
               {booking.provider.speciality}
             </p>
             <p className="text-sm text-gray-600 mt-2">
-              {dateLabel(booking.date)} ·{" "}
-              {formatTime(booking.slot.start_time)} –{" "}
-              {formatTime(booking.slot.end_time)}
+              {dateLabel(booking.date)} · {formatTime(booking.slot.start_time)}{" "}
+              – {formatTime(booking.slot.end_time)}
             </p>
             {booking.slot.service_name && (
               <p className="text-xs text-gray-400 mt-1">
@@ -267,7 +284,6 @@ function BookingModal({
             )}
           </div>
 
-          {/* Appointment type */}
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               Appointment type
@@ -302,7 +318,6 @@ function BookingModal({
             </div>
           </div>
 
-          {/* Message */}
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               Message (optional)
@@ -362,18 +377,18 @@ export default function BookPage() {
     );
   });
 
-  const specialities = [...new Set(providers.map((p) => p.speciality).filter(Boolean))];
+  const specialities = [
+    ...new Set(providers.map((p) => p.speciality).filter(Boolean)),
+  ];
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
         <h1 className="text-xl font-bold text-gray-800">Find a Doctor</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Search and book appointments with our providers
         </p>
 
-        {/* Search */}
         <div className="mt-4 relative">
           <LucideSearch
             size={16}
@@ -387,7 +402,6 @@ export default function BookPage() {
           />
         </div>
 
-        {/* Speciality chips */}
         {specialities.length > 0 && (
           <div className="mt-3 flex gap-2 flex-wrap">
             <button
@@ -404,7 +418,7 @@ export default function BookPage() {
             {specialities.map((s) => (
               <button
                 key={s}
-                onClick={() => setSearch(s)}
+                onClick={() => setSearch(s ?? "")}
                 className={
                   "text-xs px-3 py-1 rounded-full border transition-colors " +
                   (search === s
@@ -419,7 +433,6 @@ export default function BookPage() {
         )}
       </div>
 
-      {/* Provider list */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <LucideLoader2 size={28} className="animate-spin text-blue-500" />
@@ -436,7 +449,6 @@ export default function BookPage() {
         </div>
       )}
 
-      {/* Booking modal */}
       {booking && (
         <BookingModal
           booking={booking}
@@ -444,9 +456,7 @@ export default function BookPage() {
           patientFirst={identity?.first_name ?? ""}
           patientLast={identity?.last_name ?? ""}
           onClose={() => setBooking(null)}
-          onConfirmed={() => {
-            setBooking(null);
-          }}
+          onConfirmed={() => setBooking(null)}
         />
       )}
     </div>

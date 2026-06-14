@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
@@ -102,9 +102,12 @@ export default function Appointments() {
     type: "success" | "error";
   } | null>(null);
 
-  const patientEmail = identity?.email ?? "";
+  const patientEmail =
+    identity && typeof identity === "object" && "email" in identity
+      ? (identity as { email?: string }).email ?? ""
+      : "";
 
-  const fetchAppointments = () => {
+  const fetchAppointments = useCallback(() => {
     if (!patientEmail) return;
     setLoading(true);
     axiosClient
@@ -116,25 +119,20 @@ export default function Appointments() {
         setToast({ message: "Failed to load appointments", type: "error" })
       )
       .finally(() => setLoading(false));
-  };
+  }, [patientEmail, activeTab]);
 
   useEffect(() => {
     fetchAppointments();
-  }, [patientEmail, activeTab]);
+  }, [fetchAppointments]);
 
   const handleCancel = async (id: string) => {
     setCancelling(id);
     try {
-      await axiosClient.patch("/appointments/" + id, {
-        status: "cancelled",
-      });
+      await axiosClient.patch("/appointments/" + id, { status: "cancelled" });
       setToast({ message: "Appointment cancelled", type: "success" });
       fetchAppointments();
     } catch {
-      setToast({
-        message: "Failed to cancel appointment",
-        type: "error",
-      });
+      setToast({ message: "Failed to cancel appointment", type: "error" });
     } finally {
       setCancelling(null);
     }
@@ -189,10 +187,7 @@ export default function Appointments() {
           </div>
         ) : appointments.length === 0 ? (
           <div className="text-center py-12">
-            <LucideCalendarX
-              size={36}
-              className="mx-auto text-gray-300 mb-3"
-            />
+            <LucideCalendarX size={36} className="mx-auto text-gray-300 mb-3" />
             <p className="text-gray-500 font-medium">
               No {activeTab} appointments
             </p>
@@ -212,8 +207,7 @@ export default function Appointments() {
                 mins > -30 &&
                 mins < 60;
               const canCancel =
-                ["scheduled", "confirmed"].includes(appt.status) &&
-                mins > 60;
+                ["scheduled", "confirmed"].includes(appt.status) && mins > 60;
 
               return (
                 <div
@@ -280,10 +274,7 @@ export default function Appointments() {
                           className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
                         >
                           {cancelling === appt.id ? (
-                            <LucideLoader2
-                              size={12}
-                              className="animate-spin"
-                            />
+                            <LucideLoader2 size={12} className="animate-spin" />
                           ) : (
                             <LucideCalendarX size={12} />
                           )}

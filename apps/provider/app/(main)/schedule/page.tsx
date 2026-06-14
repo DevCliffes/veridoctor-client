@@ -4,21 +4,15 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../store";
 import { axiosClient } from "@veridoctor/api-client";
 import {
-  Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@veridoctor/design/components";
-import {
-  LucideCirclePlus,
-  LucideCircleSlash,
-  LucideCopy,
   LucidePlus,
+  LucideClock,
+  LucideMapPin,
+  LucideVideo,
+  LucideRepeat,
 } from "@veridoctor/design/icons";
 import { CalendarViewer, DialogModal } from "@veridoctor/design/shared";
 import { toast } from "sonner";
+import type { ReactNode } from "react";
 
 type Service = {
   id: string;
@@ -26,55 +20,118 @@ type Service = {
   estimated_duration: number;
 };
 
-const DEFAULT_SCHEDULE = [
-  { day: "Sun", start: "9:00am", end: "5:00pm" },
-  { day: "Mon", start: "9:00am", end: "5:00pm" },
-  { day: "Tue", start: "9:00am", end: "5:00pm" },
-  { day: "Wed", start: "9:00am", end: "5:00pm" },
-  { day: "Thu", start: "9:00am", end: "5:00pm" },
-  { day: "Fri", start: "9:00am", end: "5:00pm" },
-  { day: "Sat", isUnavailable: true },
+type LocationType = "virtual" | "physical" | "both";
+type RepeatType = "none" | "daily" | "weekly" | "weekdays" | "custom";
+type EndType = "never" | "on_date" | "after";
+
+const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_FULL = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
 ];
+
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
 
 export default function Schedule() {
   const userId = useSelector((state: RootState) => state.auth.identity);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
-  const [selectedDuration, setSelectedDuration] = useState<string>("");
+
+  const [startDate, setStartDate] = useState(todayStr());
+  const [endDate, setEndDate] = useState(todayStr());
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("10:00");
+
+  const [locationType, setLocationType] = useState<LocationType>("virtual");
+
+  const [repeat, setRepeat] = useState<RepeatType>("none");
+  const [repeatDays, setRepeatDays] = useState<string[]>([]);
+  const [repeatInterval, setRepeatInterval] = useState(1);
+  const [endType, setEndType] = useState<EndType>("never");
+  const [endAfterDate, setEndAfterDate] = useState("");
+  const [endAfterCount, setEndAfterCount] = useState(10);
 
   useEffect(() => {
     if (!userId) return;
     axiosClient
       .get(`provider/${userId}/services`)
-      .then((res) => {
-        const data: Service[] = res.data ?? [];
-        setServices(data);
-      })
+      .then((res) => setServices(res.data ?? []))
       .catch(() => {});
   }, [userId]);
 
-  // When a service is selected, auto-fill duration from its estimated_duration
+  // When a service is selected, auto-compute end time from its duration
   const handleServiceChange = (serviceId: string) => {
     setSelectedServiceId(serviceId);
     const svc = services.find((s) => s.id === serviceId);
     if (svc) {
-      // Map to closest duration option
-      const mins = svc.estimated_duration;
-      if (mins <= 15) setSelectedDuration("15");
-      else if (mins <= 30) setSelectedDuration("30");
-      else if (mins <= 60) setSelectedDuration("60");
-      else setSelectedDuration("90");
+      const [h, m] = startTime.split(":").map(Number);
+      const totalMins = h * 60 + m + svc.estimated_duration;
+      const endH = Math.floor(totalMins / 60) % 24;
+      const endM = totalMins % 60;
+      setEndTime(
+        `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`
+      );
     }
   };
 
-  const handleSave = () => {
+  // When start date changes, keep end date in sync and pre-select that weekday
+  const handleStartDateChange = (val: string) => {
+    setStartDate(val);
+    if (new Date(val) > new Date(endDate)) setEndDate(val);
+    const day = DAY_ABBR[new Date(val + "T00:00:00").getDay()];
+    setRepeatDays([day]);
+  };
+
+  const toggleRepeatDay = (day: string) => {
+    setRepeatDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
+
+  const weekdayLabel = DAY_FULL[new Date(startDate + "T00:00:00").getDay()];
+
+  const handleSave = async () => {
     if (!selectedServiceId) {
       toast.error("Please select a service first");
       return;
     }
-    // TODO: wire up actual schedule save API
-    toast.error("An error occurred while adding your schedule");
+
+    const payload = {
+      service: selectedServiceId,
+      location_type: locationType,
+      start_date: startDate,
+      end_date: endDate,
+      start_time: startTime,
+      end_time: endTime,
+      recurrence: repeat,
+      recurrence_interval: repeat === "custom" ? repeatInterval : 1,
+      recurrence_days:
+        repeat === "weekly" || repeat === "custom" ? repeatDays : [],
+      recurrence_end_type: repeat === "none" ? null : endType,
+      recurrence_end_date: endType === "on_date" ? endAfterDate : null,
+      recurrence_count: endType === "after" ? endAfterCount : null,
+    };
+
+    try {
+      await axiosClient.post(`provider/${userId}/schedule`, payload);
+      toast.success("Schedule added");
+    } catch {
+      toast.error("An error occurred while adding your schedule");
+    }
   };
+
+  const locationOptions: { key: LocationType; label: string; icon: ReactNode }[] = [
+    { key: "virtual", label: "Virtual", icon: <LucideVideo size={14} /> },
+    { key: "physical", label: "In-person", icon: <LucideMapPin size={14} /> },
+    { key: "both", label: "Both", icon: null },
+  ];
 
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
@@ -84,8 +141,8 @@ export default function Schedule() {
           <p className="text-gray-600 mt-2">Manage your schedule.</p>
         </div>
         <DialogModal
-          title="Add To schedule"
-          description="Add a work time to your schedule"
+          title="Add to schedule"
+          description="Create a new schedule block"
           trigger={
             <>
               <LucidePlus size={20} />
@@ -94,12 +151,11 @@ export default function Schedule() {
           }
           onSave={handleSave}
         >
-          <div className="flex flex-col gap-3">
-            {/* Title — pulled from services */}
+          <div className="flex flex-col gap-4 max-w-lg">
+            {/* Title — service dropdown */}
             <div>
-              <label className="text-sm font-medium">Service / Title</label>
               {services.length === 0 ? (
-                <p className="text-sm text-gray-400 mt-1 italic">
+                <p className="text-sm text-gray-400 italic">
                   No services found.{" "}
                   <a href="/services" className="text-blue-600 hover:underline">
                     Add a service first →
@@ -109,9 +165,9 @@ export default function Schedule() {
                 <select
                   value={selectedServiceId}
                   onChange={(e) => handleServiceChange(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded mt-1 text-sm"
+                  className="w-full text-lg font-medium border-b border-gray-200 pb-2 focus:outline-none focus:border-blue-400 bg-transparent"
                 >
-                  <option value="">Select a service</option>
+                  <option value="">Add title — select a service</option>
                   {services.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -121,38 +177,161 @@ export default function Schedule() {
               )}
             </div>
 
-            {/* Duration — auto-filled from service, but still editable */}
-            <div>
-              <label className="text-sm font-medium">Appointment duration</label>
-              <Select
-                value={selectedDuration}
-                onValueChange={setSelectedDuration}
-              >
-                <SelectTrigger className="w-full max-w-48 mt-1">
-                  <SelectValue placeholder="Select a duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">15 minutes</SelectItem>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="60">1 hour</SelectItem>
-                  <SelectItem value="90">1.5 hours</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Date / time row */}
+            <div className="flex items-start gap-2">
+              <LucideClock size={18} className="text-gray-400 mt-2 shrink-0" />
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                />
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                />
+                <span className="text-gray-400">–</span>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                />
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                />
+              </div>
             </div>
 
-            {/* Availability */}
-            <div>
-              <label className="text-sm font-medium">Availability</label>
-              <div className="rounded-xl max-w-md mt-1">
-                <div className="flex flex-col gap-1">
-                  {DEFAULT_SCHEDULE.map((item) => (
-                    <AvailabilityRow
-                      key={item.day}
-                      day={item.day}
-                      startTime={item.start}
-                      endTime={item.end}
-                      isUnavailable={item.isUnavailable}
+            {/* Recurrence */}
+            <div className="flex items-start gap-2">
+              <LucideRepeat size={18} className="text-gray-400 mt-2 shrink-0" />
+              <div className="flex-1 space-y-3">
+                <select
+                  value={repeat}
+                  onChange={(e) => setRepeat(e.target.value as RepeatType)}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                >
+                  <option value="none">Does not repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekdays">Every weekday (Mon–Fri)</option>
+                  <option value="weekly">Weekly on {weekdayLabel}</option>
+                  <option value="custom">Custom</option>
+                </select>
+
+                {(repeat === "weekly" || repeat === "custom") && (
+                  <div className="flex gap-1.5">
+                    {DAY_ABBR.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => toggleRepeatDay(d)}
+                        className={`w-9 h-9 rounded-full text-xs font-medium border transition-colors ${
+                          repeatDays.includes(d)
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        {d[0]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {repeat === "custom" && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    Repeat every
+                    <input
+                      type="number"
+                      min={1}
+                      value={repeatInterval}
+                      onChange={(e) => setRepeatInterval(Number(e.target.value))}
+                      className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50"
                     />
+                    week(s)
+                  </div>
+                )}
+
+                {repeat !== "none" && (
+                  <div className="space-y-2 pl-1">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">
+                      Ends
+                    </p>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="radio"
+                        checked={endType === "never"}
+                        onChange={() => setEndType("never")}
+                      />
+                      Never
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="radio"
+                        checked={endType === "on_date"}
+                        onChange={() => setEndType("on_date")}
+                      />
+                      On
+                      <input
+                        type="date"
+                        disabled={endType !== "on_date"}
+                        value={endAfterDate}
+                        onChange={(e) => setEndAfterDate(e.target.value)}
+                        min={startDate}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="radio"
+                        checked={endType === "after"}
+                        onChange={() => setEndType("after")}
+                      />
+                      After
+                      <input
+                        type="number"
+                        min={1}
+                        disabled={endType !== "after"}
+                        value={endAfterCount}
+                        onChange={(e) => setEndAfterCount(Number(e.target.value))}
+                        className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                      />
+                      occurrence(s)
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="flex items-start gap-2">
+              <LucideMapPin size={18} className="text-gray-400 mt-2 shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+                  Location
+                </p>
+                <div className="flex gap-2">
+                  {locationOptions.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setLocationType(opt.key)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors ${
+                        locationType === opt.key
+                          ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
+                          : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                      }`}
+                    >
+                      {opt.icon}
+                      {opt.label}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -167,60 +346,3 @@ export default function Schedule() {
     </div>
   );
 }
-
-const AvailabilityRow = ({
-  day,
-  startTime,
-  endTime,
-  isUnavailable = false,
-}: {
-  day: string;
-  startTime?: string;
-  endTime?: string;
-  isUnavailable?: boolean;
-}) => {
-  return (
-    <div className="flex items-center h-12">
-      <span className="w-10 text-sm font-medium">{day}</span>
-
-      <div className="flex-1 flex items-center gap-2">
-        {isUnavailable ? (
-          <span className="text-sm text-gray-400">Unavailable</span>
-        ) : (
-          <>
-            <input
-              defaultValue={startTime}
-              className="border rounded px-3 py-1.5 text-sm w-24 text-center"
-            />
-            <span className="text-zinc-600">—</span>
-            <input
-              defaultValue={endTime}
-              className="border rounded px-3 py-1.5 text-sm w-24 text-center"
-            />
-          </>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        {!isUnavailable && (
-          <>
-            <Button variant="roundedOutline" size="icon" className="cursor-pointer text-primary">
-              <LucideCircleSlash />
-            </Button>
-            <Button variant="roundedOutline" size="icon" className="cursor-pointer text-primary">
-              <LucideCirclePlus size={20} />
-            </Button>
-            <Button variant="roundedOutline" size="icon" className="cursor-pointer text-primary">
-              <LucideCopy size={18} />
-            </Button>
-          </>
-        )}
-        {isUnavailable && (
-          <Button variant="roundedOutline" size="icon" className="cursor-pointer text-primary">
-            <LucideCirclePlus size={20} />
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};

@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSelector } from "react-redux";
-import { RootState } from "../../store";
+import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import { Button } from "@veridoctor/design/components";
 import { LucidePlus } from "@veridoctor/design/icons";
@@ -10,6 +9,14 @@ import { MetricsRow } from "../../../components/dashboard/MetricsRow";
 import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
 import { PendingActions } from "../../../components/dashboard/PendingActions";
 import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
+
+function getField(identity: unknown, field: string): string {
+  if (identity && typeof identity === "object" && field in identity) {
+    const val = (identity as Record<string, unknown>)[field];
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
 
 interface ProviderProfile {
   first_name: string;
@@ -19,8 +26,10 @@ interface ProviderProfile {
 
 export default function Dashboard() {
   const router = useRouter();
-  const identity = useSelector((state: RootState) => state.auth.identity);
+  const { identity } = useAppSelector((store) => store.auth);
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
+
+  const identityId = getField(identity, "id");
 
   const now = new Date();
   const hour = now.getHours();
@@ -28,13 +37,12 @@ export default function Dashboard() {
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   useEffect(() => {
-    if (!identity) return;
+    if (!identityId) return;
     axiosClient
-      .get(`provider/${identity}/profile`)
+      .get(`/provider/${identityId}/profile`)
       .then((res) => setProfile(res.data))
       .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity]);
+  }, [identityId]);
 
   const providerName = profile
     ? `${profile.title ? profile.title + " " : ""}${profile.first_name} ${profile.last_name}`
@@ -45,10 +53,10 @@ export default function Dashboard() {
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <p className="text-xl font-bold">
-            {greeting}{providerName ? ` ${providerName}` : ""} 👋
+            {greeting}{providerName ? `, ${providerName}` : ""} 👋
           </p>
           <p className="text-gray-500 text-sm">
-            {now.toLocaleDateString("en-US", {
+            {now.toLocaleDateString("en-KE", {
               weekday: "long",
               year: "numeric",
               month: "long",
@@ -60,14 +68,16 @@ export default function Dashboard() {
           <LucidePlus /> New appointment
         </Button>
       </div>
-      <MetricsRow />
+
+      <MetricsRow identityId={identityId} />
+
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
-          <TodaySchedule />
-          <WeeklyChart />
+          <TodaySchedule identityId={identityId} />
+          <WeeklyChart identityId={identityId} />
         </div>
         <div className="space-y-4">
-          <PendingActions />
+          <PendingActions identityId={identityId} />
           <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-4 space-y-2">
             <p className="font-bold text-sm text-gray-500 uppercase tracking-wide">
               Quick actions

@@ -10,9 +10,24 @@ import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
 import { PendingActions } from "../../../components/dashboard/PendingActions";
 import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
 
-function getField(identity: unknown, field: string): string {
-  if (identity && typeof identity === "object" && field in identity) {
-    const val = (identity as Record<string, unknown>)[field];
+// `identity` from Redux is normally a raw ID string (rehydrated from
+// localStorage's "vd_identity"), but handle the object/JSON-string
+// shapes too just in case.
+function getIdentityId(identity: unknown): string {
+  if (typeof identity === "string") {
+    if (!identity) return "";
+    try {
+      const parsed = JSON.parse(identity);
+      if (parsed && typeof parsed === "object" && typeof parsed.id === "string") {
+        return parsed.id;
+      }
+    } catch {
+      // not JSON — it's the raw identity ID itself
+    }
+    return identity;
+  }
+  if (identity && typeof identity === "object" && "id" in identity) {
+    const val = (identity as Record<string, unknown>).id;
     if (typeof val === "string") return val;
   }
   return "";
@@ -29,7 +44,7 @@ export default function Dashboard() {
   const { identity } = useAppSelector((store) => store.auth);
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
 
-  const identityId = getField(identity, "id");
+  const identityId = getIdentityId(identity);
 
   const now = new Date();
   const hour = now.getHours();

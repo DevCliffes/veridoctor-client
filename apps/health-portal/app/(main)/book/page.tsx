@@ -44,13 +44,34 @@ interface BookingState {
   date: string;
 }
 
-function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
+function getIdentityField(identity: unknown, field: string): string {
+  if (identity && typeof identity === "object" && field in identity) {
+    const val = (identity as Record<string, unknown>)[field];
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
+
+function Toast({
+  message,
+  type,
+  onClose,
+}: {
+  message: string;
+  type: "success" | "error";
+  onClose: () => void;
+}) {
   useEffect(() => {
     const t = setTimeout(onClose, 3000);
     return () => clearTimeout(t);
   }, [onClose]);
   return (
-    <div className={"fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " + (type === "success" ? "bg-green-600" : "bg-red-600")}>
+    <div
+      className={
+        "fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " +
+        (type === "success" ? "bg-green-600" : "bg-red-600")
+      }
+    >
       {message}
     </div>
   );
@@ -63,11 +84,18 @@ function dateLabel(iso: string) {
   tomorrow.setDate(today.getDate() + 1);
   if (d.toDateString() === today.toDateString()) return "Today";
   if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
-  return d.toLocaleDateString("en-KE", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-KE", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-KE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function getNext7Days() {
@@ -78,7 +106,13 @@ function getNext7Days() {
   });
 }
 
-function ProviderCard({ provider, onBook }: { provider: Provider; onBook: (state: BookingState) => void }) {
+function ProviderCard({
+  provider,
+  onBook,
+}: {
+  provider: Provider;
+  onBook: (state: BookingState) => void;
+}) {
   const days = getNext7Days();
   const [daySlots, setDaySlots] = useState<Record<string, Slot[]>>({});
   const [loadingDays, setLoadingDays] = useState<Record<string, boolean>>({});
@@ -91,13 +125,20 @@ function ProviderCard({ provider, onBook }: { provider: Provider; onBook: (state
       setLoadingDays((prev) => ({ ...prev, [day]: true }));
       axiosClient
         .get("/provider/" + provider.id + "/available-slots?date=" + day)
-        .then((res) => setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] })))
-        .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
-        .finally(() => setLoadingDays((prev) => ({ ...prev, [day]: false })));
+        .then((res) =>
+          setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] }))
+        )
+        .catch(() =>
+          setDaySlots((prev) => ({ ...prev, [day]: [] }))
+        )
+        .finally(() =>
+          setLoadingDays((prev) => ({ ...prev, [day]: false }))
+        );
     });
   }, [dayOffset, provider.id]);
 
-  const initials = (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
+  const initials =
+    (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -120,7 +161,8 @@ function ProviderCard({ provider, onBook }: { provider: Provider; onBook: (state
           {provider.services[0] && (
             <p className="text-xs text-gray-400 mt-0.5">
               From {provider.services[0].currency}{" "}
-              {Number(provider.services[0].price).toLocaleString()} · {provider.services[0].estimated_duration} min
+              {Number(provider.services[0].price).toLocaleString()} ·{" "}
+              {provider.services[0].estimated_duration} min
             </p>
           )}
         </div>
@@ -140,12 +182,22 @@ function ProviderCard({ provider, onBook }: { provider: Provider; onBook: (state
             const slots = daySlots[day] ?? [];
             const loading = loadingDays[day];
             return (
-              <div key={day} className="flex-1 flex flex-col items-center gap-1.5">
-                <p className="text-xs font-semibold text-gray-500 text-center">{dateLabel(day)}</p>
+              <div
+                key={day}
+                className="flex-1 flex flex-col items-center gap-1.5"
+              >
+                <p className="text-xs font-semibold text-gray-500 text-center">
+                  {dateLabel(day)}
+                </p>
                 {loading ? (
-                  <LucideLoader2 size={16} className="animate-spin text-gray-300 my-2" />
+                  <LucideLoader2
+                    size={16}
+                    className="animate-spin text-gray-300 my-2"
+                  />
                 ) : slots.length === 0 ? (
-                  <p className="text-xs text-gray-300 text-center py-2">No slots</p>
+                  <p className="text-xs text-gray-300 text-center py-2">
+                    No slots
+                  </p>
                 ) : (
                   <div className="flex flex-col gap-1 w-full">
                     {slots.slice(0, 3).map((slot) => (
@@ -158,7 +210,9 @@ function ProviderCard({ provider, onBook }: { provider: Provider; onBook: (state
                       </button>
                     ))}
                     {slots.length > 3 && (
-                      <p className="text-xs text-gray-400 text-center">+{slots.length - 3} more</p>
+                      <p className="text-xs text-gray-400 text-center">
+                        +{slots.length - 3} more
+                      </p>
                     )}
                   </div>
                 )}
@@ -168,7 +222,9 @@ function ProviderCard({ provider, onBook }: { provider: Provider; onBook: (state
         </div>
 
         <button
-          onClick={() => setDayOffset(Math.min(days.length - 3, dayOffset + 3))}
+          onClick={() =>
+            setDayOffset(Math.min(days.length - 3, dayOffset + 3))
+          }
           disabled={dayOffset + 3 >= days.length}
           className="p-1 mt-1 rounded hover:bg-gray-100 disabled:opacity-30"
         >
@@ -200,22 +256,29 @@ function BookingModal({
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const canVirtual = booking.slot.location_type === "virtual" || booking.slot.location_type === "both";
-  const canPhysical = booking.slot.location_type === "physical" || booking.slot.location_type === "both";
+  const canVirtual =
+    booking.slot.location_type === "virtual" ||
+    booking.slot.location_type === "both";
+  const canPhysical =
+    booking.slot.location_type === "physical" ||
+    booking.slot.location_type === "both";
 
   const handleConfirm = async () => {
     setSaving(true);
     try {
-      await axiosClient.post("/provider/" + booking.provider.id + "/appointments", {
-        patient_first_name: patientFirst,
-        patient_last_name: patientLast,
-        patient_email: patientEmail,
-        start_time: booking.slot.start_time,
-        end_time: booking.slot.end_time,
-        appointment_type: apptType,
-        message,
-        status: "scheduled",
-      });
+      await axiosClient.post(
+        "/provider/" + booking.provider.id + "/appointments",
+        {
+          patient_first_name: patientFirst,
+          patient_last_name: patientLast,
+          patient_email: patientEmail,
+          start_time: booking.slot.start_time,
+          end_time: booking.slot.end_time,
+          appointment_type: apptType,
+          message,
+          status: "scheduled",
+        }
+      );
       onConfirmed();
     } catch {
       setSaving(false);
@@ -230,7 +293,10 @@ function BookingModal({
             <LucideCalendarCheck size={18} className="text-blue-600" />
             <h2 className="font-semibold text-gray-800">Confirm booking</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <LucideX size={18} />
           </button>
         </div>
@@ -240,22 +306,34 @@ function BookingModal({
             <p className="font-semibold text-gray-800">
               Dr. {booking.provider.first_name} {booking.provider.last_name}
             </p>
-            <p className="text-sm text-blue-600 mt-0.5">{booking.provider.speciality}</p>
+            <p className="text-sm text-blue-600 mt-0.5">
+              {booking.provider.speciality}
+            </p>
             <p className="text-sm text-gray-600 mt-2">
-              {dateLabel(booking.date)} · {formatTime(booking.slot.start_time)} – {formatTime(booking.slot.end_time)}
+              {dateLabel(booking.date)} · {formatTime(booking.slot.start_time)}{" "}
+              – {formatTime(booking.slot.end_time)}
             </p>
             {booking.slot.service_name && (
-              <p className="text-xs text-gray-400 mt-1">{booking.slot.service_name}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {booking.slot.service_name}
+              </p>
             )}
           </div>
 
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Appointment type</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Appointment type
+            </p>
             <div className="flex gap-2">
               {canVirtual && (
                 <button
                   onClick={() => setApptType("virtual")}
-                  className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " + (apptType === "virtual" ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium" : "border-gray-200 text-gray-600")}
+                  className={
+                    "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " +
+                    (apptType === "virtual"
+                      ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
+                      : "border-gray-200 text-gray-600")
+                  }
                 >
                   <LucideVideo size={14} /> Virtual
                 </button>
@@ -263,7 +341,12 @@ function BookingModal({
               {canPhysical && (
                 <button
                   onClick={() => setApptType("physical")}
-                  className={"flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " + (apptType === "physical" ? "bg-green-50 border-green-300 text-green-700 font-medium" : "border-gray-200 text-gray-600")}
+                  className={
+                    "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " +
+                    (apptType === "physical"
+                      ? "bg-green-50 border-green-300 text-green-700 font-medium"
+                      : "border-gray-200 text-gray-600")
+                  }
                 >
                   <LucideMapPin size={14} /> In-person
                 </button>
@@ -272,7 +355,9 @@ function BookingModal({
           </div>
 
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Message (optional)</p>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Message (optional)
+            </p>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -284,7 +369,10 @@ function BookingModal({
         </div>
 
         <div className="px-5 py-3 border-t flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+          >
             Cancel
           </button>
           <button
@@ -306,13 +394,22 @@ export default function BookPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [booking, setBooking] = useState<BookingState | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const patientEmail = getIdentityField(identity, "email");
+  const patientFirst = getIdentityField(identity, "first_name");
+  const patientLast = getIdentityField(identity, "last_name");
 
   useEffect(() => {
     axiosClient
       .get("/provider/list")
       .then((res) => setProviders(res.data ?? []))
-      .catch(() => setToast({ message: "Failed to load providers", type: "error" }))
+      .catch(() =>
+        setToast({ message: "Failed to load providers", type: "error" })
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -326,20 +423,31 @@ export default function BookPage() {
     );
   });
 
-  const specialities = [...new Set(providers.map((p) => p.speciality).filter(Boolean))];
+  const specialities = [
+    ...new Set(providers.map((p) => p.speciality).filter(Boolean)),
+  ];
 
   return (
     <div className="space-y-4">
       {toast && (
-        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
         <h1 className="text-xl font-bold text-gray-800">Find a Doctor</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Search and book appointments with our providers</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Search and book appointments with our providers
+        </p>
 
         <div className="mt-4 relative">
-          <LucideSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <LucideSearch
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -352,7 +460,12 @@ export default function BookPage() {
           <div className="mt-3 flex gap-2 flex-wrap">
             <button
               onClick={() => setSearch("")}
-              className={"text-xs px-3 py-1 rounded-full border transition-colors " + (search === "" ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-500 hover:border-gray-300")}
+              className={
+                "text-xs px-3 py-1 rounded-full border transition-colors " +
+                (search === ""
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "border-gray-200 text-gray-500 hover:border-gray-300")
+              }
             >
               All
             </button>
@@ -360,7 +473,12 @@ export default function BookPage() {
               <button
                 key={s}
                 onClick={() => setSearch(s ?? "")}
-                className={"text-xs px-3 py-1 rounded-full border transition-colors " + (search === s ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-500 hover:border-gray-300")}
+                className={
+                  "text-xs px-3 py-1 rounded-full border transition-colors " +
+                  (search === s
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300")
+                }
               >
                 {s}
               </button>
@@ -374,7 +492,9 @@ export default function BookPage() {
           <LucideLoader2 size={28} className="animate-spin text-blue-500" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">No providers found matching your search.</div>
+        <div className="text-center py-16 text-gray-400">
+          No providers found matching your search.
+        </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((p) => (
@@ -386,13 +506,16 @@ export default function BookPage() {
       {booking && (
         <BookingModal
           booking={booking}
-          patientEmail={identity?.email ?? ""}
-          patientFirst={identity?.first_name ?? ""}
-          patientLast={identity?.last_name ?? ""}
+          patientEmail={patientEmail}
+          patientFirst={patientFirst}
+          patientLast={patientLast}
           onClose={() => setBooking(null)}
           onConfirmed={() => {
             setBooking(null);
-            setToast({ message: "Appointment booked successfully!", type: "success" });
+            setToast({
+              message: "Appointment booked successfully!",
+              type: "success",
+            });
           }}
         />
       )}

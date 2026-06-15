@@ -32,6 +32,14 @@ interface Prescription {
   };
 }
 
+function getField(identity: unknown, field: string): string {
+  if (identity && typeof identity === "object" && field in identity) {
+    const val = (identity as Record<string, unknown>)[field];
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-KE", {
     year: "numeric",
@@ -40,13 +48,26 @@ function formatDate(iso: string) {
   });
 }
 
-function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
+function Toast({
+  message,
+  type,
+  onClose,
+}: {
+  message: string;
+  type: "success" | "error";
+  onClose: () => void;
+}) {
   useEffect(() => {
     const t = setTimeout(onClose, 3000);
     return () => clearTimeout(t);
   }, [onClose]);
   return (
-    <div className={"fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " + (type === "success" ? "bg-green-600" : "bg-red-600")}>
+    <div
+      className={
+        "fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " +
+        (type === "success" ? "bg-green-600" : "bg-red-600")
+      }
+    >
       {message}
     </div>
   );
@@ -66,11 +87,15 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
             <LucideFileText size={18} />
           </div>
           <div>
-            <p className="font-semibold text-gray-800 text-sm">{prescription.diagnosis}</p>
+            <p className="font-semibold text-gray-800 text-sm">
+              {prescription.diagnosis}
+            </p>
             {prescription.provider && (
               <p className="text-xs text-gray-500 mt-0.5">
-                Dr. {prescription.provider.first_name} {prescription.provider.last_name}
-                {prescription.provider.speciality && " · " + prescription.provider.speciality}
+                Dr. {prescription.provider.first_name}{" "}
+                {prescription.provider.last_name}
+                {prescription.provider.speciality &&
+                  " · " + prescription.provider.speciality}
               </p>
             )}
             <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
@@ -81,7 +106,8 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-            {prescription.drugs.length} {prescription.drugs.length === 1 ? "drug" : "drugs"}
+            {prescription.drugs.length}{" "}
+            {prescription.drugs.length === 1 ? "drug" : "drugs"}
           </span>
           {expanded ? (
             <LucideChevronUp size={16} className="text-gray-400" />
@@ -103,12 +129,16 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
                   <LucidePill size={14} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{drug.drug_name}</p>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {drug.drug_name}
+                  </p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {drug.frequency} · {drug.duration}
                   </p>
                   {drug.instructions && (
-                    <p className="text-xs text-gray-400 mt-0.5 italic">{drug.instructions}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 italic">
+                      {drug.instructions}
+                    </p>
                   )}
                 </div>
               </div>
@@ -117,7 +147,9 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
 
           {prescription.notes && (
             <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3">
-              <p className="text-xs font-medium text-yellow-700 mb-1">Doctor&apos;s Notes</p>
+              <p className="text-xs font-medium text-yellow-700 mb-1">
+                Doctor&apos;s Notes
+              </p>
               <p className="text-xs text-yellow-800">{prescription.notes}</p>
             </div>
           )}
@@ -131,23 +163,32 @@ export default function Prescriptions() {
   const { identity } = useAppSelector((store) => store.auth);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
-  const patientEmail = identity?.email ?? "";
+  const patientEmail = getField(identity, "email");
 
   useEffect(() => {
     if (!patientEmail) return;
     axiosClient
       .get("/prescriptions?patient_email=" + patientEmail)
       .then((res) => setPrescriptions(res.data ?? []))
-      .catch(() => setToast({ message: "Failed to load prescriptions", type: "error" }))
+      .catch(() =>
+        setToast({ message: "Failed to load prescriptions", type: "error" })
+      )
       .finally(() => setLoading(false));
   }, [patientEmail]);
 
   return (
     <div className="space-y-4">
       {toast && (
-        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
@@ -173,7 +214,10 @@ export default function Prescriptions() {
         ) : (
           <div className="space-y-3">
             {prescriptions.map((prescription) => (
-              <PrescriptionCard key={prescription.id} prescription={prescription} />
+              <PrescriptionCard
+                key={prescription.id}
+                prescription={prescription}
+              />
             ))}
           </div>
         )}

@@ -1,9 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { axiosClient } from "@veridoctor/api-client";
-import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import { RootState } from "../../app/store";
 
 interface Appointment {
   id: string;
@@ -14,6 +12,10 @@ interface Appointment {
   appointment_type: "virtual" | "physical";
   status: string;
   meet_id?: string;
+}
+
+interface TodayScheduleProps {
+  identityId: string;
 }
 
 function getInitials(first: string, last: string) {
@@ -47,6 +49,8 @@ function Row({ appt }: { appt: Appointment }) {
   const statusClass =
     appt.status === "confirmed"
       ? "bg-green-100 text-green-700"
+      : appt.status === "cancelled"
+      ? "bg-red-100 text-red-700"
       : "bg-yellow-100 text-yellow-700";
 
   return (
@@ -83,20 +87,18 @@ function Row({ appt }: { appt: Appointment }) {
   );
 }
 
-export function TodaySchedule() {
-  const identity = useSelector((state: RootState) => state.auth.identity);
+export function TodaySchedule({ identityId }: TodayScheduleProps) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!identity) return;
+    if (!identityId) return;
     axiosClient
-      .get(`provider/${identity}/appointments?filter=today`)
+      .get(`/provider/${identityId}/appointments?filter=today`)
       .then((res) => setAppointments(res.data ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity]);
+  }, [identityId]);
 
   if (loading) {
     return (

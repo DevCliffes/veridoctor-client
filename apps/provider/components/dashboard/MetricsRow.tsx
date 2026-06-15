@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { axiosClient } from "@veridoctor/api-client";
-import { useSelector } from "react-redux";
-import { RootState } from "../../app/store";
 
 interface DashboardStats {
+  today_count: number;
+  upcoming_today: number;
+  pending_count: number;
   this_week_appointments: number;
   this_week_patients: number;
   total_patients_month: number;
@@ -12,30 +13,27 @@ interface DashboardStats {
   weekly_data: { date: string; day: string; count: number }[];
 }
 
-export function MetricsRow() {
-  const identity = useSelector((state: RootState) => state.auth.identity);
+interface MetricsRowProps {
+  identityId: string;
+}
+
+export function MetricsRow({ identityId }: MetricsRowProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [todayCount, setTodayCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!identity) return;
-    Promise.all([
-      axiosClient.get(`provider/${identity}/dashboard/stats`).catch(() => null),
-      axiosClient.get(`provider/${identity}/appointments?filter=today`).catch(() => ({ data: [] })),
-    ])
-      .then(([statsRes, todayRes]) => {
-        if (statsRes?.data) setStats(statsRes.data);
-        setTodayCount(todayRes?.data?.length ?? 0);
-      })
+    if (!identityId) return;
+    axiosClient
+      .get(`/provider/${identityId}/dashboard/stats`)
+      .then((res) => setStats(res.data))
+      .catch(() => {})
       .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity]);
+  }, [identityId]);
 
   const cards = [
     {
       label: "Today's Appointments",
-      value: todayCount,
+      value: stats?.today_count ?? 0,
       sub: "scheduled for today",
       color: "bg-blue-50 text-blue-700",
     },
@@ -48,13 +46,13 @@ export function MetricsRow() {
     {
       label: "Total Patients",
       value: stats?.total_patients_month ?? 0,
-      sub: "patients served this month",
+      sub: "patients this month",
       color: "bg-purple-50 text-purple-700",
     },
     {
       label: "Avg. Duration",
       value: stats?.avg_duration_minutes ? `${stats.avg_duration_minutes}m` : "—",
-      sub: "per consultation this month",
+      sub: "per consultation",
       color: "bg-orange-50 text-orange-700",
     },
   ];

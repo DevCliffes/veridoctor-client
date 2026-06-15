@@ -34,7 +34,15 @@ import {
   setAccessToken,
   setRefreshToken,
 } from "@veridoctor/store";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+
+function getField(identity: unknown, field: string): string {
+  if (identity && typeof identity === "object" && field in identity) {
+    const val = (identity as Record<string, unknown>)[field];
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
 
 export default function MainAppLayout({
   children,
@@ -46,6 +54,14 @@ export default function MainAppLayout({
     (store) => store.auth,
   );
   const dispatch = useAppDispatch();
+
+  const firstName = getField(identity, "first_name");
+  const lastName = getField(identity, "last_name");
+  const identityId = getField(identity, "id");
+
+  const displayName = firstName && lastName
+    ? "Dr. " + firstName + " " + lastName
+    : "Dr. John Doe";
 
   const authInfo = {
     isLoggedIn: access_token ? true : false,
@@ -77,7 +93,10 @@ export default function MainAppLayout({
       setAuthInfo={(token) => setAuthInfo(token)}
     >
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
-        <TopNav center={<p>Dr. John Doe</p>} right={<ProfileDropdown />} />
+        <TopNav
+          center={<p>{displayName}</p>}
+          right={<ProfileDropdown identityId={identityId} />}
+        />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
           <div className="w-full overflow-y-scroll bg-neutral-100 p-1">
@@ -89,7 +108,16 @@ export default function MainAppLayout({
   );
 }
 
-function ProfileDropdown() {
+function ProfileDropdown({ identityId }: { identityId: string }) {
+  const dispatch = useAppDispatch();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    dispatch(setAccessToken(""));
+    dispatch(setRefreshToken(""));
+    router.push("/auth/login");
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex gap-2 border-2 hover:cursor-pointer items-center p-1 md:border-2 md:rounded-full">
@@ -97,16 +125,21 @@ function ProfileDropdown() {
         <ChevronDown />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem className="cursor-pointer">
-          <LucideUser />
-          <p>Profile</p>
+        <DropdownMenuItem className="cursor-pointer" asChild>
+          <a href={identityId ? "/profile" : "#"} className="flex items-center gap-2 w-full">
+            <LucideUser size={16} />
+            <p>Profile</p>
+          </a>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">
-          <LucideBookUser />
+          <LucideBookUser size={16} />
           <p>Accounts</p>
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">
-          <LucideLogOut />
+        <DropdownMenuItem
+          className="cursor-pointer text-red-600 focus:text-red-600"
+          onClick={handleLogout}
+        >
+          <LucideLogOut size={16} />
           <p>Logout</p>
         </DropdownMenuItem>
       </DropdownMenuContent>

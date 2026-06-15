@@ -31,6 +31,14 @@ import {
   setRefreshToken,
 } from "@veridoctor/store";
 
+function getField(identity: unknown, field: string): string {
+  if (identity && typeof identity === "object" && field in identity) {
+    const val = (identity as Record<string, unknown>)[field];
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
+
 export default function MainAppLayout({
   children,
 }: {
@@ -77,6 +85,8 @@ export default function MainAppLayout({
     dispatch(setIsLoggedIn());
   };
 
+  const identityId = getField(identity, "id");
+
   return (
     <AuthWrapper
       authInfo={authInfo}
@@ -85,7 +95,7 @@ export default function MainAppLayout({
       <div className="fixed bg-gray-50 top-0 left-0 h-svh w-full flex flex-col">
         <TopNav
           center={<p>Health portal</p>}
-          right={<ProfileDropdown identityId={identity?.id} />}
+          right={<ProfileDropdown identityId={identityId} />}
         />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />

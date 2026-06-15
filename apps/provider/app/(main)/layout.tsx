@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ChevronDown,
@@ -29,6 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@veridoctor/design/components";
+import { axiosClient } from "@veridoctor/api-client";
 import {
   setIsLoggedIn,
   setAccessToken,
@@ -36,12 +38,33 @@ import {
 } from "@veridoctor/store";
 import { usePathname, useRouter } from "next/navigation";
 
-function getField(identity: unknown, field: string): string {
-  if (identity && typeof identity === "object" && field in identity) {
-    const val = (identity as Record<string, unknown>)[field];
+// `identity` from Redux is normally a raw ID string (rehydrated from
+// localStorage's "vd_identity"), but handle the object/JSON-string
+// shapes too just in case.
+function getIdentityId(identity: unknown): string {
+  if (typeof identity === "string") {
+    if (!identity) return "";
+    try {
+      const parsed = JSON.parse(identity);
+      if (parsed && typeof parsed === "object" && typeof parsed.id === "string") {
+        return parsed.id;
+      }
+    } catch {
+      // not JSON — it's the raw identity ID itself
+    }
+    return identity;
+  }
+  if (identity && typeof identity === "object" && "id" in identity) {
+    const val = (identity as Record<string, unknown>).id;
     if (typeof val === "string") return val;
   }
   return "";
+}
+
+interface ProviderProfile {
+  first_name: string;
+  last_name: string;
+  title?: string;
 }
 
 export default function MainAppLayout({
@@ -55,13 +78,20 @@ export default function MainAppLayout({
   );
   const dispatch = useAppDispatch();
 
-  const firstName = getField(identity, "first_name");
-  const lastName = getField(identity, "last_name");
+  const identityId = getIdentityId(identity);
+  const [profile, setProfile] = useState<ProviderProfile | null>(null);
 
-  const displayName =
-    firstName && lastName
-      ? "Dr. " + firstName + " " + lastName
-      : "Dr. John Doe";
+  useEffect(() => {
+    if (!identityId) return;
+    axiosClient
+      .get(`/provider/${identityId}/profile`)
+      .then((res) => setProfile(res.data))
+      .catch(() => {});
+  }, [identityId]);
+
+  const displayName = profile
+    ? `${profile.title ?? "Dr."} ${profile.first_name} ${profile.last_name}`
+    : "";
 
   const authInfo = {
     isLoggedIn: access_token ? true : false,
@@ -94,7 +124,7 @@ export default function MainAppLayout({
     >
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
         <TopNav
-          center={<p>{displayName}</p>}
+          center={<p>{displayName || "\u00A0"}</p>}
           right={<ProfileDropdown dispatch={dispatch} />}
         />
         <div className="flex h-full">

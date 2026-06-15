@@ -3,7 +3,6 @@ import { useEffect, useState, useCallback } from "react";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
-  LucideCalendarCheck,
   LucideCalendarX,
   LucideVideo,
   LucideMapPin,
@@ -91,6 +90,14 @@ function JoinButton({ meetId, mins }: { meetId: string; mins: number }) {
   );
 }
 
+function getEmail(identity: unknown): string {
+  if (identity && typeof identity === "object" && "email" in identity) {
+    const val = (identity as Record<string, unknown>).email;
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
+
 export default function Appointments() {
   const { identity } = useAppSelector((store) => store.auth);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -102,18 +109,13 @@ export default function Appointments() {
     type: "success" | "error";
   } | null>(null);
 
-  const patientEmail =
-    identity && typeof identity === "object" && "email" in identity
-      ? (identity as { email?: string }).email ?? ""
-      : "";
+  const patientEmail = getEmail(identity);
 
   const fetchAppointments = useCallback(() => {
     if (!patientEmail) return;
     setLoading(true);
     axiosClient
-      .get(
-        "/appointments?patient_email=" + patientEmail + "&filter=" + activeTab
-      )
+      .get("/appointments?patient_email=" + patientEmail + "&filter=" + activeTab)
       .then((res) => setAppointments(res.data ?? []))
       .catch(() =>
         setToast({ message: "Failed to load appointments", type: "error" })
@@ -154,13 +156,11 @@ export default function Appointments() {
         />
       )}
 
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">My Appointments</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            View and manage your consultations
-          </p>
-        </div>
+      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+        <h1 className="text-xl font-bold text-gray-800">My Appointments</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          View and manage your consultations
+        </p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex gap-1">

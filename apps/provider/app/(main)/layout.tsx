@@ -57,11 +57,11 @@ export default function MainAppLayout({
 
   const firstName = getField(identity, "first_name");
   const lastName = getField(identity, "last_name");
-  const identityId = getField(identity, "id");
 
-  const displayName = firstName && lastName
-    ? "Dr. " + firstName + " " + lastName
-    : "Dr. John Doe";
+  const displayName =
+    firstName && lastName
+      ? "Dr. " + firstName + " " + lastName
+      : "Dr. John Doe";
 
   const authInfo = {
     isLoggedIn: access_token ? true : false,
@@ -95,7 +95,7 @@ export default function MainAppLayout({
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
         <TopNav
           center={<p>{displayName}</p>}
-          right={<ProfileDropdown identityId={identityId} />}
+          right={<ProfileDropdown dispatch={dispatch} />}
         />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
@@ -108,9 +108,12 @@ export default function MainAppLayout({
   );
 }
 
-function ProfileDropdown({ identityId }: { identityId: string }) {
-  const dispatch = useAppDispatch();
+function ProfileDropdown({ dispatch }: { dispatch: ReturnType<typeof useAppDispatch> }) {
   const router = useRouter();
+
+  const handleProfile = () => {
+    router.push("/profile");
+  };
 
   const handleLogout = () => {
     dispatch(setAccessToken(""));
@@ -125,11 +128,12 @@ function ProfileDropdown({ identityId }: { identityId: string }) {
         <ChevronDown />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem className="cursor-pointer" asChild>
-          <a href={identityId ? "/profile" : "#"} className="flex items-center gap-2 w-full">
-            <LucideUser size={16} />
-            <p>Profile</p>
-          </a>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          onClick={handleProfile}
+        >
+          <LucideUser size={16} />
+          <p>Profile</p>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">
           <LucideBookUser size={16} />

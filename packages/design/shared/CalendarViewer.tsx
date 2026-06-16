@@ -47,14 +47,18 @@ const EVENT_COLORS = [
   "bg-teal-500 text-white",
 ];
 
-const HOUR_HEIGHT = 60; // px per hour
+const HOUR_HEIGHT = 60;
 
-function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarViewerProps) {
+function CalendarViewer({
+  appointments,
+  onDayClick,
+  onEventClick,
+}: CalendarViewerProps) {
   const [view, setView] = React.useState<ViewMode>("month");
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [expandedDay, setExpandedDay] = React.useState<Date | null>(null);
+  const [popoverAppt, setPopoverAppt] = React.useState<Appointment | null>(null);
 
-  // Navigation
   const goBack = () => {
     if (view === "month") setCurrentDate(subMonths(currentDate, 1));
     else if (view === "week") setCurrentDate(subWeeks(currentDate, 1));
@@ -67,13 +71,12 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
   };
   const goToday = () => setCurrentDate(new Date());
 
-  // Header label
   const headerLabel = React.useMemo(() => {
     if (view === "month") return format(currentDate, "MMMM yyyy");
     if (view === "week") {
       const ws = startOfWeek(currentDate);
       const we = endOfWeek(currentDate);
-      return `${format(ws, "MMM d")} – ${format(we, "MMM d, yyyy")}`;
+      return `${format(ws, "MMM d")} \u2013 ${format(we, "MMM d, yyyy")}`;
     }
     return format(currentDate, "EEEE, MMMM d, yyyy");
   }, [view, currentDate]);
@@ -92,19 +95,19 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
     return map;
   }, [appointments]);
 
-  // ── Month data ──
   const monthStart = startOfMonth(currentDate);
   const monthDays = eachDayOfInterval({
     start: startOfWeek(monthStart),
     end: endOfWeek(endOfMonth(monthStart)),
   });
 
-  // ── Week data ──
   const weekStart = startOfWeek(currentDate);
-  const weekDays = eachDayOfInterval({ start: weekStart, end: endOfWeek(currentDate) });
+  const weekDays = eachDayOfInterval({
+    start: weekStart,
+    end: endOfWeek(currentDate),
+  });
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  // Position an event in the time grid
   const eventStyle = (appt: Appointment) => {
     const startMins = appt.start.getHours() * 60 + appt.start.getMinutes();
     const endMins = appt.end.getHours() * 60 + appt.end.getMinutes();
@@ -113,13 +116,19 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
     return { top, height };
   };
 
-  // ── Time grid (shared by day + week) ──
+  const handleEventClick = (appt: Appointment) => {
+    if (onEventClick) {
+      onEventClick(appt);
+    } else {
+      setPopoverAppt(appt);
+    }
+  };
+
   function TimeGrid({ days }: { days: Date[] }) {
     return (
       <div className="flex overflow-auto" style={{ maxHeight: "600px" }}>
-        {/* Time labels */}
         <div className="w-14 shrink-0 border-r">
-          <div className="h-10 border-b" /> {/* header spacer */}
+          <div className="h-10 border-b" />
           {hours.map((h) => (
             <div
               key={h}
@@ -127,38 +136,42 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
               style={{ height: HOUR_HEIGHT }}
             >
               <span className="-translate-y-2 inline-block">
-                {h === 0 ? "" : format(new Date().setHours(h, 0, 0, 0), "h a")}
+                {h === 0
+                  ? ""
+                  : format(new Date().setHours(h, 0, 0, 0), "h a")}
               </span>
             </div>
           ))}
         </div>
 
-        {/* Day columns */}
         {days.map((day) => {
           const dayAppts = appointments.filter((a) => isSameDay(a.start, day));
           const isToday = isSameDay(day, new Date());
           return (
-            <div key={day.toString()} className="flex-1 min-w-0 border-r last:border-r-0">
-              {/* Day header */}
+            <div
+              key={day.toString()}
+              className="flex-1 min-w-0 border-r last:border-r-0"
+            >
               <div
-                className={`h-10 border-b flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 ${
-                  isToday ? "bg-blue-50" : ""
-                }`}
+                className={
+                  "h-10 border-b flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 " +
+                  (isToday ? "bg-blue-50" : "")
+                }
                 onClick={() => onDayClick?.(day)}
               >
                 <span className="text-xs text-gray-500 uppercase">
                   {format(day, "EEE")}
                 </span>
                 <span
-                  className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full ${
-                    isToday ? "bg-blue-600 text-white" : "text-gray-700"
-                  }`}
+                  className={
+                    "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full " +
+                    (isToday ? "bg-blue-600 text-white" : "text-gray-700")
+                  }
                 >
                   {format(day, "d")}
                 </span>
               </div>
 
-              {/* Hour rows + events */}
               <div className="relative">
                 {hours.map((h) => (
                   <div
@@ -172,11 +185,12 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
                   return (
                     <button
                       key={appt.id}
-                      onClick={() => onEventClick?.(appt)}
+                      onClick={() => handleEventClick(appt)}
                       style={{ top, height, left: 2, right: 2 }}
-                      className={`absolute rounded text-xs px-1 py-0.5 text-left font-medium truncate hover:opacity-80 transition-opacity ${
-                        nameColorMap[appt.patientName] ?? "bg-blue-500 text-white"
-                      }`}
+                      className={
+                        "absolute rounded text-xs px-1 py-0.5 text-left font-medium truncate hover:opacity-80 transition-opacity " +
+                        (nameColorMap[appt.patientName] ?? "bg-blue-500 text-white")
+                      }
                     >
                       {format(appt.start, "h:mm a")} {appt.patientName}
                     </button>
@@ -190,7 +204,6 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
     );
   }
 
-  // All events for the currently expanded day (used in the "+N more" popover)
   const expandedDayAppts = expandedDay
     ? appointments
         .filter((a) => isSameDay(a.start, expandedDay))
@@ -202,11 +215,19 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-2">
-          <button onClick={goBack} className="p-1.5 rounded hover:bg-gray-100 transition-colors">
+          <button
+            onClick={goBack}
+            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+          >
             <ChevronLeft size={16} />
           </button>
-          <h2 className="text-base font-semibold min-w-[200px] text-center">{headerLabel}</h2>
-          <button onClick={goForward} className="p-1.5 rounded hover:bg-gray-100 transition-colors">
+          <h2 className="text-base font-semibold min-w-[200px] text-center">
+            {headerLabel}
+          </h2>
+          <button
+            onClick={goForward}
+            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+          >
             <ChevronRight size={16} />
           </button>
           <button
@@ -223,9 +244,15 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
             <ChevronDown size={14} />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setView("month")}>Month</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setView("week")}>Week</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setView("day")}>Day</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setView("month")}>
+              Month
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setView("week")}>
+              Week
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setView("day")}>
+              Day
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -235,28 +262,46 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
         <>
           <div className="grid grid-cols-7 border-b bg-gray-50">
             {weekDayLabels.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-semibold text-gray-500 tracking-wide">
+              <div
+                key={d}
+                className="py-2 text-center text-xs font-semibold text-gray-500 tracking-wide"
+              >
                 {d}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7" style={{ gridAutoRows: "120px" }}>
+          <div
+            className="grid grid-cols-7"
+            style={{ gridAutoRows: "120px" }}
+          >
             {monthDays.map((day, idx) => {
-              const dayAppts = appointments.filter((a) => isSameDay(a.start, day));
+              const dayAppts = appointments.filter((a) =>
+                isSameDay(a.start, day)
+              );
               const isToday = isSameDay(day, new Date());
-              const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+              const isCurrentMonth =
+                day.getMonth() === currentDate.getMonth();
               return (
                 <div
                   key={day.toString()}
                   onClick={() => onDayClick?.(day)}
-                  className={`border-r border-b flex flex-col cursor-pointer hover:bg-gray-50/80 transition-colors overflow-hidden
-                    ${idx % 7 === 6 ? "border-r-0" : ""}
-                    ${!isCurrentMonth ? "bg-gray-50/40" : "bg-white"}
-                  `}
+                  className={
+                    "border-r border-b flex flex-col cursor-pointer hover:bg-gray-50/80 transition-colors overflow-hidden " +
+                    (idx % 7 === 6 ? "border-r-0 " : "") +
+                    (!isCurrentMonth ? "bg-gray-50/40" : "bg-white")
+                  }
                 >
                   <div className="px-2 pt-1.5 pb-0.5">
-                    <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full
-                      ${isToday ? "bg-blue-600 text-white" : isCurrentMonth ? "text-gray-700" : "text-gray-300"}`}>
+                    <span
+                      className={
+                        "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full " +
+                        (isToday
+                          ? "bg-blue-600 text-white"
+                          : isCurrentMonth
+                          ? "text-gray-700"
+                          : "text-gray-300")
+                      }
+                    >
                       {format(day, "d")}
                     </span>
                   </div>
@@ -264,17 +309,32 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
                     {dayAppts.slice(0, 3).map((a) => (
                       <button
                         key={a.id}
-                        onClick={(e) => { e.stopPropagation(); onEventClick?.(a); }}
-                        className={`text-xs px-1.5 py-0.5 rounded font-medium truncate text-left w-full hover:opacity-80 transition-opacity
-                          ${nameColorMap[a.patientName] ?? "bg-blue-500 text-white"}`}
-                        title={`${a.patientName} · ${format(a.start, "HH:mm")}–${format(a.end, "HH:mm")}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEventClick(a);
+                        }}
+                        className={
+                          "text-xs px-1.5 py-0.5 rounded font-medium truncate text-left w-full hover:opacity-80 transition-opacity " +
+                          (nameColorMap[a.patientName] ??
+                            "bg-blue-500 text-white")
+                        }
+                        title={
+                          a.patientName +
+                          " \u00b7 " +
+                          format(a.start, "HH:mm") +
+                          "\u2013" +
+                          format(a.end, "HH:mm")
+                        }
                       >
                         {format(a.start, "HH:mm")} {a.patientName}
                       </button>
                     ))}
                     {dayAppts.length > 3 && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedDay(day); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedDay(day);
+                        }}
                         className="text-xs text-blue-500 hover:text-blue-700 hover:underline px-1.5 text-left"
                       >
                         +{dayAppts.length - 3} more
@@ -288,13 +348,10 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
         </>
       )}
 
-      {/* Week view */}
       {view === "week" && <TimeGrid days={weekDays} />}
-
-      {/* Day view */}
       {view === "day" && <TimeGrid days={[currentDate]} />}
 
-      {/* "+N more" popover — lists every event for the selected day */}
+      {/* Expanded day popover */}
       {expandedDay && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
@@ -320,16 +377,111 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
                 <button
                   key={a.id}
                   onClick={() => {
-                    onEventClick?.(a);
+                    handleEventClick(a);
                     setExpandedDay(null);
                   }}
-                  className={`text-sm px-3 py-2 rounded-lg font-medium text-left hover:opacity-80 transition-opacity ${
-                    nameColorMap[a.patientName] ?? "bg-blue-500 text-white"
-                  }`}
+                  className={
+                    "text-sm px-3 py-2 rounded-lg font-medium text-left hover:opacity-80 transition-opacity " +
+                    (nameColorMap[a.patientName] ?? "bg-blue-500 text-white")
+                  }
                 >
-                  {format(a.start, "h:mm a")} – {format(a.end, "h:mm a")} · {a.patientName}
+                  {format(a.start, "h:mm a")} \u2013 {format(a.end, "h:mm a")}{" "}
+                  \u00b7 {a.patientName}
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Patient details popover — shown when no onEventClick prop is passed */}
+      {popoverAppt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => setPopoverAppt(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="font-semibold text-gray-800 text-sm">
+                Appointment Details
+              </h3>
+              <button
+                onClick={() => setPopoverAppt(null)}
+                className="p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-4 py-4 space-y-3">
+              {/* Avatar + name */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={
+                    "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 " +
+                    (nameColorMap[popoverAppt.patientName] ??
+                      "bg-blue-500 text-white")
+                  }
+                >
+                  {popoverAppt.patientName
+                    .split(" ")
+                    .map((n) => n[0] ?? "")
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-800 text-sm">
+                    {popoverAppt.patientName}
+                  </p>
+                  <p className="text-xs text-gray-400">Patient</p>
+                </div>
+              </div>
+
+              {/* Time */}
+              <div className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-1">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">
+                  Time
+                </p>
+                <p className="text-sm font-medium text-gray-700">
+                  {format(popoverAppt.start, "EEEE, MMM d")}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {format(popoverAppt.start, "h:mm a")} \u2013{" "}
+                  {format(popoverAppt.end, "h:mm a")}
+                </p>
+              </div>
+
+              {/* Meta fields if available */}
+              {popoverAppt.meta && (
+                <div className="space-y-1.5">
+                  {popoverAppt.meta.location_type && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-400">Type</p>
+                      <span
+                        className={
+                          "text-xs px-2 py-0.5 rounded-full font-medium capitalize " +
+                          (popoverAppt.meta.location_type === "virtual"
+                            ? "bg-indigo-100 text-indigo-700"
+                            : "bg-green-100 text-green-700")
+                        }
+                      >
+                        {String(popoverAppt.meta.location_type)}
+                      </span>
+                    </div>
+                  )}
+                  {popoverAppt.meta.service_name && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-400">Service</p>
+                      <p className="text-xs text-gray-700 font-medium">
+                        {String(popoverAppt.meta.service_name)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

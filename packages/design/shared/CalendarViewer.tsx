@@ -13,9 +13,6 @@ import {
   subWeeks,
   addDays,
   subDays,
-  startOfDay,
-  eachHourOfInterval,
-  endOfDay,
 } from "date-fns";
 import {
   DropdownMenu,
@@ -23,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 type ViewMode = "day" | "week" | "month";
 
@@ -55,6 +52,7 @@ const HOUR_HEIGHT = 60; // px per hour
 function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarViewerProps) {
   const [view, setView] = React.useState<ViewMode>("month");
   const [currentDate, setCurrentDate] = React.useState(new Date());
+  const [expandedDay, setExpandedDay] = React.useState<Date | null>(null);
 
   // Navigation
   const goBack = () => {
@@ -192,8 +190,15 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
     );
   }
 
+  // All events for the currently expanded day (used in the "+N more" popover)
+  const expandedDayAppts = expandedDay
+    ? appointments
+        .filter((a) => isSameDay(a.start, expandedDay))
+        .sort((a, b) => a.start.getTime() - b.start.getTime())
+    : [];
+
   return (
-    <div className="rounded-lg border bg-white mt-4">
+    <div className="rounded-lg border bg-white mt-4 relative">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-2">
@@ -268,7 +273,12 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
                       </button>
                     ))}
                     {dayAppts.length > 3 && (
-                      <div className="text-xs text-gray-400 px-1.5">+{dayAppts.length - 3} more</div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedDay(day); }}
+                        className="text-xs text-blue-500 hover:text-blue-700 hover:underline px-1.5 text-left"
+                      >
+                        +{dayAppts.length - 3} more
+                      </button>
                     )}
                   </div>
                 </div>
@@ -283,6 +293,47 @@ function CalendarViewer({ appointments, onDayClick, onEventClick }: CalendarView
 
       {/* Day view */}
       {view === "day" && <TimeGrid days={[currentDate]} />}
+
+      {/* "+N more" popover — lists every event for the selected day */}
+      {expandedDay && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => setExpandedDay(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h3 className="font-semibold text-gray-800 text-sm">
+                {format(expandedDay, "EEEE, MMMM d, yyyy")}
+              </h3>
+              <button
+                onClick={() => setExpandedDay(null)}
+                className="p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-2 flex flex-col gap-1.5">
+              {expandedDayAppts.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => {
+                    onEventClick?.(a);
+                    setExpandedDay(null);
+                  }}
+                  className={`text-sm px-3 py-2 rounded-lg font-medium text-left hover:opacity-80 transition-opacity ${
+                    nameColorMap[a.patientName] ?? "bg-blue-500 text-white"
+                  }`}
+                >
+                  {format(a.start, "h:mm a")} – {format(a.end, "h:mm a")} · {a.patientName}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

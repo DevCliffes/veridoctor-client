@@ -37,10 +37,8 @@ import {
   setRefreshToken,
 } from "@veridoctor/store";
 import { usePathname, useRouter } from "next/navigation";
+import { GlobalNewAppointmentDialog } from "../../../components/GlobalNewAppointmentDialog";
 
-// `identity` from Redux is normally a raw ID string (rehydrated from
-// localStorage's "vd_identity"), but handle the object/JSON-string
-// shapes too just in case.
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
     if (!identity) return "";
@@ -49,9 +47,7 @@ function getIdentityId(identity: unknown): string {
       if (parsed && typeof parsed === "object" && typeof parsed.id === "string") {
         return parsed.id;
       }
-    } catch {
-      // not JSON — it's the raw identity ID itself
-    }
+    } catch {}
     return identity;
   }
   if (identity && typeof identity === "object" && "id" in identity) {
@@ -91,7 +87,7 @@ export default function MainAppLayout({
 
   const displayName = profile
     ? `${profile.title ?? "Dr."} ${profile.first_name} ${profile.last_name}`
-    : "";
+    : "\u00A0";
 
   const authInfo = {
     isLoggedIn: access_token ? true : false,
@@ -122,9 +118,12 @@ export default function MainAppLayout({
       authInfo={authInfo}
       setAuthInfo={(token) => setAuthInfo(token)}
     >
+      {/* Global dialog — opens from any page via window.dispatchEvent(new CustomEvent("vd:new-appointment")) */}
+      <GlobalNewAppointmentDialog userId={identityId} />
+
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
         <TopNav
-          center={<p>{displayName || "\u00A0"}</p>}
+          center={<p>{displayName}</p>}
           right={<ProfileDropdown dispatch={dispatch} />}
         />
         <div className="flex h-full">
@@ -138,18 +137,12 @@ export default function MainAppLayout({
   );
 }
 
-function ProfileDropdown({ dispatch }: { dispatch: ReturnType<typeof useAppDispatch> }) {
+function ProfileDropdown({
+  dispatch,
+}: {
+  dispatch: ReturnType<typeof useAppDispatch>;
+}) {
   const router = useRouter();
-
-  const handleProfile = () => {
-    router.push("/profile");
-  };
-
-  const handleLogout = () => {
-    dispatch(setAccessToken(""));
-    dispatch(setRefreshToken(""));
-    router.push("/auth/login");
-  };
 
   return (
     <DropdownMenu>
@@ -160,7 +153,7 @@ function ProfileDropdown({ dispatch }: { dispatch: ReturnType<typeof useAppDispa
       <DropdownMenuContent>
         <DropdownMenuItem
           className="cursor-pointer"
-          onClick={handleProfile}
+          onClick={() => router.push("/profile")}
         >
           <LucideUser size={16} />
           <p>Profile</p>
@@ -171,7 +164,11 @@ function ProfileDropdown({ dispatch }: { dispatch: ReturnType<typeof useAppDispa
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer text-red-600 focus:text-red-600"
-          onClick={handleLogout}
+          onClick={() => {
+            dispatch(setAccessToken(""));
+            dispatch(setRefreshToken(""));
+            router.push("/auth/login");
+          }}
         >
           <LucideLogOut size={16} />
           <p>Logout</p>

@@ -500,13 +500,10 @@ export default function Schedule() {
       const block = schedules.find((s) => s.id === appt.meta?.scheduleId);
       if (block) setEditingBlock(block);
     }
-    // booked appointments just show the built-in popover (no onEventClick passed)
   };
 
-  // Schedule blocks as calendar events
   const scheduleEvents = schedules.flatMap(expandToCalendarEvents);
 
-  // Booked appointments as calendar events (different color via patientName)
   const bookedEvents: Appointment[] = bookedAppts
     .filter((a) => a.status !== "cancelled")
     .map((a) => ({
@@ -558,7 +555,7 @@ export default function Schedule() {
               {services.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">
                   No services found.{" "}
-                  
+                  <a
                     href="/services"
                     className="text-blue-600 hover:underline"
                   >

@@ -57,6 +57,28 @@ const SPECIALITIES = [
   "Nutritionist","Pharmacist","Anesthesiologist","General Surgeon",
 ];
 
+// `identity` from Redux is a raw ID string (rehydrated from localStorage),
+// but handle object/JSON-string shapes defensively.
+function getIdentityId(identity: unknown): string {
+  if (typeof identity === "string") {
+    if (!identity) return "";
+    try {
+      const parsed = JSON.parse(identity);
+      if (parsed && typeof parsed === "object" && typeof parsed.id === "string") {
+        return parsed.id;
+      }
+    } catch {
+      // not JSON — it's the raw identity ID itself
+    }
+    return identity;
+  }
+  if (identity && typeof identity === "object" && "id" in identity) {
+    const val = (identity as Record<string, unknown>).id;
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
+
 function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
   useEffect(() => {
     const t = setTimeout(onClose, 3000);
@@ -96,9 +118,9 @@ const selectClass = inputClass;
 
 export default function ProfilePage() {
   const { identity } = useAppSelector((store) => store.auth);
-  const identityId = identity && typeof identity === "object" && "id" in identity
-    ? String((identity as Record<string, unknown>).id ?? "")
-    : "";
+
+  // ✅ Fixed: was checking typeof identity === "object" which fails for raw string IDs
+  const identityId = getIdentityId(identity);
 
   const [profile, setProfile] = useState<ProviderProfile>({
     first_name: "", last_name: "", email: "", title: "Dr.",
@@ -116,7 +138,10 @@ export default function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!identityId) return;
+    if (!identityId) {
+      setLoading(false); // ✅ Don't spin forever if no identity
+      return;
+    }
     axiosClient
       .get("/provider/" + identityId + "/profile")
       .then((res) => {
@@ -382,7 +407,7 @@ export default function ProfilePage() {
             Add
           </button>
         </div>
-        {profile.insurances_accepted.length > 0 && (
+        {profile.insurances_accepted.filter((i) => !COMMON_INSURANCES.includes(i)).length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {profile.insurances_accepted
               .filter((i) => !COMMON_INSURANCES.includes(i))
@@ -408,4 +433,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

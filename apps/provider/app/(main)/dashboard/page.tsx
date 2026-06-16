@@ -79,7 +79,7 @@ export default function Dashboard() {
             })}
           </p>
         </div>
-        <Button onClick={() => router.push("/appointments")}>
+        <Button onClick={() => window.dispatchEvent(new CustomEvent("vd:new-appointment"))}>
           <LucidePlus /> New appointment
         </Button>
       </div>

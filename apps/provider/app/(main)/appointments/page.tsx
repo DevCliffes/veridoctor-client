@@ -1,30 +1,35 @@
 "use client";
 
-import AppointmentForm, {
-  AppointmentFormValues,
-} from "@/components/AppointmentForm";
 import { Button } from "@veridoctor/design/components";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@veridoctor/design/components";
-import {
   DataTable,
-  DatatableActions,
   DatatableColumnHeader,
   DatatableFilterTabs,
-  DialogModal,
 } from "@veridoctor/design/shared";
 import { axiosClient } from "@veridoctor/api-client";
-import { LucideVideo } from "@veridoctor/design/icons";
+import { LucideVideo, LucidePlus } from "@veridoctor/design/icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useSelector } from "react-redux";
+import { useAppSelector } from "../../hooks";
 import { toast } from "sonner";
-import { RootState } from "../../store";
+
+function getIdentityId(identity: unknown): string {
+  if (typeof identity === "string") {
+    if (!identity) return "";
+    try {
+      const parsed = JSON.parse(identity);
+      if (parsed && typeof parsed === "object" && typeof parsed.id === "string")
+        return parsed.id;
+    } catch {}
+    return identity;
+  }
+  if (identity && typeof identity === "object" && "id" in identity) {
+    const val = (identity as Record<string, unknown>).id;
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
 
 type Appointment = {
   id: string;
@@ -39,48 +44,122 @@ type Appointment = {
   meet_id: string;
 };
 
-const emptyForm: AppointmentFormValues = {
-  patient_first_name: "",
-  patient_last_name: "",
-  patient_phone_number: "",
-  patient_email: "",
-  date: "",
-  time: "",
-  duration: 30,
-  message: "",
-  appointment_type: "virtual",
-};
-
 export default function Appointments() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const userId = useSelector((state: RootState) => state.auth.identity);
+  const { identity } = useAppSelector((store) => store.auth);
+  const userId = getIdentityId(identity);
+
   const [loading, setLoading] = useState(false);
-  const [appointmentTime, setAppointmentTime] = useState<"now" | "later">("now");
-  const [formValues, setFormValues] = useState<AppointmentFormValues>(emptyForm);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleSaving, setRescheduleSaving] = useState(false);
 
   const filter = searchParams.get("filter") ?? "today";
   const appointmentType = searchParams.get("appointment_type") ?? "";
 
-  const joinCall = (meetId: string) => {
-    router.push(`/calls/${meetId}`);
+  const openNewAppointment = () => {
+    window.dispatchEvent(new CustomEvent("vd:new-appointment"));
   };
+
+  const joinCall = (meetId: string) => router.push(`/calls/${meetId}`);
 
   const isJoinEnabled = (startTime: string) => {
     if (filter === "past" || filter === "upcoming") return false;
-    const appointmentDate = new Date(startTime);
-    const now = new Date();
-    return appointmentDate.toDateString() === now.toDateString();
+    return new Date(startTime).toDateString() === new Date().toDateString();
+  };
+
+  const handleCancel = async (id: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    setCancellingId(id);
+    try {
+      await axiosClient.patch(`/provider/${userId}/appointments/${id}`, {
+        status: "cancelled",
+      });
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a))
+      );
+      toast.success("Appointment cancelled");
+    } catch {
+      toast.error("Failed to cancel appointment");
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const openReschedule = (appt: Appointment) => {
+    setReschedulingAppt(appt);
+    const d = new Date(appt.start_time);
+    setRescheduleDate(d.toISOString().split("T")[0]);
+    setRescheduleTime(d.toTimeString().slice(0, 5));
+  };
+
+  const handleReschedule = async () => {
+    if (!reschedulingAppt || !rescheduleDate || !rescheduleTime) {
+      toast.error("Please select a new date and time");
+      return;
+    }
+    setRescheduleSaving(true);
+    const newStart = new Date(
+      `${rescheduleDate}T${rescheduleTime}`
+    ).toISOString();
+    const duration =
+      new Date(reschedulingAppt.end_time).getTime() -
+      new Date(reschedulingAppt.start_time).getTime();
+    const newEnd = new Date(
+      new Date(newStart).getTime() + duration
+    ).toISOString();
+
+    try {
+      await axiosClient.patch(
+        `/provider/${userId}/appointments/${reschedulingAppt.id}`,
+        { start_time: newStart, end_time: newEnd, status: "scheduled" }
+      );
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a.id === reschedulingAppt.id
+            ? { ...a, start_time: newStart, end_time: newEnd, status: "scheduled" }
+            : a
+        )
+      );
+      toast.success("Appointment rescheduled");
+      setReschedulingAppt(null);
+    } catch {
+      toast.error("Failed to reschedule appointment");
+    } finally {
+      setRescheduleSaving(false);
+    }
+  };
+
+  const statusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      cancelled: "bg-red-100 text-red-700",
+      confirmed: "bg-green-100 text-green-700",
+      completed: "bg-blue-100 text-blue-700",
+      scheduled: "bg-yellow-100 text-yellow-700",
+    };
+    return (
+      <span
+        className={`text-xs px-2 py-1 rounded-full font-medium ${
+          styles[status] ?? "bg-gray-100 text-gray-600"
+        }`}
+      >
+        {status}
+      </span>
+    );
   };
 
   const tableRows: {
     id: string;
     name: ReactNode;
     date: string;
-    status: string;
+    status: ReactNode;
     call: ReactNode;
+    actions: ReactNode;
   }[] = appointments.map((appointment) => ({
     id: appointment.id,
     name: (
@@ -91,8 +170,8 @@ export default function Appointments() {
         {appointment.patient_first_name} {appointment.patient_last_name}
       </button>
     ),
-    date: new Date(appointment.start_time).toLocaleString(),
-    status: appointment.status,
+    date: new Date(appointment.start_time).toLocaleString("en-KE"),
+    status: statusBadge(appointment.status),
     call:
       appointment.appointment_type === "virtual" ? (
         <Button
@@ -104,7 +183,27 @@ export default function Appointments() {
           <LucideVideo /> Join call
         </Button>
       ) : (
-        "Physical"
+        <span className="text-xs text-gray-500">In-person</span>
+      ),
+    actions:
+      appointment.status === "cancelled" ? (
+        <span className="text-xs text-gray-400">—</span>
+      ) : (
+        <div className="flex gap-1">
+          <button
+            onClick={() => openReschedule(appointment)}
+            className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+          >
+            Reschedule
+          </button>
+          <button
+            onClick={() => handleCancel(appointment.id)}
+            disabled={cancellingId === appointment.id}
+            className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            {cancellingId === appointment.id ? "..." : "Cancel"}
+          </button>
+        </div>
       ),
   }));
 
@@ -113,6 +212,7 @@ export default function Appointments() {
     { name: "Date/Time", type: "string", key: "date" },
     { name: "Status", type: "string", key: "status" },
     { name: "Call", type: "string", key: "call" },
+    { name: "Actions", type: "string", key: "actions" },
   ];
 
   const fetchAppointments = useCallback(() => {
@@ -121,9 +221,8 @@ export default function Appointments() {
     const params = new URLSearchParams();
     params.set("filter", filter);
     if (appointmentType) params.set("appointment_type", appointmentType);
-
     axiosClient
-      .get(`provider/${userId}/appointments?${params.toString()}`)
+      .get(`/provider/${userId}/appointments?${params.toString()}`)
       .then((res) => setAppointments(res.data ?? []))
       .catch(() => toast.error("Could not load appointments"))
       .finally(() => setLoading(false));
@@ -138,39 +237,20 @@ export default function Appointments() {
       {
         name: "Today",
         value: "today",
-        action: (filter) => updateQueryParams("filter", filter),
+        action: (f) => updateQueryParams("filter", f),
       },
       {
         name: "Upcoming",
         value: "upcoming",
-        action: (filter) => updateQueryParams("filter", filter),
+        action: (f) => updateQueryParams("filter", f),
       },
       {
         name: "Past",
         value: "past",
-        action: (filter) => updateQueryParams("filter", filter),
+        action: (f) => updateQueryParams("filter", f),
       },
     ],
     defaultTab: filter,
-  };
-
-  const actions: DatatableActions = {
-    primary: [
-      {
-        name: "view",
-        action: () => toast.info("Click a patient name to view appointment details"),
-      },
-    ],
-    secondary: [
-      {
-        name: "cancel",
-        action: () => toast.info("Cancel appointment is not available yet"),
-      },
-      {
-        name: "reschedule",
-        action: () => toast.info("Reschedule appointment is not available yet"),
-      },
-    ],
   };
 
   const updateQueryParams = (name: string, value: string) => {
@@ -179,107 +259,74 @@ export default function Appointments() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
-  const getStartTime = () => {
-    if (appointmentTime === "now") return new Date().toISOString();
-    if (!formValues.date || !formValues.time) return "";
-    return new Date(`${formValues.date}T${formValues.time}`).toISOString();
-  };
-
-  const getEndTime = (startTime: string) => {
-    const end = new Date(startTime);
-    end.setMinutes(end.getMinutes() + (formValues.duration ?? 30));
-    return end.toISOString();
-  };
-
-  const handleSaveAppointment = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (!userId) {
-        toast.error("Please sign in before creating an appointment");
-        return reject();
-      }
-      const startTime = getStartTime();
-      if (!formValues.patient_first_name || !formValues.patient_last_name) {
-        toast.error("Patient first and last name are required");
-        return reject();
-      }
-      if (!startTime) {
-        toast.error("Please choose the appointment date and time");
-        return reject();
-      }
-      setLoading(true);
-      axiosClient
-        .post(`provider/${userId}/appointments`, {
-          patient_first_name: formValues.patient_first_name,
-          patient_last_name: formValues.patient_last_name,
-          patient_phone_number: formValues.patient_phone_number,
-          patient_email: formValues.patient_email,
-          appointment_type: formValues.appointment_type,
-          start_time: startTime,
-          end_time: getEndTime(startTime),
-          message: formValues.message,
-        })
-        .then((res) => {
-          toast.success("Appointment created");
-          setFormValues(emptyForm);
-          setAppointments((current) => [res.data, ...current]);
-          resolve();
-        })
-        .catch(() => {
-          toast.error("An error occurred while submitting your appointment. Please try again later");
-          reject();
-        })
-        .finally(() => setLoading(false));
-    });
-  };
-
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
+      {/* Reschedule dialog */}
+      {reschedulingAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-semibold text-gray-800">
+              Reschedule — {reschedulingAppt.patient_first_name}{" "}
+              {reschedulingAppt.patient_last_name}
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">
+                  New Date
+                </label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  className="w-full mt-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">
+                  New Time
+                </label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  className="w-full mt-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setReschedulingAppt(null)}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReschedule}
+                disabled={rescheduleSaving}
+                className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
+              >
+                {rescheduleSaving ? "Saving..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold">Appointments</h1>
           <p className="text-gray-600 mt-2">Manage your appointments here.</p>
         </div>
-        <DialogModal
-          title="Add a new appointment"
-          description="Create a new appointment"
-          trigger={<p>New appointment</p>}
-          onSave={handleSaveAppointment}
-        >
-          <div>
-            <Tabs
-              defaultValue="now"
-              onValueChange={(value) =>
-                setAppointmentTime(value === "schedule" ? "later" : "now")
-              }
-            >
-              <TabsList variant="line">
-                <TabsTrigger value="now">Now</TabsTrigger>
-                <TabsTrigger value="schedule">Later</TabsTrigger>
-              </TabsList>
-              <TabsContent value="now">
-                <AppointmentForm
-                  time="now"
-                  values={formValues}
-                  setValues={setFormValues}
-                />
-              </TabsContent>
-              <TabsContent value="schedule">
-                <AppointmentForm
-                  time="later"
-                  values={formValues}
-                  setValues={setFormValues}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </DialogModal>
+        <Button onClick={openNewAppointment}>
+          <LucidePlus /> New appointment
+        </Button>
       </div>
+
       <DataTable
         rows={tableRows}
         columns={tableColumns}
         isLoading={loading}
         filterTabs={filterTabs}
-        tableActions={actions}
       />
     </div>
   );

@@ -38,6 +38,7 @@ type ScheduleBlock = {
   recurrence_end_type: EndType | null;
   recurrence_end_date: string | null;
   recurrence_count: number | null;
+  excluded_dates: string[];
 };
 
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -70,17 +71,20 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
       include = s.recurrence_days?.includes(dow) ?? false;
 
     if (include) {
-      const evStart = new Date(cursor);
-      evStart.setHours(sh, sm, 0, 0);
-      const evEnd = new Date(cursor);
-      evEnd.setHours(eh, em, 0, 0);
-      events.push({
-        id: `${s.id}-${cursor.toISOString()}`,
-        start: evStart,
-        end: evEnd,
-        patientName: s.service_name ?? "Available",
-        meta: { scheduleId: s.id },
-      });
+      const dateStr = cursor.toISOString().split("T")[0];
+      if (!s.excluded_dates?.includes(dateStr)) {
+        const evStart = new Date(cursor);
+        evStart.setHours(sh, sm, 0, 0);
+        const evEnd = new Date(cursor);
+        evEnd.setHours(eh, em, 0, 0);
+        events.push({
+          id: `${s.id}-${cursor.toISOString()}`,
+          start: evStart,
+          end: evEnd,
+          patientName: s.service_name ?? "Available",
+          meta: { scheduleId: s.id, occurrenceDate: dateStr },
+        });
+      }
     }
 
     cursor.setDate(cursor.getDate() + 1);
@@ -93,12 +97,14 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
 function EditScheduleModal({
   block,
   services,
+  occurrenceDate,
   onClose,
   onSaved,
   onDeleted,
 }: {
   block: ScheduleBlock;
   services: Service[];
+  occurrenceDate: string | null;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -151,10 +157,40 @@ function EditScheduleModal({
   };
 
   const handleDelete = async () => {
+    const isRecurring = block.recurrence !== "none";
+
+    // For recurring schedules, ask whether to remove just this occurrence
+    // or the entire series. For one-off blocks, there's only one outcome.
+    const deleteWholeSeries = isRecurring
+      ? confirm(
+          "This is a recurring schedule.\n\nClick OK to delete the ENTIRE series, or Cancel to delete only this occurrence."
+        )
+      : true;
+
+    if (isRecurring && !deleteWholeSeries) {
+      if (!occurrenceDate) {
+        toast.error("Could not determine which occurrence to delete");
+        return;
+      }
+      setDeleting(true);
+      try {
+        await axiosClient.delete(
+          `provider/${userId}/schedule/${block.id}?occurrence_date=${occurrenceDate}`
+        );
+        toast.success("This occurrence was removed");
+        onDeleted();
+      } catch {
+        toast.error("Could not delete this occurrence");
+      } finally {
+        setDeleting(false);
+      }
+      return;
+    }
+
     if (!confirm("Delete this schedule block?")) return;
     setDeleting(true);
     try {
-      await axiosClient.delete(`provider/${userId}/schedule/${block.id}`);
+      await axiosClient.delete(`provider/${userId}/schedule/${block.id}?delete_series=true`);
       toast.success("Schedule deleted");
       onDeleted();
     } catch {
@@ -335,6 +371,7 @@ export default function Schedule() {
   const [services, setServices] = useState<Service[]>([]);
   const [schedules, setSchedules] = useState<ScheduleBlock[]>([]);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
+  const [editingOccurrenceDate, setEditingOccurrenceDate] = useState<string | null>(null);
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [startDate, setStartDate] = useState(todayStr());
@@ -409,11 +446,16 @@ export default function Schedule() {
     }
   };
 
-  // When an event is clicked, find its parent ScheduleBlock and open edit modal
+  // When an event is clicked, find its parent ScheduleBlock (and which
+  // exact occurrence date was clicked) and open the edit modal
   const handleEventClick = (appt: Appointment) => {
     const scheduleId = appt.meta?.scheduleId as string;
+    const occurrenceDate = (appt.meta?.occurrenceDate as string) ?? null;
     const block = schedules.find((s) => s.id === scheduleId);
-    if (block) setEditingBlock(block);
+    if (block) {
+      setEditingBlock(block);
+      setEditingOccurrenceDate(occurrenceDate);
+    }
   };
 
   const calendarEvents = schedules.flatMap(expandToCalendarEvents);
@@ -447,7 +489,7 @@ export default function Schedule() {
               ) : (
                 <select value={selectedServiceId} onChange={(e) => handleServiceChange(e.target.value)}
                   className="w-full text-lg font-medium border-b border-gray-200 pb-2 focus:outline-none focus:border-blue-400 bg-transparent">
-                  <option value="">Add title — select a service</option>
+                  <option value="">Select a service</option>
                   {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               )}
@@ -556,9 +598,10 @@ export default function Schedule() {
         <EditScheduleModal
           block={editingBlock}
           services={services}
-          onClose={() => setEditingBlock(null)}
-          onSaved={() => { setEditingBlock(null); fetchSchedules(); }}
-          onDeleted={() => { setEditingBlock(null); fetchSchedules(); }}
+          occurrenceDate={editingOccurrenceDate}
+          onClose={() => { setEditingBlock(null); setEditingOccurrenceDate(null); }}
+          onSaved={() => { setEditingBlock(null); setEditingOccurrenceDate(null); fetchSchedules(); }}
+          onDeleted={() => { setEditingBlock(null); setEditingOccurrenceDate(null); fetchSchedules(); }}
         />
       )}
     </div>

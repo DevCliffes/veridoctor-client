@@ -37,7 +37,7 @@ import {
   setRefreshToken,
 } from "@veridoctor/store";
 import { usePathname, useRouter } from "next/navigation";
-import { GlobalNewAppointmentDialog } from "../../../components/GlobalNewAppointmentDialog";
+import { GlobalNewAppointmentDialog } from "../../components/GlobalNewAppointmentDialog";
 
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {

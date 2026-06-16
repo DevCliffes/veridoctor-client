@@ -26,46 +26,56 @@ type Section = {
 
 const defaultSections: Section[] = [
   {
+    id: "demographics",
+    title: "Patient Demographics",
+    fields: [
+      { id: "f1", label: "Full Name", type: "text", required: true, section: "demographics" },
+      { id: "f2", label: "Age", type: "number", required: true, section: "demographics" },
+      { id: "f3", label: "Gender", type: "select", required: true, options: ["Male", "Female", "Other"], section: "demographics" },
+      { id: "f4", label: "Contact Number", type: "text", required: true, section: "demographics" },
+    ],
+  },
+  {
     id: "vitals",
     title: "Vital Signs",
     fields: [
-      { id: "f1", label: "Blood Pressure (mmHg)", type: "text", required: false, section: "vitals" },
-      { id: "f2", label: "Pulse (bpm)", type: "number", required: false, section: "vitals" },
-      { id: "f3", label: "Temperature (°C)", type: "number", required: false, section: "vitals" },
-      { id: "f4", label: "Weight (kg)", type: "number", required: false, section: "vitals" },
-      { id: "f5", label: "Height (cm)", type: "number", required: false, section: "vitals" },
+      { id: "f5", label: "Blood Pressure (mmHg)", type: "text", required: false, section: "vitals" },
+      { id: "f6", label: "Pulse (bpm)", type: "number", required: false, section: "vitals" },
+      { id: "f7", label: "Temperature (°C)", type: "number", required: false, section: "vitals" },
+      { id: "f8", label: "Weight (kg)", type: "number", required: false, section: "vitals" },
+      { id: "f9", label: "Height (cm)", type: "number", required: false, section: "vitals" },
     ],
   },
   {
     id: "complaint",
     title: "Chief Complaint / Reason for Visit",
     fields: [
-      { id: "f6", label: "Chief Complaint", type: "textarea", required: true, section: "complaint" },
-      { id: "f7", label: "Duration of Symptoms", type: "text", required: false, section: "complaint" },
+      { id: "f10", label: "Chief Complaint", type: "textarea", required: true, section: "complaint" },
+      { id: "f11", label: "Duration of Symptoms", type: "text", required: false, section: "complaint" },
     ],
   },
   {
     id: "history",
     title: "Medical History",
     fields: [
-      { id: "f8", label: "Known Allergies", type: "textarea", required: false, section: "history" },
-      { id: "f9", label: "Chronic Conditions", type: "textarea", required: false, section: "history" },
-      { id: "f10", label: "Current Medications", type: "textarea", required: false, section: "history" },
+      { id: "f12", label: "Known Allergies", type: "textarea", required: false, section: "history" },
+      { id: "f13", label: "Chronic Conditions", type: "textarea", required: false, section: "history" },
+      { id: "f14", label: "Current Medications", type: "textarea", required: false, section: "history" },
     ],
   },
   {
     id: "examination",
     title: "Clinical Notes / Examination Findings",
     fields: [
-      { id: "f11", label: "Examination Findings", type: "textarea", required: false, section: "examination" },
+      { id: "f15", label: "Examination Findings", type: "textarea", required: false, section: "examination" },
     ],
   },
   {
     id: "diagnosis",
     title: "Diagnosis",
     fields: [
-      { id: "f12", label: "Primary Diagnosis", type: "textarea", required: false, section: "diagnosis" },
-      { id: "f13", label: "ICD Code", type: "text", required: false, section: "diagnosis" },
+      { id: "f16", label: "Primary Diagnosis", type: "textarea", required: false, section: "diagnosis" },
+      { id: "f17", label: "ICD Code", type: "text", required: false, section: "diagnosis" },
     ],
   },
   {
@@ -78,8 +88,8 @@ const defaultSections: Section[] = [
     id: "followup",
     title: "Follow-up Instructions",
     fields: [
-      { id: "f14", label: "Follow-up Date", type: "date", required: false, section: "followup" },
-      { id: "f15", label: "Instructions for Patient", type: "textarea", required: false, section: "followup" },
+      { id: "f18", label: "Follow-up Date", type: "date", required: false, section: "followup" },
+      { id: "f19", label: "Instructions for Patient", type: "textarea", required: false, section: "followup" },
     ],
   },
 ];
@@ -191,7 +201,6 @@ function FormBuilderInner() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Edit field modal */}
       {editingField && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -248,7 +257,6 @@ function FormBuilderInner() {
         </div>
       )}
 
-      {/* Top bar */}
       <div className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <button onClick={() => router.push("/forms")} className="text-gray-500 hover:text-gray-700">← Back</button>
@@ -279,13 +287,11 @@ function FormBuilderInner() {
             </div>
 
             <div className="p-4 flex flex-col gap-3">
-              {/* Prescription section: special preview, no field builder */}
               {section.isPrescription ? (
                 <div className="flex flex-col gap-3">
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
                     This section renders a full medication builder when filling the form — drug name, frequency, duration, and special instructions per medication.
                   </div>
-                  {/* Static preview of what it'll look like */}
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 opacity-60 pointer-events-none select-none flex flex-col gap-3">
                     <div>
                       <p className="text-xs font-medium text-gray-500 mb-1">Diagnosis / Indication</p>

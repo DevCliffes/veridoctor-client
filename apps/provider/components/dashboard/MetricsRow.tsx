@@ -9,6 +9,7 @@ interface DashboardStats {
   this_week_appointments: number;
   this_week_patients: number;
   total_patients_month: number;
+  total_patients: number;
   avg_duration_minutes: number;
   weekly_data: { date: string; day: string; count: number }[];
 }
@@ -45,8 +46,8 @@ export function MetricsRow({ identityId }: MetricsRowProps) {
     },
     {
       label: "Total Patients",
-      value: stats?.total_patients_month ?? 0,
-      sub: "patients this month",
+      value: stats?.total_patients ?? 0,
+      sub: "patients seen overall",
       color: "bg-purple-50 text-purple-700",
     },
     {

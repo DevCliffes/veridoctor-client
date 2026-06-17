@@ -42,6 +42,7 @@ interface BookingState {
   provider: Provider;
   slot: Slot;
   date: string;
+  appointmentType: "virtual" | "physical";
 }
 
 function Toast({
@@ -109,6 +110,12 @@ function ProviderCard({
   const [daySlots, setDaySlots] = useState<Record<string, Slot[]>>({});
   const [loadingDays, setLoadingDays] = useState<Record<string, boolean>>({});
   const [dayOffset, setDayOffset] = useState(0);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
+    provider.services[0]?.id ?? null
+  );
+  const [selectedApptType, setSelectedApptType] = useState<
+    "virtual" | "physical"
+  >("virtual");
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
 
   useEffect(() => {
@@ -159,6 +166,60 @@ function ProviderCard({
         </div>
       </div>
 
+      {provider.services.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+            Service
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            {provider.services.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedServiceId(s.id)}
+                className={
+                  "text-xs px-3 py-1.5 rounded-full border transition-colors " +
+                  (selectedServiceId === s.id
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "border-gray-200 text-gray-600 hover:border-gray-300")
+                }
+              >
+                {s.name} · {s.estimated_duration}m
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3">
+        <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+          Appointment type
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSelectedApptType("virtual")}
+            className={
+              "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
+              (selectedApptType === "virtual"
+                ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
+                : "border-gray-200 text-gray-600")
+            }
+          >
+            <LucideVideo size={13} /> Virtual
+          </button>
+          <button
+            onClick={() => setSelectedApptType("physical")}
+            className={
+              "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
+              (selectedApptType === "physical"
+                ? "bg-green-50 border-green-300 text-green-700 font-medium"
+                : "border-gray-200 text-gray-600")
+            }
+          >
+            <LucideMapPin size={13} /> In-person
+          </button>
+        </div>
+      </div>
+
       <div className="mt-4 flex gap-2 items-start">
         <button
           onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
@@ -172,9 +233,21 @@ function ProviderCard({
           {visibleDays.map((day) => {
             const allSlots = daySlots[day] ?? [];
             const now = new Date();
-            const futureSlots = allSlots.filter(
-              (slot) => new Date(slot.start_time) > now
-            );
+            const futureSlots = allSlots.filter((slot) => {
+              if (new Date(slot.start_time) <= now) return false;
+              if (
+                selectedServiceId &&
+                slot.service_id &&
+                slot.service_id !== selectedServiceId
+              )
+                return false;
+              if (
+                slot.location_type !== "both" &&
+                slot.location_type !== selectedApptType
+              )
+                return false;
+              return true;
+            });
             const loading = loadingDays[day];
             return (
               <div key={day} className="flex-1 flex flex-col items-center gap-1.5">
@@ -195,7 +268,14 @@ function ProviderCard({
                     {futureSlots.slice(0, 3).map((slot) => (
                       <button
                         key={slot.start_time}
-                        onClick={() => onBook({ provider, slot, date: day })}
+                        onClick={() =>
+                          onBook({
+                            provider,
+                            slot,
+                            date: day,
+                            appointmentType: selectedApptType,
+                          })
+                        }
                         className="w-full text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors"
                       >
                         {formatTime(slot.start_time)}
@@ -245,7 +325,7 @@ function BookingModal({
   onConfirmed: () => void;
 }) {
   const [apptType, setApptType] = useState<"virtual" | "physical">(
-    booking.slot.location_type === "physical" ? "physical" : "virtual"
+    booking.appointmentType
   );
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);

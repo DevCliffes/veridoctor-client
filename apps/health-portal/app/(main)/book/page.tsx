@@ -44,57 +44,6 @@ interface BookingState {
   date: string;
 }
 
-// Recursively extract a string field from a potentially nested identity object.
-function extractField(obj: unknown, field: string): string {
-  if (!obj || typeof obj !== "object") return "";
-  const record = obj as Record<string, unknown>;
-
-  // Direct match
-  if (typeof record[field] === "string" && record[field] !== "") {
-    return record[field] as string;
-  }
-
-  // Try one level deeper (e.g. identity.identity.first_name)
-  for (const key of Object.keys(record)) {
-    const val = record[key];
-    if (val && typeof val === "object") {
-      const nested = extractField(val, field);
-      if (nested) return nested;
-    }
-    // Handle JSON-stringified sub-objects
-    if (typeof val === "string") {
-      try {
-        const parsed = JSON.parse(val);
-        const nested = extractField(parsed, field);
-        if (nested) return nested;
-      } catch {}
-    }
-  }
-  return "";
-}
-
-function getPatientInfo(identity: unknown): {
-  email: string;
-  first_name: string;
-  last_name: string;
-} {
-  // identity may be a raw string (just the id), a JSON string, or an object
-  let obj: unknown = identity;
-  if (typeof identity === "string") {
-    try {
-      obj = JSON.parse(identity);
-    } catch {
-      // plain id string — nothing useful
-      return { email: "", first_name: "", last_name: "" };
-    }
-  }
-  return {
-    email: extractField(obj, "email"),
-    first_name: extractField(obj, "first_name"),
-    last_name: extractField(obj, "last_name"),
-  };
-}
-
 function Toast({
   message,
   type,
@@ -450,6 +399,12 @@ function BookingModal({
 
 export default function BookPage() {
   const { identity } = useAppSelector((store) => store.auth);
+  const identityId = typeof identity === "string" ? identity : "";
+
+  const [patientEmail, setPatientEmail] = useState("");
+  const [patientFirst, setPatientFirst] = useState("");
+  const [patientLast, setPatientLast] = useState("");
+
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -459,8 +414,18 @@ export default function BookPage() {
     type: "success" | "error";
   } | null>(null);
 
-  const { email: patientEmail, first_name: patientFirst, last_name: patientLast } =
-    getPatientInfo(identity);
+  // Fetch the patient's actual saved profile, rather than guessing from the raw login ID
+  useEffect(() => {
+    if (!identityId) return;
+    axiosClient
+      .get(`/identity/register/${identityId}`)
+      .then((res) => {
+        setPatientEmail(res.data.email ?? "");
+        setPatientFirst(res.data.first_name ?? "");
+        setPatientLast(res.data.last_name ?? "");
+      })
+      .catch(() => {});
+  }, [identityId]);
 
   useEffect(() => {
     axiosClient

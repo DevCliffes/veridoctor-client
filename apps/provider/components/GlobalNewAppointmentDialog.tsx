@@ -12,8 +12,9 @@ const emptyForm: AppointmentFormValues = {
   patient_last_name: "",
   patient_phone_number: "",
   patient_email: "",
+  service_id: null,
   date: "",
-  time: "",
+  start_time: "",
   duration: 30,
   message: "",
   appointment_type: "virtual",
@@ -35,8 +36,9 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
 
   const getStartTime = () => {
     if (appointmentTime === "now") return new Date().toISOString();
-    if (!formValues.date || !formValues.time) return "";
-    return new Date(`${formValues.date}T${formValues.time}`).toISOString();
+    // For "later", the start time comes from the slot the provider picked
+    // in AppointmentForm — no more reconstructing it from raw date/time inputs
+    return formValues.start_time || "";
   };
 
   const getEndTime = (startTime: string) => {
@@ -57,7 +59,11 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
         return reject();
       }
       if (!startTime) {
-        toast.error("Please choose the appointment date and time");
+        toast.error(
+          appointmentTime === "later"
+            ? "Please select an available time slot"
+            : "Please choose the appointment date and time"
+        );
         return reject();
       }
       axiosClient
@@ -66,6 +72,7 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
           patient_last_name: formValues.patient_last_name,
           patient_phone_number: formValues.patient_phone_number,
           patient_email: formValues.patient_email,
+          service: formValues.service_id,
           appointment_type: formValues.appointment_type,
           start_time: startTime,
           end_time: getEndTime(startTime),
@@ -106,10 +113,20 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
           <TabsTrigger value="schedule">Later</TabsTrigger>
         </TabsList>
         <TabsContent value="now">
-          <AppointmentForm time="now" values={formValues} setValues={setFormValues} />
+          <AppointmentForm
+            userId={userId}
+            time="now"
+            values={formValues}
+            setValues={setFormValues}
+          />
         </TabsContent>
         <TabsContent value="schedule">
-          <AppointmentForm time="later" values={formValues} setValues={setFormValues} />
+          <AppointmentForm
+            userId={userId}
+            time="later"
+            values={formValues}
+            setValues={setFormValues}
+          />
         </TabsContent>
       </Tabs>
     </DialogModal>

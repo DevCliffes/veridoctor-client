@@ -30,15 +30,6 @@ import {
   setAccessToken,
   setRefreshToken,
 } from "@veridoctor/store";
-
-function getField(identity: unknown, field: string): string {
-  if (identity && typeof identity === "object" && field in identity) {
-    const val = (identity as Record<string, unknown>)[field];
-    if (typeof val === "string") return val;
-  }
-  return "";
-}
-
 export default function MainAppLayout({
   children,
 }: {
@@ -49,13 +40,11 @@ export default function MainAppLayout({
     (store) => store.auth
   );
   const dispatch = useAppDispatch();
-
   const authInfo = {
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
   };
-
   const navItems: navITem[] = [
     {
       linkTo: "/dashboard",
@@ -78,25 +67,18 @@ export default function MainAppLayout({
       name: "Prescriptions",
     },
   ];
-
   const setAuthInfo = (token: TokenPayload) => {
     dispatch(setAccessToken(token.a_token));
     dispatch(setRefreshToken(token.refresh_token));
     dispatch(setIsLoggedIn());
   };
-
-  const identityId = getField(identity, "id");
-
   return (
     <AuthWrapper
       authInfo={authInfo}
       setAuthInfo={(token) => setAuthInfo(token)}
     >
       <div className="fixed bg-gray-50 top-0 left-0 h-svh w-full flex flex-col">
-        <TopNav
-          center={<p>Health portal</p>}
-          right={<ProfileDropdown identityId={identityId} />}
-        />
+        <TopNav center={<p>Health portal</p>} right={<ProfileDropdown />} />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
           <div className="w-full overflow-y-scroll bg-gray-200 p-4 rounded-lg">
@@ -107,17 +89,14 @@ export default function MainAppLayout({
     </AuthWrapper>
   );
 }
-
-function ProfileDropdown({ identityId }: { identityId?: string }) {
+function ProfileDropdown() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-
   const handleLogout = () => {
     dispatch(setAccessToken(""));
     dispatch(setRefreshToken(""));
     router.push("/auth/login");
   };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex gap-2 border-2 hover:cursor-pointer items-center p-1 md:border-2 md:rounded-full">
@@ -125,11 +104,12 @@ function ProfileDropdown({ identityId }: { identityId?: string }) {
         <ChevronDown />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem className="cursor-pointer">
-          <a className="flex gap-2" href={identityId ? "/profile" : "#"}>
-            <LucideUser />
-            <p>Profile</p>
-          </a>
+        <DropdownMenuItem
+          className="cursor-pointer flex gap-2"
+          onClick={() => router.push("/profile")}
+        >
+          <LucideUser />
+          <p>Profile</p>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer">
           <LucideBookUser />
@@ -143,4 +123,3 @@ function ProfileDropdown({ identityId }: { identityId?: string }) {
     </DropdownMenu>
   );
 }
-

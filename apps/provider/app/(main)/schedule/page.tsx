@@ -522,7 +522,15 @@ export default function Schedule() {
       },
     }));
 
-  const allCalendarEvents = [...scheduleEvents, ...bookedEvents];
+  // Hide schedule slots that are already covered by a booked appointment
+  const filteredScheduleEvents = scheduleEvents.filter((slot) => {
+    return !bookedEvents.some(
+      (booked) =>
+        booked.start < slot.end && booked.end > slot.start
+    );
+  });
+
+  const allCalendarEvents = [...filteredScheduleEvents, ...bookedEvents];
 
   const locationOptions: { key: LocationType; label: string; icon: ReactNode }[] = [
     { key: "virtual", label: "Virtual", icon: <LucideVideo size={14} /> },

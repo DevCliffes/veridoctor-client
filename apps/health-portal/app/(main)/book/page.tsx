@@ -601,4 +601,3 @@ export default function BookPage() {
     </div>
   );
 }
-

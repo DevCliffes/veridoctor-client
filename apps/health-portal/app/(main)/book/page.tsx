@@ -44,12 +44,55 @@ interface BookingState {
   date: string;
 }
 
-function getIdentityField(identity: unknown, field: string): string {
-  if (identity && typeof identity === "object" && field in identity) {
-    const val = (identity as Record<string, unknown>)[field];
-    if (typeof val === "string") return val;
+// Recursively extract a string field from a potentially nested identity object.
+function extractField(obj: unknown, field: string): string {
+  if (!obj || typeof obj !== "object") return "";
+  const record = obj as Record<string, unknown>;
+
+  // Direct match
+  if (typeof record[field] === "string" && record[field] !== "") {
+    return record[field] as string;
+  }
+
+  // Try one level deeper (e.g. identity.identity.first_name)
+  for (const key of Object.keys(record)) {
+    const val = record[key];
+    if (val && typeof val === "object") {
+      const nested = extractField(val, field);
+      if (nested) return nested;
+    }
+    // Handle JSON-stringified sub-objects
+    if (typeof val === "string") {
+      try {
+        const parsed = JSON.parse(val);
+        const nested = extractField(parsed, field);
+        if (nested) return nested;
+      } catch {}
+    }
   }
   return "";
+}
+
+function getPatientInfo(identity: unknown): {
+  email: string;
+  first_name: string;
+  last_name: string;
+} {
+  // identity may be a raw string (just the id), a JSON string, or an object
+  let obj: unknown = identity;
+  if (typeof identity === "string") {
+    try {
+      obj = JSON.parse(identity);
+    } catch {
+      // plain id string — nothing useful
+      return { email: "", first_name: "", last_name: "" };
+    }
+  }
+  return {
+    email: extractField(obj, "email"),
+    first_name: extractField(obj, "first_name"),
+    last_name: extractField(obj, "last_name"),
+  };
 }
 
 function Toast({
@@ -128,13 +171,12 @@ function ProviderCard({
         .then((res) =>
           setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] }))
         )
-        .catch(() =>
-          setDaySlots((prev) => ({ ...prev, [day]: [] }))
-        )
+        .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
         .finally(() =>
           setLoadingDays((prev) => ({ ...prev, [day]: false }))
         );
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayOffset, provider.id]);
 
   const initials =
@@ -182,10 +224,7 @@ function ProviderCard({
             const slots = daySlots[day] ?? [];
             const loading = loadingDays[day];
             return (
-              <div
-                key={day}
-                className="flex-1 flex flex-col items-center gap-1.5"
-              >
+              <div key={day} className="flex-1 flex flex-col items-center gap-1.5">
                 <p className="text-xs font-semibold text-gray-500 text-center">
                   {dateLabel(day)}
                 </p>
@@ -255,6 +294,7 @@ function BookingModal({
   );
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const canVirtual =
     booking.slot.location_type === "virtual" ||
@@ -264,7 +304,13 @@ function BookingModal({
     booking.slot.location_type === "both";
 
   const handleConfirm = async () => {
+    // Guard: patient info must be present
+    if (!patientFirst || !patientLast) {
+      setError("Your profile is missing a name. Please update your profile first.");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
       await axiosClient.post(
         "/provider/" + booking.provider.id + "/appointments",
@@ -281,6 +327,7 @@ function BookingModal({
       );
       onConfirmed();
     } catch {
+      setError("Booking failed. Please try again.");
       setSaving(false);
     }
   };
@@ -293,10 +340,7 @@ function BookingModal({
             <LucideCalendarCheck size={18} className="text-blue-600" />
             <h2 className="font-semibold text-gray-800">Confirm booking</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <LucideX size={18} />
           </button>
         </div>
@@ -319,6 +363,16 @@ function BookingModal({
               </p>
             )}
           </div>
+
+          {/* Show who is booking */}
+          {(patientFirst || patientEmail) && (
+            <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              Booking as:{" "}
+              <span className="font-medium text-gray-700">
+                {[patientFirst, patientLast].filter(Boolean).join(" ") || patientEmail}
+              </span>
+            </div>
+          )}
 
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
@@ -366,6 +420,12 @@ function BookingModal({
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-400 bg-gray-50"
             />
           </div>
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-3 border-t flex gap-2">
@@ -399,9 +459,8 @@ export default function BookPage() {
     type: "success" | "error";
   } | null>(null);
 
-  const patientEmail = getIdentityField(identity, "email");
-  const patientFirst = getIdentityField(identity, "first_name");
-  const patientLast = getIdentityField(identity, "last_name");
+  const { email: patientEmail, first_name: patientFirst, last_name: patientLast } =
+    getPatientInfo(identity);
 
   useEffect(() => {
     axiosClient

@@ -228,6 +228,7 @@ function BookingModal({
   patientEmail,
   patientFirst,
   patientLast,
+  patientPhone,
   onClose,
   onConfirmed,
 }: {
@@ -235,6 +236,7 @@ function BookingModal({
   patientEmail: string;
   patientFirst: string;
   patientLast: string;
+  patientPhone: string;
   onClose: () => void;
   onConfirmed: () => void;
 }) {
@@ -253,7 +255,6 @@ function BookingModal({
     booking.slot.location_type === "both";
 
   const handleConfirm = async () => {
-    // Guard: patient info must be present
     if (!patientFirst || !patientLast) {
       setError("Your profile is missing a name. Please update your profile first.");
       return;
@@ -267,6 +268,7 @@ function BookingModal({
           patient_first_name: patientFirst,
           patient_last_name: patientLast,
           patient_email: patientEmail,
+          patient_phone_number: patientPhone,
           start_time: booking.slot.start_time,
           end_time: booking.slot.end_time,
           appointment_type: apptType,
@@ -313,7 +315,6 @@ function BookingModal({
             )}
           </div>
 
-          {/* Show who is booking */}
           {(patientFirst || patientEmail) && (
             <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
               Booking as:{" "}
@@ -404,6 +405,7 @@ export default function BookPage() {
   const [patientEmail, setPatientEmail] = useState("");
   const [patientFirst, setPatientFirst] = useState("");
   const [patientLast, setPatientLast] = useState("");
+  const [patientPhone, setPatientPhone] = useState("");
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -414,7 +416,6 @@ export default function BookPage() {
     type: "success" | "error";
   } | null>(null);
 
-  // Fetch the patient's actual saved profile, rather than guessing from the raw login ID
   useEffect(() => {
     if (!identityId) return;
     axiosClient
@@ -423,6 +424,7 @@ export default function BookPage() {
         setPatientEmail(res.data.email ?? "");
         setPatientFirst(res.data.first_name ?? "");
         setPatientLast(res.data.last_name ?? "");
+        setPatientPhone(res.data.phone_number ?? "");
       })
       .catch(() => {});
   }, [identityId]);
@@ -533,6 +535,7 @@ export default function BookPage() {
           patientEmail={patientEmail}
           patientFirst={patientFirst}
           patientLast={patientLast}
+          patientPhone={patientPhone}
           onClose={() => setBooking(null)}
           onConfirmed={() => {
             setBooking(null);

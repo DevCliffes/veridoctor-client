@@ -11,41 +11,6 @@ import {
   LucideSave,
 } from "@veridoctor/design/icons";
 
-/**
- * Identity in the Redux store has been seen nested or JSON-stringified in
- * past bugs (see the booking page fix), so this walks the object safely
- * instead of assuming a flat shape.
- */
-function extractIdentityField(source: unknown, field: string): string {
-  if (!source) return "";
-  if (typeof source === "string") {
-    try {
-      return extractIdentityField(JSON.parse(source), field);
-    } catch {
-      return "";
-    }
-  }
-  if (typeof source === "object") {
-    const obj = source as Record<string, unknown>;
-    if (field in obj) {
-      const val = obj[field];
-      if (typeof val === "string") return val;
-      if (val && typeof val === "object") {
-        const nested = extractIdentityField(val, field);
-        if (nested) return nested;
-      }
-    }
-    for (const key of Object.keys(obj)) {
-      const val = obj[key];
-      if (val && (typeof val === "object" || typeof val === "string")) {
-        const found = extractIdentityField(val, field);
-        if (found) return found;
-      }
-    }
-  }
-  return "";
-}
-
 interface ProfileFormState {
   first_name: string;
   last_name: string;
@@ -63,8 +28,7 @@ const GENDER_OPTIONS = [
 
 export default function ProfilePage() {
   const { identity } = useAppSelector((store) => store.auth);
-  const identityId = extractIdentityField(identity, "id");
-
+  const identityId = typeof identity === "string" ? identity : "";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProfileFormState>({
@@ -149,7 +113,6 @@ export default function ProfilePage() {
           </p>
         </div>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">
@@ -164,7 +127,6 @@ export default function ProfilePage() {
             />
           </div>
         </div>
-
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">
             Last Name
@@ -178,7 +140,6 @@ export default function ProfilePage() {
             />
           </div>
         </div>
-
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">
             Email
@@ -195,7 +156,6 @@ export default function ProfilePage() {
             Contact support to change your email address.
           </p>
         </div>
-
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">
             Phone Number
@@ -209,7 +169,6 @@ export default function ProfilePage() {
             />
           </div>
         </div>
-
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">
             Gender
@@ -228,7 +187,6 @@ export default function ProfilePage() {
           </select>
         </div>
       </div>
-
       <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
         <button
           onClick={handleSave}
@@ -246,4 +204,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

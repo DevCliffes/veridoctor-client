@@ -95,7 +95,9 @@ function ProfileDropdown() {
   const handleLogout = () => {
     dispatch(setAccessToken(""));
     dispatch(setRefreshToken(""));
-    router.push("/auth/login");
+    if (typeof window !== "undefined") {
+      window.location.href = process.env.NEXT_PUBLIC_WEB_APP_URL || "/";
+    }
   };
   return (
     <DropdownMenu>

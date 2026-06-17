@@ -59,6 +59,13 @@ function CalendarViewer({
   const [expandedDay, setExpandedDay] = React.useState<Date | null>(null);
   const [popoverAppt, setPopoverAppt] = React.useState<Appointment | null>(null);
 
+  const popoverLocationType = popoverAppt?.meta?.location_type as
+    | string
+    | undefined;
+  const popoverServiceName = popoverAppt?.meta?.service_name as
+    | string
+    | undefined;
+
   const goBack = () => {
     if (view === "month") setCurrentDate(subMonths(currentDate, 1));
     else if (view === "week") setCurrentDate(subWeeks(currentDate, 1));
@@ -457,26 +464,26 @@ function CalendarViewer({
               {/* Meta fields if available */}
               {popoverAppt.meta && (
                 <div className="space-y-1.5">
-                  {popoverAppt.meta.location_type && (
+                  {popoverLocationType && (
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-gray-400">Type</p>
                       <span
                         className={
                           "text-xs px-2 py-0.5 rounded-full font-medium capitalize " +
-                          (popoverAppt.meta.location_type === "virtual"
+                          (popoverLocationType === "virtual"
                             ? "bg-indigo-100 text-indigo-700"
                             : "bg-green-100 text-green-700")
                         }
                       >
-                        {String(popoverAppt.meta.location_type)}
+                        {popoverLocationType}
                       </span>
                     </div>
                   )}
-                  {popoverAppt.meta.service_name && (
+                  {popoverServiceName && (
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-gray-400">Service</p>
                       <p className="text-xs text-gray-700 font-medium">
-                        {String(popoverAppt.meta.service_name)}
+                        {popoverServiceName}
                       </p>
                     </div>
                   )}

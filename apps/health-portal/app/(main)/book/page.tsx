@@ -170,7 +170,11 @@ function ProviderCard({
 
         <div className="flex gap-2 flex-1">
           {visibleDays.map((day) => {
-            const slots = daySlots[day] ?? [];
+            const allSlots = daySlots[day] ?? [];
+            const now = new Date();
+            const futureSlots = allSlots.filter(
+              (slot) => new Date(slot.start_time) > now
+            );
             const loading = loadingDays[day];
             return (
               <div key={day} className="flex-1 flex flex-col items-center gap-1.5">
@@ -182,13 +186,13 @@ function ProviderCard({
                     size={16}
                     className="animate-spin text-gray-300 my-2"
                   />
-                ) : slots.length === 0 ? (
+                ) : futureSlots.length === 0 ? (
                   <p className="text-xs text-gray-300 text-center py-2">
                     No slots
                   </p>
                 ) : (
                   <div className="flex flex-col gap-1 w-full">
-                    {slots.slice(0, 3).map((slot) => (
+                    {futureSlots.slice(0, 3).map((slot) => (
                       <button
                         key={slot.start_time}
                         onClick={() => onBook({ provider, slot, date: day })}
@@ -197,9 +201,9 @@ function ProviderCard({
                         {formatTime(slot.start_time)}
                       </button>
                     ))}
-                    {slots.length > 3 && (
+                    {futureSlots.length > 3 && (
                       <p className="text-xs text-gray-400 text-center">
-                        +{slots.length - 3} more
+                        +{futureSlots.length - 3} more
                       </p>
                     )}
                   </div>

@@ -10,6 +10,9 @@ import {
   LucideMapPin,
   LucideVideo,
   LucideFileText,
+  LucideShieldAlert,
+  LucideShieldCheck,
+  LucideBell,
 } from "@veridoctor/design/icons";
 
 interface Drug {
@@ -24,7 +27,6 @@ interface FormField {
   id: string;
   label?: string;
   name?: string;
-  type?: string;
 }
 
 interface FormSection {
@@ -58,6 +60,18 @@ interface HealthRecord {
   drugs?: Drug[];
 }
 
+interface AccessRequest {
+  id: string;
+  requested_category: string;
+  status: "pending" | "approved" | "denied";
+  provider_name: string;
+  provider_speciality: string;
+  facility_name: string;
+  appointment_date: string;
+  created_at: string;
+  responded_at: string | null;
+}
+
 const TYPE_TABS = [
   { key: "", label: "All Records" },
   { key: "consultation", label: "Consultations" },
@@ -72,36 +86,23 @@ function formatDate(iso: string) {
   });
 }
 
-/**
- * Builds a flat map of { fieldId → label } from the form_snapshot
- * so clinical notes display proper field names instead of "F1", "F2" etc.
- */
 function buildLabelMap(snapshot: FormSection[]): Record<string, string> {
   const map: Record<string, string> = {};
   if (!Array.isArray(snapshot)) return map;
   for (const section of snapshot) {
     for (const field of section.fields ?? []) {
-      if (field.id) {
-        map[field.id] = field.label ?? field.name ?? field.id;
-      }
+      if (field.id) map[field.id] = field.label ?? field.name ?? field.id;
     }
   }
   return map;
 }
 
-/**
- * Safely renders any field value — handles strings, numbers,
- * nested objects (like prescription references), and arrays.
- */
 function renderValue(val: unknown): string {
   if (val === null || val === undefined) return "—";
   if (typeof val === "string") return val;
   if (typeof val === "number" || typeof val === "boolean") return String(val);
-  if (Array.isArray(val)) {
-    return val.map((v) => renderValue(v)).join(", ");
-  }
+  if (Array.isArray(val)) return val.map(renderValue).join(", ");
   if (typeof val === "object") {
-    // Try to extract a meaningful string from common object shapes
     const obj = val as Record<string, unknown>;
     if (obj.name) return String(obj.name);
     if (obj.drug_name) return String(obj.drug_name);
@@ -111,9 +112,135 @@ function renderValue(val: unknown): string {
   return String(val);
 }
 
+function AccessRequestsPanel({
+  identityId,
+}: {
+  identityId: string;
+}) {
+  const [requests, setRequests] = useState<AccessRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [responding, setResponding] = useState<string | null>(null);
+
+  const fetchRequests = () => {
+    axiosClient
+      .get(`/records/patient/${identityId}/access-requests`)
+      .then((res) => setRequests(res.data ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!identityId) return;
+    fetchRequests();
+  }, [identityId]);
+
+  const handleRespond = async (grantId: string, newStatus: "approved" | "denied") => {
+    setResponding(grantId);
+    try {
+      await axiosClient.patch(`/records/access-grants/${grantId}`, {
+        status: newStatus,
+      });
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === grantId ? { ...r, status: newStatus, responded_at: new Date().toISOString() } : r
+        )
+      );
+    } catch {
+      // silent
+    } finally {
+      setResponding(null);
+    }
+  };
+
+  const pending = requests.filter((r) => r.status === "pending");
+  const past = requests.filter((r) => r.status !== "pending");
+
+  if (loading || requests.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 space-y-3">
+      <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+        <LucideBell size={16} className="text-amber-500" />
+        Access Requests
+        {pending.length > 0 && (
+          <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+            {pending.length}
+          </span>
+        )}
+      </h2>
+
+      {pending.length > 0 && (
+        <div className="space-y-2">
+          {pending.map((req) => (
+            <div
+              key={req.id}
+              className="bg-amber-50 border border-amber-100 rounded-xl p-4"
+            >
+              <div className="flex items-start gap-2">
+                <LucideShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">
+                    {req.provider_name} is requesting access to your{" "}
+                    <span className="text-blue-700">{req.requested_category}</span> records
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {req.facility_name && `${req.facility_name} · `}
+                    During consultation on {formatDate(req.appointment_date)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => handleRespond(req.id, "approved")}
+                  disabled={responding === req.id}
+                  className="flex-1 py-2 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                >
+                  <LucideShieldCheck size={12} />
+                  {responding === req.id ? "Saving…" : "Approve"}
+                </button>
+                <button
+                  onClick={() => handleRespond(req.id, "denied")}
+                  disabled={responding === req.id}
+                  className="flex-1 py-2 text-xs font-semibold border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                >
+                  Deny
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {past.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-gray-400 uppercase tracking-wide">Previous requests</p>
+          {past.map((req) => (
+            <div
+              key={req.id}
+              className="flex items-center justify-between text-xs text-gray-500 py-1.5 border-b border-gray-50 last:border-0"
+            >
+              <span>
+                {req.provider_name} · {req.requested_category}
+              </span>
+              <span
+                className={
+                  req.status === "approved"
+                    ? "text-green-600 font-medium"
+                    : "text-red-500 font-medium"
+                }
+              >
+                {req.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CaptureBlock({ capture }: { capture: Capture }) {
   const labelMap = buildLabelMap(capture.form_snapshot ?? []);
-
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -124,12 +251,8 @@ function CaptureBlock({ capture }: { capture: Capture }) {
           const label = labelMap[key] ?? key.replace(/_/g, " ");
           return (
             <div key={key} className="flex gap-2 text-sm">
-              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">
-                {label}
-              </span>
-              <span className="text-gray-800 font-medium">
-                {renderValue(val)}
-              </span>
+              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">{label}</span>
+              <span className="text-gray-800 font-medium">{renderValue(val)}</span>
             </div>
           );
         })}
@@ -140,7 +263,6 @@ function CaptureBlock({ capture }: { capture: Capture }) {
 
 function ConsultationCard({ record }: { record: HealthRecord }) {
   const [expanded, setExpanded] = useState(false);
-
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <button
@@ -196,7 +318,6 @@ function ConsultationCard({ record }: { record: HealthRecord }) {
             <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
           ))}
       </button>
-
       {expanded && record.captures && record.captures.length > 0 && (
         <div className="border-t border-gray-100 px-5 py-4 space-y-5 bg-gray-50">
           {record.captures.map((cap, i) => (
@@ -210,7 +331,6 @@ function ConsultationCard({ record }: { record: HealthRecord }) {
 
 function PrescriptionCard({ record }: { record: HealthRecord }) {
   const [expanded, setExpanded] = useState(false);
-
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <button
@@ -252,40 +372,26 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
           <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
         )}
       </button>
-
       {expanded && (
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-3">
           {record.notes && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Doctor's Notes
-              </p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Doctor's Notes</p>
               <p className="text-sm text-gray-700">{record.notes}</p>
             </div>
           )}
           {record.drugs && record.drugs.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                Medications
-              </p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Medications</p>
               <div className="space-y-2">
                 {record.drugs.map((drug, i) => (
-                  <div
-                    key={i}
-                    className="bg-white rounded-xl border border-gray-100 px-4 py-3"
-                  >
-                    <p className="text-sm font-semibold text-gray-800">
-                      {drug.drug_name}
-                    </p>
+                  <div key={i} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+                    <p className="text-sm font-semibold text-gray-800">{drug.drug_name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {[drug.dosage, drug.frequency, drug.duration]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      {[drug.dosage, drug.frequency, drug.duration].filter(Boolean).join(" · ")}
                     </p>
                     {drug.instructions && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        {drug.instructions}
-                      </p>
+                      <p className="text-xs text-gray-400 mt-1">{drug.instructions}</p>
                     )}
                   </div>
                 ))}
@@ -321,15 +427,14 @@ export default function RecordsPage() {
       .finally(() => setLoading(false));
   }, [identityId, activeType]);
 
-  const consultationCount = records.filter(
-    (r) => r.record_type === "consultation"
-  ).length;
-  const prescriptionCount = records.filter(
-    (r) => r.record_type === "prescription"
-  ).length;
+  const consultationCount = records.filter((r) => r.record_type === "consultation").length;
+  const prescriptionCount = records.filter((r) => r.record_type === "prescription").length;
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
+      {/* Access requests — only renders if there are any */}
+      {identityId && <AccessRequestsPanel identityId={identityId} />}
+
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
           <LucideActivitySquare size={20} className="text-blue-600" />
@@ -380,8 +485,7 @@ export default function RecordsPage() {
           <LucideFileText size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">No records found.</p>
           <p className="text-gray-300 text-xs mt-1">
-            Records appear here after a consultation or prescription is added
-            by a provider.
+            Records appear here after a consultation or prescription is added by a provider.
           </p>
         </div>
       ) : (

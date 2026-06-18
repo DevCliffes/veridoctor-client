@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ChevronDown,
   LayoutDashboard,
+  LucideActivitySquare,
   LucideBookUser,
   LucideCalendarCheck,
   LucideCircleUser,
@@ -30,6 +31,7 @@ import {
   setAccessToken,
   setRefreshToken,
 } from "@veridoctor/store";
+
 export default function MainAppLayout({
   children,
 }: {
@@ -40,11 +42,13 @@ export default function MainAppLayout({
     (store) => store.auth
   );
   const dispatch = useAppDispatch();
+
   const authInfo = {
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
   };
+
   const navItems: navITem[] = [
     {
       linkTo: "/dashboard",
@@ -62,16 +66,23 @@ export default function MainAppLayout({
       name: "Find a Doctor",
     },
     {
+      linkTo: "/records",
+      icon: <LucideActivitySquare />,
+      name: "Health Records",
+    },
+    {
       linkTo: "/prescriptions",
       icon: <LucideFileText />,
       name: "Prescriptions",
     },
   ];
+
   const setAuthInfo = (token: TokenPayload) => {
     dispatch(setAccessToken(token.a_token));
     dispatch(setRefreshToken(token.refresh_token));
     dispatch(setIsLoggedIn());
   };
+
   return (
     <AuthWrapper
       authInfo={authInfo}
@@ -89,9 +100,11 @@ export default function MainAppLayout({
     </AuthWrapper>
   );
 }
+
 function ProfileDropdown() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+
   const handleLogout = () => {
     dispatch(setAccessToken(""));
     dispatch(setRefreshToken(""));
@@ -99,6 +112,7 @@ function ProfileDropdown() {
       window.location.href = process.env.NEXT_PUBLIC_WEB_APP_URL || "/";
     }
   };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex gap-2 border-2 hover:cursor-pointer items-center p-1 md:border-2 md:rounded-full">
@@ -125,4 +139,3 @@ function ProfileDropdown() {
     </DropdownMenu>
   );
 }
-

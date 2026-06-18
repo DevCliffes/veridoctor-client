@@ -324,19 +324,9 @@ function BookingModal({
   onClose: () => void;
   onConfirmed: () => void;
 }) {
-  const [apptType, setApptType] = useState<"virtual" | "physical">(
-    booking.appointmentType
-  );
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const canVirtual =
-    booking.slot.location_type === "virtual" ||
-    booking.slot.location_type === "both";
-  const canPhysical =
-    booking.slot.location_type === "physical" ||
-    booking.slot.location_type === "both";
 
   const handleConfirm = async () => {
     if (!patientFirst || !patientLast) {
@@ -355,7 +345,7 @@ function BookingModal({
           patient_phone_number: patientPhone,
           start_time: booking.slot.start_time,
           end_time: booking.slot.end_time,
-          appointment_type: apptType,
+          appointment_type: booking.appointmentType,
           message,
           status: "scheduled",
         }
@@ -408,38 +398,15 @@ function BookingModal({
             </div>
           )}
 
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              Appointment type
-            </p>
-            <div className="flex gap-2">
-              {canVirtual && (
-                <button
-                  onClick={() => setApptType("virtual")}
-                  className={
-                    "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " +
-                    (apptType === "virtual"
-                      ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
-                      : "border-gray-200 text-gray-600")
-                  }
-                >
-                  <LucideVideo size={14} /> Virtual
-                </button>
-              )}
-              {canPhysical && (
-                <button
-                  onClick={() => setApptType("physical")}
-                  className={
-                    "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " +
-                    (apptType === "physical"
-                      ? "bg-green-50 border-green-300 text-green-700 font-medium"
-                      : "border-gray-200 text-gray-600")
-                  }
-                >
-                  <LucideMapPin size={14} /> In-person
-                </button>
-              )}
-            </div>
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 w-fit">
+            {booking.appointmentType === "virtual" ? (
+              <LucideVideo size={13} className="text-indigo-500" />
+            ) : (
+              <LucideMapPin size={13} className="text-green-500" />
+            )}
+            <span className="font-medium text-gray-700 capitalize">
+              {booking.appointmentType === "virtual" ? "Virtual" : "In-person"}
+            </span>
           </div>
 
           <div>

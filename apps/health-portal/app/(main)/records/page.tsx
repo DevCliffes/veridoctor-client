@@ -10,7 +10,6 @@ import {
   LucideMapPin,
   LucideVideo,
   LucideFileText,
-  LucideFlask,
 } from "@veridoctor/design/icons";
 
 interface Drug {
@@ -116,13 +115,23 @@ function ConsultationCard({ record }: { record: HealthRecord }) {
                   .join(", ")}
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {formatDate(record.date)}
+            </p>
           </div>
         </div>
-        {record.has_clinical_notes && (
-          expanded ? <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
-                   : <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
-        )}
+        {record.has_clinical_notes &&
+          (expanded ? (
+            <LucideChevronUp
+              size={16}
+              className="text-gray-400 shrink-0 mt-1"
+            />
+          ) : (
+            <LucideChevronDown
+              size={16}
+              className="text-gray-400 shrink-0 mt-1"
+            />
+          ))}
       </button>
 
       {expanded && record.captures && record.captures.length > 0 && (
@@ -172,14 +181,13 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
               </p>
               {record.drugs && record.drugs.length > 0 && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">
-                  {record.drugs.length} medication{record.drugs.length > 1 ? "s" : ""}
+                  {record.drugs.length} medication
+                  {record.drugs.length > 1 ? "s" : ""}
                 </span>
               )}
             </div>
             {record.diagnosis && (
-              <p className="text-xs text-gray-600 mt-0.5">
-                {record.diagnosis}
-              </p>
+              <p className="text-xs text-gray-600 mt-0.5">{record.diagnosis}</p>
             )}
             <p className="text-xs text-gray-500 mt-0.5">
               {record.provider_name}
@@ -193,13 +201,21 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
                   .join(", ")}
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {formatDate(record.date)}
+            </p>
           </div>
         </div>
         {expanded ? (
-          <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
+          <LucideChevronUp
+            size={16}
+            className="text-gray-400 shrink-0 mt-1"
+          />
         ) : (
-          <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
+          <LucideChevronDown
+            size={16}
+            className="text-gray-400 shrink-0 mt-1"
+          />
         )}
       </button>
 
@@ -332,11 +348,11 @@ export default function RecordsPage() {
         </div>
       ) : records.length === 0 ? (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
-          <LucideFlask size={32} className="text-gray-200 mx-auto mb-3" />
+          <LucideFileText size={32} className="text-gray-200 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">No records found.</p>
           <p className="text-gray-300 text-xs mt-1">
-            Records appear here after a consultation or prescription is added by
-            a provider.
+            Records appear here after a consultation or prescription is added
+            by a provider.
           </p>
         </div>
       ) : (

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
@@ -106,6 +107,7 @@ function ProviderCard({
   provider: Provider;
   onBook: (state: BookingState) => void;
 }) {
+  const router = useRouter();
   const days = getNext7Days();
   const [daySlots, setDaySlots] = useState<Record<string, Slot[]>>({});
   const [loadingDays, setLoadingDays] = useState<Record<string, boolean>>({});
@@ -113,7 +115,7 @@ function ProviderCard({
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
     provider.services[0]?.id ?? null
   );
-  const [selectedApptType, setSelectedApptType] = useState<
+  const [selectedApptType, setSelectedApptType] = useState
     "virtual" | "physical"
   >("virtual");
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
@@ -349,6 +351,7 @@ function BookingModal({
           start_time: booking.slot.start_time,
           end_time: booking.slot.end_time,
           appointment_type: booking.appointmentType,
+          service: booking.slot.service_id,
           message,
           status: "scheduled",
         }

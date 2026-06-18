@@ -37,7 +37,6 @@ function Row({ appt }: { appt: Appointment }) {
   const router = useRouter();
   const mins = minutesUntil(appt.start_time);
   const isNext = mins > 0 && mins <= 60;
-  const isPast = mins < 0;
 
   const borderClass = isNext
     ? "border-blue-200 bg-blue-50"
@@ -49,6 +48,8 @@ function Row({ appt }: { appt: Appointment }) {
   const statusClass =
     appt.status === "confirmed"
       ? "bg-green-100 text-green-700"
+      : appt.status === "in-progress"
+      ? "bg-blue-100 text-blue-700"
       : appt.status === "cancelled"
       ? "bg-red-100 text-red-700"
       : "bg-yellow-100 text-yellow-700";
@@ -79,9 +80,6 @@ function Row({ appt }: { appt: Appointment }) {
         {isNext && (
           <span className="text-xs text-blue-600 font-medium">in {mins}m</span>
         )}
-        {isPast && (
-          <span className="text-xs text-gray-400">done</span>
-        )}
       </div>
     </button>
   );
@@ -99,6 +97,13 @@ export function TodaySchedule({ identityId }: TodayScheduleProps) {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [identityId]);
+
+  // Only show appointments that are still ongoing or upcoming — hide
+  // anything whose end_time has already passed.
+  const now = Date.now();
+  const visibleAppointments = appointments.filter(
+    (appt) => new Date(appt.end_time).getTime() >= now
+  );
 
   if (loading) {
     return (
@@ -118,16 +123,19 @@ export function TodaySchedule({ identityId }: TodayScheduleProps) {
       <h2 className="font-semibold text-gray-700 mb-3">
         Today's Schedule{" "}
         <span className="text-gray-400 font-normal text-sm">
-          ({appointments.length})
+          ({visibleAppointments.length})
         </span>
       </h2>
-      {appointments.length === 0 ? (
+      {visibleAppointments.length === 0 ? (
         <p className="text-gray-400 text-sm text-center py-6">
-          No appointments scheduled for today.
+          No more appointments scheduled for today.
         </p>
       ) : (
-        <div className="space-y-2">
-          {appointments.map((appt) => (
+        <div
+          className="space-y-2 overflow-y-auto pr-1"
+          style={{ maxHeight: "420px" }}
+        >
+          {visibleAppointments.map((appt) => (
             <Row key={appt.id} appt={appt} />
           ))}
         </div>

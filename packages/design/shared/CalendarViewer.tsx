@@ -59,12 +59,8 @@ function CalendarViewer({
   const [expandedDay, setExpandedDay] = React.useState<Date | null>(null);
   const [popoverAppt, setPopoverAppt] = React.useState<Appointment | null>(null);
 
-  const popoverLocationType = popoverAppt?.meta?.location_type as
-    | string
-    | undefined;
-  const popoverServiceName = popoverAppt?.meta?.service_name as
-    | string
-    | undefined;
+  const popoverLocationType = popoverAppt?.meta?.location_type as string | undefined;
+  const popoverServiceName = popoverAppt?.meta?.service_name as string | undefined;
 
   const goBack = () => {
     if (view === "month") setCurrentDate(subMonths(currentDate, 1));
@@ -83,7 +79,7 @@ function CalendarViewer({
     if (view === "week") {
       const ws = startOfWeek(currentDate);
       const we = endOfWeek(currentDate);
-      return `${format(ws, "MMM d")} \u2013 ${format(we, "MMM d, yyyy")}`;
+      return `${format(ws, "MMM d")} – ${format(we, "MMM d, yyyy")}`;
     }
     return format(currentDate, "EEEE, MMMM d, yyyy");
   }, [view, currentDate]);
@@ -143,9 +139,7 @@ function CalendarViewer({
               style={{ height: HOUR_HEIGHT }}
             >
               <span className="-translate-y-2 inline-block">
-                {h === 0
-                  ? ""
-                  : format(new Date().setHours(h, 0, 0, 0), "h a")}
+                {h === 0 ? "" : format(new Date().setHours(h, 0, 0, 0), "h a")}
               </span>
             </div>
           ))}
@@ -277,17 +271,13 @@ function CalendarViewer({
               </div>
             ))}
           </div>
-          <div
-            className="grid grid-cols-7"
-            style={{ gridAutoRows: "120px" }}
-          >
+          <div className="grid grid-cols-7" style={{ gridAutoRows: "120px" }}>
             {monthDays.map((day, idx) => {
               const dayAppts = appointments.filter((a) =>
                 isSameDay(a.start, day)
               );
               const isToday = isSameDay(day, new Date());
-              const isCurrentMonth =
-                day.getMonth() === currentDate.getMonth();
+              const isCurrentMonth = day.getMonth() === currentDate.getMonth();
               return (
                 <div
                   key={day.toString()}
@@ -322,14 +312,13 @@ function CalendarViewer({
                         }}
                         className={
                           "text-xs px-1.5 py-0.5 rounded font-medium truncate text-left w-full hover:opacity-80 transition-opacity " +
-                          (nameColorMap[a.patientName] ??
-                            "bg-blue-500 text-white")
+                          (nameColorMap[a.patientName] ?? "bg-blue-500 text-white")
                         }
                         title={
                           a.patientName +
-                          " \u00b7 " +
+                          " · " +
                           format(a.start, "HH:mm") +
-                          "\u2013" +
+                          "–" +
                           format(a.end, "HH:mm")
                         }
                       >
@@ -392,8 +381,7 @@ function CalendarViewer({
                     (nameColorMap[a.patientName] ?? "bg-blue-500 text-white")
                   }
                 >
-                  {format(a.start, "h:mm a")} \u2013 {format(a.end, "h:mm a")}{" "}
-                  \u00b7 {a.patientName}
+                  {format(a.start, "h:mm a")} – {format(a.end, "h:mm a")} · {a.patientName}
                 </button>
               ))}
             </div>
@@ -401,7 +389,7 @@ function CalendarViewer({
         </div>
       )}
 
-      {/* Patient details popover — shown when no onEventClick prop is passed */}
+      {/* Patient details popover */}
       {popoverAppt && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
@@ -423,13 +411,11 @@ function CalendarViewer({
               </button>
             </div>
             <div className="px-4 py-4 space-y-3">
-              {/* Avatar + name */}
               <div className="flex items-center gap-3">
                 <div
                   className={
                     "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 " +
-                    (nameColorMap[popoverAppt.patientName] ??
-                      "bg-blue-500 text-white")
+                    (nameColorMap[popoverAppt.patientName] ?? "bg-blue-500 text-white")
                   }
                 >
                   {popoverAppt.patientName
@@ -447,7 +433,6 @@ function CalendarViewer({
                 </div>
               </div>
 
-              {/* Time */}
               <div className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-1">
                 <p className="text-xs text-gray-400 uppercase tracking-wide">
                   Time
@@ -456,12 +441,11 @@ function CalendarViewer({
                   {format(popoverAppt.start, "EEEE, MMM d")}
                 </p>
                 <p className="text-sm text-gray-600">
-                  {format(popoverAppt.start, "h:mm a")} \u2013{" "}
+                  {format(popoverAppt.start, "h:mm a")} –{" "}
                   {format(popoverAppt.end, "h:mm a")}
                 </p>
               </div>
 
-              {/* Meta fields if available */}
               {popoverAppt.meta && (
                 <div className="space-y-1.5">
                   {popoverLocationType && (

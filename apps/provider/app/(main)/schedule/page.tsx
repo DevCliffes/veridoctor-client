@@ -50,6 +50,7 @@ type BookedAppointment = {
   appointment_type: string;
   status: string;
   meet_id: string;
+  service_name: string | null;
 };
 
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -510,13 +511,20 @@ export default function Schedule() {
       id: "booked-" + a.id,
       start: new Date(a.start_time),
       end: new Date(a.end_time),
-      patientName: a.patient_first_name + " " + a.patient_last_name,
+      patientName:
+        a.patient_first_name +
+        " " +
+        a.patient_last_name +
+        (a.service_name ? " · " + a.service_name : "") +
+        " · " +
+        (a.appointment_type === "virtual" ? "Virtual" : "In-person"),
       meta: {
         type: "booked",
         appointmentId: a.id,
         email: a.patient_email,
         phone: a.patient_phone_number,
         appointment_type: a.appointment_type,
+        service_name: a.service_name,
         status: a.status,
         location_type: a.appointment_type,
       },
@@ -525,8 +533,7 @@ export default function Schedule() {
   // Hide schedule slots that are already covered by a booked appointment
   const filteredScheduleEvents = scheduleEvents.filter((slot) => {
     return !bookedEvents.some(
-      (booked) =>
-        booked.start < slot.end && booked.end > slot.start
+      (booked) => booked.start < slot.end && booked.end > slot.start
     );
   });
 
@@ -563,10 +570,7 @@ export default function Schedule() {
               {services.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">
                   No services found.{" "}
-                  <a
-                    href="/services"
-                    className="text-blue-600 hover:underline"
-                  >
+                  <a href="/services" className="text-blue-600 hover:underline">
                     Add a service first →
                   </a>
                 </p>
@@ -692,9 +696,7 @@ export default function Schedule() {
                         min={1}
                         disabled={endType !== "after"}
                         value={endAfterCount}
-                        onChange={(e) =>
-                          setEndAfterCount(Number(e.target.value))
-                        }
+                        onChange={(e) => setEndAfterCount(Number(e.target.value))}
                         className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
                       />
                       occurrence(s)

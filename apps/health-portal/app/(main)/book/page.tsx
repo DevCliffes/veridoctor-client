@@ -115,9 +115,7 @@ function ProviderCard({
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
     provider.services[0]?.id ?? null
   );
-  const [selectedApptType, setSelectedApptType] = useState
-    "virtual" | "physical"
-  >("virtual");
+  const [selectedApptType, setSelectedApptType] = useState<"virtual" | "physical">("virtual");
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
 
   useEffect(() => {

@@ -15,6 +15,11 @@ import {
   LucideChevronDown,
   LucideFileText,
   LucideHistory,
+  LucideShieldAlert,
+  LucideShieldCheck,
+  LucidePill,
+  LucideLock,
+  LucideLoader2,
 } from "@veridoctor/design/icons";
 
 type Appointment = {
@@ -23,6 +28,7 @@ type Appointment = {
   patient_last_name: string;
   patient_email: string;
   patient_phone_number: string;
+  patient_identity: string | null;
   appointment_type: "virtual" | "physical";
   start_time: string;
   end_time: string;
@@ -48,6 +54,41 @@ type RecordEntry = {
   captures: Capture[];
 };
 
+type RecordCategory = {
+  speciality: string;
+  facility_name: string;
+  record_count: number;
+  last_record_at: string | null;
+  sensitivity: string;
+  access_status: "pending" | "approved" | "denied" | null;
+  grant_id: string | null;
+};
+
+type PatientSummary = {
+  patient: {
+    uid: string | null;
+    identity_id: string;
+    first_name: string;
+    last_name: string;
+    gender: string;
+    date_of_birth: string | null;
+    blood_type: string | null;
+  };
+  consultation_active: boolean;
+  stats: {
+    total_records: number;
+    most_recent: string | null;
+    active_medications: number;
+    prior_facilities: number;
+  };
+  always_visible: {
+    allergies: string[];
+    active_medications_count: number;
+  };
+  record_categories: RecordCategory[];
+  access_granted: { id: string; requested_category: string; status: string }[];
+};
+
 const STATUS_OPTIONS = [
   { value: "confirmed", label: "Confirmed" },
   { value: "in-progress", label: "In Progress" },
@@ -66,6 +107,24 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
   scheduled: "bg-yellow-100 text-yellow-700",
 };
+
+function timeAgo(isoDate: string) {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return "today";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} mo ago`;
+  return `${Math.floor(months / 12)} yr ago`;
+}
+
+function formatDOB(iso: string) {
+  return new Date(iso).toLocaleDateString("en-KE", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -160,7 +219,6 @@ export default function AppointmentDetailPage() {
     appointment.status
   );
 
-  // Join call is only available for virtual appointments happening today
   const canJoinCall =
     appointment.appointment_type === "virtual" &&
     appointment.meet_id &&
@@ -168,7 +226,6 @@ export default function AppointmentDetailPage() {
 
   return (
     <div className="p-4 mx-4 space-y-4 max-w-3xl">
-      {/* Back */}
       <button
         onClick={() => router.push("/appointments")}
         className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
@@ -198,7 +255,6 @@ export default function AppointmentDetailPage() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col items-end gap-2">
             {hasDraft && (
               <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
@@ -268,25 +324,19 @@ export default function AppointmentDetailPage() {
               : "text-gray-500 hover:text-gray-700"
           }`}
         >
-          Medical Records
+          Patient Records
         </button>
       </div>
 
       {activeTab === "details" && (
         <>
-          {/* Appointment details */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
             <h2 className="font-semibold text-gray-700">Appointment Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-start gap-3">
-                <LucideCalendarCheck
-                  size={16}
-                  className="text-blue-500 mt-0.5 shrink-0"
-                />
+                <LucideCalendarCheck size={16} className="text-blue-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">
-                    Date
-                  </p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Date</p>
                   <p className="text-sm text-gray-700 font-medium">
                     {startTime.toLocaleDateString("en-KE", {
                       weekday: "long",
@@ -295,112 +345,67 @@ export default function AppointmentDetailPage() {
                       day: "numeric",
                     })}
                   </p>
-                  {isToday && (
-                    <span className="text-xs text-green-600 font-medium">
-                      Today
-                    </span>
-                  )}
-                  {isFuture && !isToday && (
-                    <span className="text-xs text-blue-500 font-medium">
-                      Upcoming
-                    </span>
-                  )}
-                  {isPast && !isToday && (
-                    <span className="text-xs text-gray-400 font-medium">
-                      Past
-                    </span>
-                  )}
+                  {isToday && <span className="text-xs text-green-600 font-medium">Today</span>}
+                  {isFuture && !isToday && <span className="text-xs text-blue-500 font-medium">Upcoming</span>}
+                  {isPast && !isToday && <span className="text-xs text-gray-400 font-medium">Past</span>}
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
-                <LucideCalendarCheck
-                  size={16}
-                  className="text-blue-500 mt-0.5 shrink-0"
-                />
+                <LucideCalendarCheck size={16} className="text-blue-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">
-                    Time
-                  </p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Time</p>
                   <p className="text-sm text-gray-700 font-medium">
-                    {startTime.toLocaleTimeString("en-KE", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    –{" "}
-                    {endTime.toLocaleTimeString("en-KE", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {startTime.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
+                    {" – "}
+                    {endTime.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 {appointment.appointment_type === "virtual" ? (
-                  <LucideVideo
-                    size={16}
-                    className="text-indigo-500 mt-0.5 shrink-0"
-                  />
+                  <LucideVideo size={16} className="text-indigo-500 mt-0.5 shrink-0" />
                 ) : (
-                  <LucideMapPin
-                    size={16}
-                    className="text-green-500 mt-0.5 shrink-0"
-                  />
+                  <LucideMapPin size={16} className="text-green-500 mt-0.5 shrink-0" />
                 )}
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">
-                    Type
-                  </p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Type</p>
                   <p className="text-sm text-gray-700 font-medium capitalize">
                     {appointment.appointment_type}
                   </p>
                 </div>
               </div>
 
-              {appointment.appointment_type === "virtual" &&
-                appointment.meet_id && (
-                  <div className="flex items-start gap-3">
-                    <LucideVideo
-                      size={16}
-                      className={
-                        canJoinCall
-                          ? "text-indigo-500 mt-0.5 shrink-0"
-                          : "text-gray-300 mt-0.5 shrink-0"
-                      }
-                    />
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">
-                        Call
+              {appointment.appointment_type === "virtual" && appointment.meet_id && (
+                <div className="flex items-start gap-3">
+                  <LucideVideo
+                    size={16}
+                    className={canJoinCall ? "text-indigo-500 mt-0.5 shrink-0" : "text-gray-300 mt-0.5 shrink-0"}
+                  />
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Call</p>
+                    {canJoinCall ? (
+                      <button
+                        onClick={() => router.push(`/calls/${appointment.meet_id}`)}
+                        className="text-sm text-blue-600 hover:underline font-medium"
+                      >
+                        Join video call →
+                      </button>
+                    ) : (
+                      <p className="text-sm text-gray-400 font-medium">
+                        {isFuture ? "Available on the day" : "Call has ended"}
                       </p>
-                      {canJoinCall ? (
-                        <button
-                          onClick={() =>
-                            router.push(`/calls/${appointment.meet_id}`)
-                          }
-                          className="text-sm text-blue-600 hover:underline font-medium"
-                        >
-                          Join video call →
-                        </button>
-                      ) : (
-                        <p className="text-sm text-gray-400 font-medium">
-                          {isFuture
-                            ? "Available on the day of the appointment"
-                            : "Call has ended"}
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
-                )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Status management */}
           {!isTerminal && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <h2 className="font-semibold text-gray-700 mb-3">
-                Update Status
-              </h2>
+              <h2 className="font-semibold text-gray-700 mb-3">Update Status</h2>
               <div className="flex flex-wrap gap-2">
                 {STATUS_OPTIONS.filter(
                   (s) =>
@@ -433,42 +438,30 @@ export default function AppointmentDetailPage() {
             </div>
           )}
 
-          {/* Patient contact */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
             <h2 className="font-semibold text-gray-700">Patient Contact</h2>
             {appointment.patient_email && (
               <div className="flex items-center gap-3">
                 <LucideMail size={15} className="text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-700">
-                  {appointment.patient_email}
-                </span>
+                <span className="text-sm text-gray-700">{appointment.patient_email}</span>
               </div>
             )}
             {appointment.patient_phone_number && (
               <div className="flex items-center gap-3">
                 <LucidePhone size={15} className="text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-700">
-                  {appointment.patient_phone_number}
-                </span>
+                <span className="text-sm text-gray-700">{appointment.patient_phone_number}</span>
               </div>
             )}
           </div>
 
-          {/* Captures for this appointment */}
-          <PastCaptures
-            appointmentId={id}
-            userId={userId}
-            router={router}
-          />
+          <PastCaptures appointmentId={id} userId={userId} router={router} />
         </>
       )}
 
-      {activeTab === "records" && appointment.patient_email && (
-        <MedicalRecords
-          patientEmail={appointment.patient_email}
-          patientName={`${appointment.patient_first_name} ${appointment.patient_last_name}`}
-          userId={userId}
-          router={router}
+      {activeTab === "records" && (
+        <PatientRecordPanel
+          appointmentId={id}
+          userId={String(userId ?? "")}
         />
       )}
     </div>
@@ -499,9 +492,7 @@ function PastCaptures({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
-      <h2 className="font-semibold text-gray-700">
-        Captures for this appointment
-      </h2>
+      <h2 className="font-semibold text-gray-700">Captures for this appointment</h2>
       <div className="space-y-2">
         {captures.map((c) => (
           <div
@@ -511,20 +502,14 @@ function PastCaptures({
             <div className="flex items-center gap-3">
               <LucideFileText size={15} className="text-blue-400 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-gray-700">
-                  {c.form_name}
-                </p>
+                <p className="text-sm font-medium text-gray-700">{c.form_name}</p>
                 <p className="text-xs text-gray-400">
                   {new Date(c.created_at).toLocaleString("en-KE")}
                 </p>
               </div>
             </div>
             <button
-              onClick={() =>
-                router.push(
-                  `/appointments/${appointmentId}/capture/${c.id}`
-                )
-              }
+              onClick={() => router.push(`/appointments/${appointmentId}/capture/${c.id}`)}
               className="text-xs text-blue-600 hover:underline"
             >
               View →
@@ -536,149 +521,274 @@ function PastCaptures({
   );
 }
 
-// ─── Full medical records for this patient across all appointments ─────────────
-function MedicalRecords({
-  patientEmail,
-  patientName,
+// ─── Patient Record Panel (Medical Records tab) ───────────────────────────────
+function PatientRecordPanel({
+  appointmentId,
   userId,
-  router,
 }: {
-  patientEmail: string;
-  patientName: string;
-  userId: string | null;
-  router: ReturnType<typeof useRouter>;
+  appointmentId: string;
+  userId: string;
 }) {
-  const [records, setRecords] = useState<RecordEntry[]>([]);
+  const [summary, setSummary] = useState<PatientSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [requesting, setRequesting] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!userId || !patientEmail) return;
-
+  const fetchSummary = () => {
     axiosClient
-      .get(`provider/${userId}/appointments?filter=past`)
-      .then(async (res) => {
-        const allAppts: Appointment[] = res.data ?? [];
-        const patientAppts = allAppts.filter(
-          (a) => a.patient_email === patientEmail
-        );
-
-        const withCaptures = await Promise.all(
-          patientAppts.map(async (appt) => {
-            try {
-              const capRes = await axiosClient.get(
-                `provider/${userId}/appointments/${appt.id}/captures`
-              );
-              return {
-                appointment: appt,
-                captures: (capRes.data ?? []) as Capture[],
-              };
-            } catch {
-              return { appointment: appt, captures: [] as Capture[] };
-            }
-          })
-        );
-
-        setRecords(withCaptures.filter((r) => r.captures.length > 0));
-      })
+      .get(`/records/appointment/${appointmentId}/patient-summary`)
+      .then((res) => setSummary(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [userId, patientEmail]);
+  };
+
+  useEffect(() => {
+    fetchSummary();
+  }, [appointmentId]);
+
+  const handleRequest = async (category: string) => {
+    setRequesting(category);
+    try {
+      await axiosClient.post("/records/access-request", {
+        appointment_id: appointmentId,
+        requested_category: category,
+        provider_identity_id: userId,
+      });
+      toast.success(`Access request sent to patient for ${category}`);
+      fetchSummary();
+    } catch {
+      toast.error("Could not send access request");
+    } finally {
+      setRequesting(null);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="space-y-3 animate-pulse">
-        {[1, 2].map((i) => (
-          <div key={i} className="h-20 bg-gray-100 rounded-xl" />
-        ))}
+      <div className="flex items-center justify-center py-16">
+        <LucideLoader2 size={24} className="animate-spin text-blue-400" />
       </div>
     );
   }
 
-  if (records.length === 0) {
+  if (!summary) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-        <LucideHistory size={32} className="text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">
-          No medical records found for {patientName}.
-        </p>
-        <p className="text-xs text-gray-400 mt-1">
-          Records appear here after appointment captures are saved.
+        <LucideHistory size={28} className="text-gray-300 mx-auto mb-2" />
+        <p className="text-sm text-gray-400">
+          No patient identity linked to this appointment. Records are only
+          available for patients with a Veridoctor account.
         </p>
       </div>
     );
   }
+
+  const { patient, stats, always_visible, record_categories, access_granted } = summary;
+
+  const dobFormatted = patient.date_of_birth ? formatDOB(patient.date_of_birth) : null;
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-500">
-        Showing all recorded visits for{" "}
-        <span className="font-medium text-gray-700">{patientName}</span>
-      </p>
-      {records.map(({ appointment, captures }) => (
-        <div
-          key={appointment.id}
-          className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-gray-700">
-                {new Date(appointment.start_time).toLocaleDateString("en-KE", {
-                  weekday: "short",
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </p>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  STATUS_STYLES[appointment.status] ?? "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {appointment.status}
-              </span>
+      {/* Patient header */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-bold shrink-0">
+              {patient.first_name[0]}{patient.last_name[0]}
             </div>
-            <button
-              onClick={() => router.push(`/appointments/${appointment.id}`)}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              View appointment →
-            </button>
+            <div>
+              <p className="font-bold text-gray-800 text-base">
+                {patient.first_name} {patient.last_name}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {patient.uid && <span>ID · {patient.uid}</span>}
+                {dobFormatted && <span> · DOB: {dobFormatted}</span>}
+                {patient.gender && patient.gender !== "UNKNOWN" && (
+                  <span> · {patient.gender.charAt(0) + patient.gender.slice(1).toLowerCase()}</span>
+                )}
+              </p>
+            </div>
           </div>
+          <div className="flex gap-2 flex-wrap">
+            <span className="text-xs px-2.5 py-1 rounded-full border border-green-200 text-green-700 font-medium">
+              ✓ Active patient
+            </span>
+            {summary.consultation_active && (
+              <span className="text-xs px-2.5 py-1 rounded-full border border-blue-200 text-blue-700 font-medium">
+                ⏱ Consultation active
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Consent banner */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+        <LucideShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-800">
+          You are viewing limited patient information. Full records from other
+          providers require patient consent. Requests expire when this
+          consultation ends.
+        </p>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: "Total records", value: stats.total_records },
+          {
+            label: "Most recent",
+            value: stats.most_recent ? timeAgo(stats.most_recent) : "—",
+          },
+          { label: "Active meds", value: stats.active_medications },
+          { label: "Prior facilities", value: stats.prior_facilities },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 text-center"
+          >
+            <p className="text-lg font-bold text-gray-800">{stat.value}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Always visible */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+          Always visible
+        </p>
+
+        <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-100">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+              <LucideShieldAlert size={15} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Allergies</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {always_visible.allergies.length > 0
+                  ? always_visible.allergies.join(" · ")
+                  : "None recorded"}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">
+            Always shown
+          </span>
+        </div>
+
+        <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-orange-50 border border-orange-100">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+              <LucidePill size={15} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">
+                Active medications
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {always_visible.active_medications_count > 0
+                  ? `${always_visible.active_medications_count} active prescription${always_visible.active_medications_count > 1 ? "s" : ""} on record`
+                  : "No active medications on record"}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">
+            Always shown
+          </span>
+        </div>
+      </div>
+
+      {/* Record categories */}
+      {record_categories.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Record categories — consent required
+          </p>
           <div className="space-y-2">
-            {captures.map((c) => (
+            {record_categories.map((cat) => (
               <div
-                key={c.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
+                key={cat.speciality + cat.facility_name}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100"
               >
-                <div className="flex items-center gap-3">
-                  <LucideFileText
-                    size={14}
-                    className="text-blue-400 shrink-0"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">
-                      {c.form_name}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <LucideFileText size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {cat.speciality}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {new Date(c.created_at).toLocaleString("en-KE")}
+                      {[
+                        cat.facility_name,
+                        cat.record_count > 0 ? `${cat.record_count} records` : null,
+                        cat.last_record_at ? timeAgo(cat.last_record_at) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
+                    {cat.sensitivity === "ask_first" && (
+                      <p className="text-xs text-gray-400 italic mt-0.5">
+                        Patient has set this to <em>ask me first</em>
+                      </p>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={() =>
-                    router.push(
-                      `/appointments/${appointment.id}/capture/${c.id}`
-                    )
-                  }
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  View →
-                </button>
+                {cat.access_status === "approved" ? (
+                  <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full font-medium shrink-0">
+                    <LucideShieldCheck size={12} /> Approved
+                  </span>
+                ) : cat.access_status === "pending" ? (
+                  <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-medium shrink-0">
+                    Pending…
+                  </span>
+                ) : cat.access_status === "denied" ? (
+                  <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full font-medium shrink-0">
+                    Denied
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleRequest(cat.speciality)}
+                    disabled={requesting === cat.speciality}
+                    className="flex items-center gap-1.5 text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 shrink-0 font-medium"
+                  >
+                    <LucideLock size={11} />
+                    {requesting === cat.speciality ? "Sending…" : "Request"}
+                  </button>
+                )}
               </div>
             ))}
           </div>
         </div>
-      ))}
+      )}
+
+      {/* Access granted */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+          Access granted this consultation
+        </p>
+        {access_granted.length === 0 ? (
+          <p className="text-xs text-gray-400 flex items-center gap-1.5">
+            <LucideLock size={12} />
+            No records shared yet. Requests sent to patient appear here once
+            approved.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {access_granted.map((g) => (
+              <div
+                key={g.id}
+                className="flex items-center gap-2 text-sm text-gray-700"
+              >
+                <LucideShieldCheck size={14} className="text-green-500 shrink-0" />
+                <span className="font-medium">{g.requested_category}</span>
+                <span className="text-xs text-gray-400">— access approved</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -497,11 +497,13 @@ export default function Schedule() {
   };
 
   const handleEventClick = (appt: Appointment) => {
-    if (appt.meta?.type === "schedule") {
-      const block = schedules.find((s) => s.id === appt.meta?.scheduleId);
-      if (block) setEditingBlock(block);
-    }
-  };
+  if (appt.meta?.type === "schedule") {
+    const block = schedules.find((s) => s.id === appt.meta?.scheduleId);
+    if (block) setEditingBlock(block);
+  } else if (appt.meta?.type === "booked" && appt.meta?.appointmentId) {
+    window.location.href = "/appointments/" + appt.meta.appointmentId;
+  }
+};
 
   const scheduleEvents = schedules.flatMap(expandToCalendarEvents);
 

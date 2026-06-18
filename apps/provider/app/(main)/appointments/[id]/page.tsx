@@ -682,4 +682,3 @@ function MedicalRecords({
     </div>
   );
 }
-

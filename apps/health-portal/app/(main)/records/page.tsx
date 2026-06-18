@@ -20,8 +20,21 @@ interface Drug {
   instructions: string;
 }
 
+interface FormField {
+  id: string;
+  label?: string;
+  name?: string;
+  type?: string;
+}
+
+interface FormSection {
+  title?: string;
+  fields?: FormField[];
+}
+
 interface Capture {
   form_name: string;
+  form_snapshot: FormSection[];
   values: Record<string, unknown>;
   captured_at: string;
 }
@@ -35,13 +48,11 @@ interface HealthRecord {
   speciality: string;
   facility_name: string;
   county: string;
-  // consultation
   appointment_type?: string;
   status?: string;
   service_name?: string;
   captures?: Capture[];
   has_clinical_notes?: boolean;
-  // prescription
   diagnosis?: string;
   notes?: string;
   drugs?: Drug[];
@@ -59,6 +70,72 @@ function formatDate(iso: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+/**
+ * Builds a flat map of { fieldId → label } from the form_snapshot
+ * so clinical notes display proper field names instead of "F1", "F2" etc.
+ */
+function buildLabelMap(snapshot: FormSection[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!Array.isArray(snapshot)) return map;
+  for (const section of snapshot) {
+    for (const field of section.fields ?? []) {
+      if (field.id) {
+        map[field.id] = field.label ?? field.name ?? field.id;
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Safely renders any field value — handles strings, numbers,
+ * nested objects (like prescription references), and arrays.
+ */
+function renderValue(val: unknown): string {
+  if (val === null || val === undefined) return "—";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (Array.isArray(val)) {
+    return val.map((v) => renderValue(v)).join(", ");
+  }
+  if (typeof val === "object") {
+    // Try to extract a meaningful string from common object shapes
+    const obj = val as Record<string, unknown>;
+    if (obj.name) return String(obj.name);
+    if (obj.drug_name) return String(obj.drug_name);
+    if (obj.label) return String(obj.label);
+    return JSON.stringify(val);
+  }
+  return String(val);
+}
+
+function CaptureBlock({ capture }: { capture: Capture }) {
+  const labelMap = buildLabelMap(capture.form_snapshot ?? []);
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        {capture.form_name || "Clinical Notes"}
+      </p>
+      <div className="space-y-2">
+        {Object.entries(capture.values).map(([key, val]) => {
+          const label = labelMap[key] ?? key.replace(/_/g, " ");
+          return (
+            <div key={key} className="flex gap-2 text-sm">
+              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">
+                {label}
+              </span>
+              <span className="text-gray-800 font-medium">
+                {renderValue(val)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function ConsultationCard({ record }: { record: HealthRecord }) {
@@ -81,20 +158,16 @@ function ConsultationCard({ record }: { record: HealthRecord }) {
               </p>
               <span
                 className={
-                  "text-xs px-2 py-0.5 rounded-full font-medium " +
+                  "text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 " +
                   (record.appointment_type === "virtual"
                     ? "bg-indigo-50 text-indigo-700"
                     : "bg-green-50 text-green-700")
                 }
               >
                 {record.appointment_type === "virtual" ? (
-                  <span className="flex items-center gap-1">
-                    <LucideVideo size={11} /> Virtual
-                  </span>
+                  <><LucideVideo size={11} /> Virtual</>
                 ) : (
-                  <span className="flex items-center gap-1">
-                    <LucideMapPin size={11} /> In-person
-                  </span>
+                  <><LucideMapPin size={11} /> In-person</>
                 )}
               </span>
               {record.has_clinical_notes && (
@@ -110,50 +183,24 @@ function ConsultationCard({ record }: { record: HealthRecord }) {
             {record.facility_name && (
               <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                 <LucideMapPin size={11} />
-                {[record.facility_name, record.county]
-                  .filter(Boolean)
-                  .join(", ")}
+                {[record.facility_name, record.county].filter(Boolean).join(", ")}
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-1">
-              {formatDate(record.date)}
-            </p>
+            <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
           </div>
         </div>
         {record.has_clinical_notes &&
           (expanded ? (
-            <LucideChevronUp
-              size={16}
-              className="text-gray-400 shrink-0 mt-1"
-            />
+            <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
           ) : (
-            <LucideChevronDown
-              size={16}
-              className="text-gray-400 shrink-0 mt-1"
-            />
+            <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
           ))}
       </button>
 
       {expanded && record.captures && record.captures.length > 0 && (
-        <div className="border-t border-gray-100 px-5 py-4 space-y-4 bg-gray-50">
+        <div className="border-t border-gray-100 px-5 py-4 space-y-5 bg-gray-50">
           {record.captures.map((cap, i) => (
-            <div key={i}>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                {cap.form_name || "Clinical Notes"}
-              </p>
-              <div className="space-y-2">
-                {Object.entries(cap.values).map(([key, val]) => (
-                  <div key={key} className="text-sm">
-                    <span className="text-gray-500 capitalize">
-                      {key.replace(/_/g, " ")}:{" "}
-                    </span>
-                    <span className="text-gray-800 font-medium">
-                      {String(val)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CaptureBlock key={i} capture={cap} />
           ))}
         </div>
       )}
@@ -176,13 +223,10 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-800">
-                Prescription
-              </p>
+              <p className="text-sm font-semibold text-gray-800">Prescription</p>
               {record.drugs && record.drugs.length > 0 && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">
-                  {record.drugs.length} medication
-                  {record.drugs.length > 1 ? "s" : ""}
+                  {record.drugs.length} medication{record.drugs.length > 1 ? "s" : ""}
                 </span>
               )}
             </div>
@@ -196,26 +240,16 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
             {record.facility_name && (
               <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                 <LucideMapPin size={11} />
-                {[record.facility_name, record.county]
-                  .filter(Boolean)
-                  .join(", ")}
+                {[record.facility_name, record.county].filter(Boolean).join(", ")}
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-1">
-              {formatDate(record.date)}
-            </p>
+            <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
           </div>
         </div>
         {expanded ? (
-          <LucideChevronUp
-            size={16}
-            className="text-gray-400 shrink-0 mt-1"
-          />
+          <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
         ) : (
-          <LucideChevronDown
-            size={16}
-            className="text-gray-400 shrink-0 mt-1"
-          />
+          <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
         )}
       </button>
 
@@ -304,22 +338,17 @@ export default function RecordsPage() {
         <p className="text-sm text-gray-500 mt-0.5">
           Your complete medical history across all providers
         </p>
-
         <div className="mt-4 grid grid-cols-3 gap-3">
           <div className="bg-blue-50 rounded-xl p-3 text-center">
             <p className="text-2xl font-bold text-blue-700">{total}</p>
             <p className="text-xs text-blue-600 mt-0.5">Total records</p>
           </div>
           <div className="bg-purple-50 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-purple-700">
-              {consultationCount}
-            </p>
+            <p className="text-2xl font-bold text-purple-700">{consultationCount}</p>
             <p className="text-xs text-purple-600 mt-0.5">Consultations</p>
           </div>
           <div className="bg-green-50 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-green-700">
-              {prescriptionCount}
-            </p>
+            <p className="text-2xl font-bold text-green-700">{prescriptionCount}</p>
             <p className="text-xs text-green-600 mt-0.5">Prescriptions</p>
           </div>
         </div>

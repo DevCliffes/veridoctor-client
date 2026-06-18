@@ -48,6 +48,25 @@ type RecordEntry = {
   captures: Capture[];
 };
 
+const STATUS_OPTIONS = [
+  { value: "confirmed", label: "Confirmed" },
+  { value: "in-progress", label: "In Progress" },
+  { value: "completed", label: "Completed" },
+  { value: "rescheduled", label: "Rescheduled" },
+  { value: "no-show", label: "No Show" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const STATUS_STYLES: Record<string, string> = {
+  confirmed: "bg-green-100 text-green-700",
+  "in-progress": "bg-blue-100 text-blue-700",
+  completed: "bg-gray-100 text-gray-600",
+  rescheduled: "bg-purple-100 text-purple-700",
+  "no-show": "bg-orange-100 text-orange-700",
+  cancelled: "bg-red-100 text-red-700",
+  scheduled: "bg-yellow-100 text-yellow-700",
+};
+
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -56,8 +75,8 @@ export default function AppointmentDetailPage() {
   const [forms, setForms] = useState<Form[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFormId, setSelectedFormId] = useState<string>("");
-  const [cancelling, setCancelling] = useState(false);
   const [activeTab, setActiveTab] = useState<"details" | "records">("details");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     if (!userId || !id) return;
@@ -82,21 +101,25 @@ export default function AppointmentDetailPage() {
     router.push(`/appointments/${id}/capture?form=${selectedFormId}`);
   };
 
-  const handleCancel = async () => {
-    if (!confirm("Are you sure you want to cancel this appointment?")) return;
-    setCancelling(true);
+  const handleStatusChange = async (newStatus: string) => {
+    if (!appointment || newStatus === appointment.status) return;
+    if (
+      !confirm(
+        `Mark this appointment as "${STATUS_OPTIONS.find((s) => s.value === newStatus)?.label}"?`
+      )
+    )
+      return;
+    setUpdatingStatus(true);
     try {
       await axiosClient.patch(`provider/${userId}/appointments/${id}`, {
-        status: "cancelled",
+        status: newStatus,
       });
-      toast.success("Appointment cancelled");
-      setAppointment((prev) =>
-        prev ? { ...prev, status: "cancelled" } : prev
-      );
+      toast.success("Status updated");
+      setAppointment((prev) => (prev ? { ...prev, status: newStatus } : prev));
     } catch {
-      toast.error("Could not cancel appointment");
+      toast.error("Could not update status");
     } finally {
-      setCancelling(false);
+      setUpdatingStatus(false);
     }
   };
 
@@ -129,9 +152,19 @@ export default function AppointmentDetailPage() {
 
   const startTime = new Date(appointment.start_time);
   const endTime = new Date(appointment.end_time);
-  const isToday = startTime.toDateString() === new Date().toDateString();
-  const isPast = startTime < new Date();
-  const isCancelled = appointment.status === "cancelled";
+  const now = new Date();
+  const isToday = startTime.toDateString() === now.toDateString();
+  const isPast = endTime < now;
+  const isFuture = startTime > now;
+  const isTerminal = ["cancelled", "completed", "no-show"].includes(
+    appointment.status
+  );
+
+  // Join call is only available for virtual appointments happening today
+  const canJoinCall =
+    appointment.appointment_type === "virtual" &&
+    appointment.meet_id &&
+    isToday;
 
   return (
     <div className="p-4 mx-4 space-y-4 max-w-3xl">
@@ -157,11 +190,7 @@ export default function AppointmentDetailPage() {
               </h1>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${
-                  appointment.status === "confirmed"
-                    ? "bg-green-100 text-green-700"
-                    : appointment.status === "cancelled"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-yellow-100 text-yellow-700"
+                  STATUS_STYLES[appointment.status] ?? "bg-gray-100 text-gray-600"
                 }`}
               >
                 {appointment.status}
@@ -177,15 +206,6 @@ export default function AppointmentDetailPage() {
               </span>
             )}
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              {!isCancelled && !isPast && (
-                <button
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                  className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                >
-                  {cancelling ? "Cancelling…" : "Cancel appointment"}
-                </button>
-              )}
               <div className="relative">
                 <select
                   value={selectedFormId}
@@ -280,8 +300,19 @@ export default function AppointmentDetailPage() {
                       Today
                     </span>
                   )}
+                  {isFuture && !isToday && (
+                    <span className="text-xs text-blue-500 font-medium">
+                      Upcoming
+                    </span>
+                  )}
+                  {isPast && !isToday && (
+                    <span className="text-xs text-gray-400 font-medium">
+                      Past
+                    </span>
+                  )}
                 </div>
               </div>
+
               <div className="flex items-start gap-3">
                 <LucideCalendarCheck
                   size={16}
@@ -304,6 +335,7 @@ export default function AppointmentDetailPage() {
                   </p>
                 </div>
               </div>
+
               <div className="flex items-start gap-3">
                 {appointment.appointment_type === "virtual" ? (
                   <LucideVideo
@@ -325,30 +357,81 @@ export default function AppointmentDetailPage() {
                   </p>
                 </div>
               </div>
+
               {appointment.appointment_type === "virtual" &&
                 appointment.meet_id && (
                   <div className="flex items-start gap-3">
                     <LucideVideo
                       size={16}
-                      className="text-indigo-500 mt-0.5 shrink-0"
+                      className={
+                        canJoinCall
+                          ? "text-indigo-500 mt-0.5 shrink-0"
+                          : "text-gray-300 mt-0.5 shrink-0"
+                      }
                     />
                     <div>
                       <p className="text-xs text-gray-400 uppercase tracking-wide">
                         Call
                       </p>
-                      <button
-                        onClick={() =>
-                          router.push(`/calls/${appointment.meet_id}`)
-                        }
-                        className="text-sm text-blue-600 hover:underline font-medium"
-                      >
-                        Join video call →
-                      </button>
+                      {canJoinCall ? (
+                        <button
+                          onClick={() =>
+                            router.push(`/calls/${appointment.meet_id}`)
+                          }
+                          className="text-sm text-blue-600 hover:underline font-medium"
+                        >
+                          Join video call →
+                        </button>
+                      ) : (
+                        <p className="text-sm text-gray-400 font-medium">
+                          {isFuture
+                            ? "Available on the day of the appointment"
+                            : "Call has ended"}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
             </div>
           </div>
+
+          {/* Status management */}
+          {!isTerminal && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <h2 className="font-semibold text-gray-700 mb-3">
+                Update Status
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {STATUS_OPTIONS.filter(
+                  (s) =>
+                    s.value !== appointment.status &&
+                    s.value !== "scheduled" &&
+                    s.value !== "confirmed"
+                ).map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => handleStatusChange(s.value)}
+                    disabled={updatingStatus}
+                    className={`text-sm px-4 py-2 rounded-lg border font-medium transition-colors disabled:opacity-50 ${
+                      s.value === "completed"
+                        ? "border-green-200 text-green-700 hover:bg-green-50"
+                        : s.value === "no-show"
+                        ? "border-orange-200 text-orange-700 hover:bg-orange-50"
+                        : s.value === "rescheduled"
+                        ? "border-purple-200 text-purple-700 hover:bg-purple-50"
+                        : s.value === "cancelled"
+                        ? "border-red-200 text-red-600 hover:bg-red-50"
+                        : s.value === "in-progress"
+                        ? "border-blue-200 text-blue-700 hover:bg-blue-50"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    {updatingStatus ? "Updating…" : s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Patient contact */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
@@ -548,9 +631,7 @@ function MedicalRecords({
               </p>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  appointment.status === "confirmed"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-500"
+                  STATUS_STYLES[appointment.status] ?? "bg-gray-100 text-gray-500"
                 }`}
               >
                 {appointment.status}
@@ -601,4 +682,3 @@ function MedicalRecords({
     </div>
   );
 }
-

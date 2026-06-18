@@ -113,7 +113,7 @@ function ProviderCard({
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
     provider.services[0]?.id ?? null
   );
-  const [selectedApptType, setSelectedApptType] = useState
+  const [selectedApptType, setSelectedApptType] = useState<
     "virtual" | "physical"
   >("virtual");
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
@@ -324,9 +324,19 @@ function BookingModal({
   onClose: () => void;
   onConfirmed: () => void;
 }) {
+  const [apptType, setApptType] = useState<"virtual" | "physical">(
+    booking.appointmentType
+  );
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const canVirtual =
+    booking.slot.location_type === "virtual" ||
+    booking.slot.location_type === "both";
+  const canPhysical =
+    booking.slot.location_type === "physical" ||
+    booking.slot.location_type === "both";
 
   const handleConfirm = async () => {
     if (!patientFirst || !patientLast) {
@@ -345,7 +355,7 @@ function BookingModal({
           patient_phone_number: patientPhone,
           start_time: booking.slot.start_time,
           end_time: booking.slot.end_time,
-          appointment_type: booking.appointmentType,
+          appointment_type: apptType,
           message,
           status: "scheduled",
         }
@@ -389,24 +399,46 @@ function BookingModal({
             )}
           </div>
 
-          <div className="flex gap-2">
-            {(patientFirst || patientEmail) && (
-              <div className="flex-1 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                Booking as:{" "}
-                <span className="font-medium text-gray-700">
-                  {[patientFirst, patientLast].filter(Boolean).join(" ") || patientEmail}
-                </span>
-              </div>
-            )}
-            <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 flex items-center gap-1">
-              {booking.appointmentType === "virtual" ? (
-                <LucideVideo size={12} className="text-indigo-500" />
-              ) : (
-                <LucideMapPin size={12} className="text-green-500" />
-              )}
-              <span className="font-medium text-gray-700 capitalize">
-                {booking.appointmentType}
+          {(patientFirst || patientEmail) && (
+            <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              Booking as:{" "}
+              <span className="font-medium text-gray-700">
+                {[patientFirst, patientLast].filter(Boolean).join(" ") || patientEmail}
               </span>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Appointment type
+            </p>
+            <div className="flex gap-2">
+              {canVirtual && (
+                <button
+                  onClick={() => setApptType("virtual")}
+                  className={
+                    "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " +
+                    (apptType === "virtual"
+                      ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
+                      : "border-gray-200 text-gray-600")
+                  }
+                >
+                  <LucideVideo size={14} /> Virtual
+                </button>
+              )}
+              {canPhysical && (
+                <button
+                  onClick={() => setApptType("physical")}
+                  className={
+                    "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm border transition-colors " +
+                    (apptType === "physical"
+                      ? "bg-green-50 border-green-300 text-green-700 font-medium"
+                      : "border-gray-200 text-gray-600")
+                  }
+                >
+                  <LucideMapPin size={14} /> In-person
+                </button>
+              )}
             </div>
           </div>
 
@@ -601,4 +633,3 @@ export default function BookPage() {
     </div>
   );
 }
-

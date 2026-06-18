@@ -792,3 +792,4 @@ function PatientRecordPanel({
     </div>
   );
 }
+

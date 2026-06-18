@@ -145,7 +145,10 @@ function ProviderCard({
           {initials.toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-gray-800 text-base">
+          <h3
+            onClick={() => router.push(`/book/provider/${provider.id}`)}
+            className="font-bold text-gray-800 text-base hover:text-blue-600 cursor-pointer transition-colors"
+          >
             Dr. {provider.first_name} {provider.last_name}
           </h3>
           <p className="text-sm text-blue-600 font-medium mt-0.5">

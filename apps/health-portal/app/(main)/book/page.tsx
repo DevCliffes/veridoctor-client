@@ -12,6 +12,8 @@ import {
   LucideX,
   LucideChevronLeft,
   LucideChevronRight,
+  LucideChevronDown,
+  LucideChevronUp,
 } from "@veridoctor/design/icons";
 
 interface Service {
@@ -27,6 +29,11 @@ interface Provider {
   first_name: string;
   last_name: string;
   speciality: string;
+  clinic_name: string;
+  county: string;
+  bio: string;
+  languages: string[];
+  insurances_accepted: string[];
   services: Service[];
 }
 
@@ -116,6 +123,7 @@ function ProviderCard({
     provider.services[0]?.id ?? null
   );
   const [selectedApptType, setSelectedApptType] = useState<"virtual" | "physical">("virtual");
+  const [expanded, setExpanded] = useState(false);
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
 
   useEffect(() => {
@@ -138,15 +146,23 @@ function ProviderCard({
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
 
+  const hasExtraInfo =
+    provider.bio ||
+    provider.clinic_name ||
+    provider.county ||
+    (provider.languages && provider.languages.length > 0) ||
+    (provider.insurances_accepted && provider.insurances_accepted.length > 0);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      {/* Header */}
       <div className="flex gap-4">
         <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold shrink-0">
           {initials.toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
           <h3
-            onClick={() => router.push(`/book/provider/${provider.id}`)}
+            onClick={() => router.push("/book/provider/" + provider.id)}
             className="font-bold text-gray-800 text-base hover:text-blue-600 cursor-pointer transition-colors"
           >
             Dr. {provider.first_name} {provider.last_name}
@@ -154,6 +170,13 @@ function ProviderCard({
           <p className="text-sm text-blue-600 font-medium mt-0.5">
             {provider.speciality ?? "General Practitioner"}
           </p>
+          {provider.clinic_name && (
+            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+              <LucideMapPin size={11} className="shrink-0" />
+              {provider.clinic_name}
+              {provider.county ? ", " + provider.county : ""}
+            </p>
+          )}
           {provider.services.length > 0 && (
             <p className="text-xs text-gray-500 mt-1">
               {provider.services.map((s) => s.name).join(" · ")}
@@ -169,6 +192,76 @@ function ProviderCard({
         </div>
       </div>
 
+      {/* Expandable extra info */}
+      {hasExtraInfo && (
+        <div className="mt-3">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+          >
+            {expanded ? (
+              <>
+                <LucideChevronUp size={13} /> Less info
+              </>
+            ) : (
+              <>
+                <LucideChevronDown size={13} /> More info
+              </>
+            )}
+          </button>
+
+          {expanded && (
+            <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+              {provider.bio && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
+                    About
+                  </p>
+                  <p className="text-sm text-gray-600">{provider.bio}</p>
+                </div>
+              )}
+
+              {provider.languages && provider.languages.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+                    Languages
+                  </p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {provider.languages.map((lang) => (
+                      <span
+                        key={lang}
+                        className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium"
+                      >
+                        {lang}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {provider.insurances_accepted && provider.insurances_accepted.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+                    Accepted Insurance
+                  </p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {provider.insurances_accepted.map((ins) => (
+                      <span
+                        key={ins}
+                        className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100"
+                      >
+                        {ins}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Service selector */}
       {provider.services.length > 0 && (
         <div className="mt-4">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
@@ -193,6 +286,7 @@ function ProviderCard({
         </div>
       )}
 
+      {/* Appointment type */}
       <div className="mt-3">
         <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
           Appointment type
@@ -223,6 +317,7 @@ function ProviderCard({
         </div>
       </div>
 
+      {/* Date slots */}
       <div className="mt-4 flex gap-2 items-start">
         <button
           onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
@@ -333,7 +428,7 @@ function BookingModal({
 
   const handleConfirm = async () => {
     if (!patientEmail) {
-      setError("We couldn't verify your account email. Please refresh the page and try again.");
+      setError("We couldn't verify your account email. Please refresh and try again.");
       return;
     }
     if (!patientFirst || !patientLast) {
@@ -479,14 +574,9 @@ export default function BookPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!identityId) {
-      // No identity in store yet — keep profileLoading true rather than
-      // falsely resolving to "loaded with no email", so booking stays
-      // gated until we actually know who the patient is.
-      return;
-    }
+    if (!identityId) return;
     axiosClient
-      .get(`/identity/register/${identityId}`)
+      .get("/identity/register/" + identityId)
       .then((res) => {
         setPatientEmail(res.data.email ?? "");
         setPatientFirst(res.data.first_name ?? "");
@@ -514,7 +604,11 @@ export default function BookPage() {
       p.first_name.toLowerCase().includes(q) ||
       p.last_name.toLowerCase().includes(q) ||
       (p.speciality ?? "").toLowerCase().includes(q) ||
-      p.services.some((s) => s.name.toLowerCase().includes(q))
+      (p.clinic_name ?? "").toLowerCase().includes(q) ||
+      p.services.some((s) => s.name.toLowerCase().includes(q)) ||
+      (p.insurances_accepted ?? []).some((ins) =>
+        ins.toLowerCase().includes(q)
+      )
     );
   });
 
@@ -522,9 +616,6 @@ export default function BookPage() {
     ...new Set(providers.map((p) => p.speciality).filter(Boolean)),
   ];
 
-  // Booking requires a verified patient email — block the whole booking
-  // interaction (not just the submit button) until the profile fetch
-  // has actually resolved, so we never open the modal with a blank email.
   const handleBookClick = (state: BookingState) => {
     if (profileLoading) {
       setToast({
@@ -567,7 +658,7 @@ export default function BookPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, speciality or service..."
+            placeholder="Search by name, speciality, clinic or insurance..."
             className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50"
           />
         </div>

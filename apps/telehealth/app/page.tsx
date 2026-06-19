@@ -1,91 +1,358 @@
 "use client";
+import { useParams, useSearchParams } from "next/navigation";
+import socketService from "@/utils/socketService";
+import webRTCService from "@/utils/webRTCService";
+import { useEffect, useRef, useState } from "react";
+import {
+  Video,
+  VideoOff,
+  PhoneOff,
+  MicIcon,
+  MicOffIcon,
+} from "@veridoctor/design/icons";
+import { toast } from "sonner";
+import { useAppDispatch, UseAppSelector } from "@/states/store/hooks";
+import { setHasJoined, setIsOfferer, setOffer } from "@/states/features/webrtc";
 
-import { Button } from "@veridoctor/design/components";
-import { LucideCog } from "@veridoctor/design/icons";
-import Image from "next/dist/shared/lib/image-external";
-import { useRouter } from "next/navigation";
-import { ChangeEvent, useEffect, useState } from "react";
+export default function TelehealthVideoPlayer() {
+  const dispatch = useAppDispatch();
+  const searchParams = useSearchParams();
+  const initLocalVideoRef = useRef<HTMLVideoElement>(null);
+  const userId = searchParams.get("userId");
+  const isOffererParam = searchParams.get("isOfferer") === "true";
+  const { meetId } = useParams<{ meetId: string }>();
+  const [audioMuted, setAudioMuted] = useState(false);
+  const [videoOff, setVideoOff] = useState(false);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const { hasJoined, offer } = UseAppSelector((state) => state.webrtc);
+  const [localMediaAvailable, setLocalMediaAvailable] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [remoteConnected, setRemoteConnected] = useState(false);
 
-export default function Home() {
-  const [meetLink, setMeetLink] = useState("");
-  const [dateTime, setDateTime] = useState<string>(
-    new Date().toLocaleString("en-US", {
-      dateStyle: "long",
-      timeStyle: "short",
-    }),
-  );
+  // Keep a ref to localStream so joinMeeting always sees the latest value
+  const localStreamRef = useRef<MediaStream | null>(null);
 
+  const TELEHEALTH_BACKEND_URL =
+    process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
+
+  // Initialize notification audio
   useEffect(() => {
-    const timer = setInterval(() => {
-      const newDateTime = new Date().toLocaleString("en-US", {
-        dateStyle: "long",
-        timeStyle: "short",
+    let context: AudioContext;
+    const initAudio = async () => {
+      context = new window.AudioContext();
+      setAudioContext(context);
+      try {
+        const response = await fetch("/sounds/notification.mp3");
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = await context.decodeAudioData(arrayBuffer);
+        setAudioBuffer(buffer);
+      } catch (error) {
+        console.error("Error loading audio:", error);
+      }
+    };
+    initAudio();
+    return () => {
+      context?.close();
+    };
+  }, []);
+
+  // Initialize local media
+  useEffect(() => {
+    webRTCService.setOffererType(isOffererParam);
+    dispatch(setIsOfferer(isOffererParam));
+    webRTCService.initilaizeMedia().then((stream) => {
+      if (stream && initLocalVideoRef.current) {
+        initLocalVideoRef.current.srcObject = stream;
+        initLocalVideoRef.current.muted = true;
+      }
+      localStreamRef.current = stream;
+      setLocalMediaAvailable(true);
+      setLocalStream(stream);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Attach local stream to local video element after joining
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, hasJoined]);
+
+  // Attach remote stream to video element whenever it arrives
+  useEffect(() => {
+    if (remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      setRemoteConnected(true);
+    }
+  }, [remoteStream]);
+
+  // Connect to signaling server and set up ALL listeners before anything else
+  useEffect(() => {
+    socketService.connect(TELEHEALTH_BACKEND_URL, {
+      userName: userId,
+      roomName: meetId,
+    });
+
+    if (!isOffererParam) {
+      // Patient: listen for the offer. Store it in Redux so the "Join Call"
+      // button becomes active. The offer may arrive at any time after connect.
+      socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
+        dispatch(setOffer(incomingOffer));
+        webRTCService.setOffererType(false);
+      });
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setupPeerConnection = async () => {
+    const pc = await webRTCService.createPeerConnection();
+
+    pc.addEventListener("icecandidate", (event: RTCPeerConnectionIceEvent) => {
+      if (event.candidate) {
+        socketService.emit("icecandidate", {
+          candidate: event.candidate,
+          roomId: meetId,
+          isOfferer: isOffererParam,
+        });
+      }
+    });
+
+    // Add local tracks
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
+    }
+
+    // When remote tracks arrive, update state to trigger the video element
+    pc.addEventListener("track", (event: RTCTrackEvent) => {
+      const [remoteStr] = event.streams;
+      setRemoteStream(remoteStr);
+    });
+
+    pc.addEventListener("connectionstatechange", () => {
+      if (pc.connectionState === "connected") {
+        toast.success("Call connected");
+      }
+      if (pc.connectionState === "disconnected") {
+        toast.error("Disconnected. Reconnecting...");
+        setRemoteConnected(false);
+      }
+    });
+
+    // ICE candidates from the remote peer
+    socketService.on("receiveIceCandidate", (candidate: RTCIceCandidate) => {
+      webRTCService.addIceCandidate(candidate).catch(console.error);
+    });
+
+    return pc;
+  };
+
+  const joinMeeting = async (incomingOffer?: RTCSessionDescriptionInit) => {
+    if (isOffererParam) {
+      // ── PROVIDER (offerer) ───────────────────────────────────────────────
+      // Register remoteAnswer listener BEFORE sending the offer so we never
+      // miss the answer that comes back from the patient.
+      await setupPeerConnection();
+
+      socketService.on("remoteAnswer", (answer: RTCSessionDescriptionInit) => {
+        webRTCService.handleRemoteAnswer(answer).catch(console.error);
       });
 
-      setDateTime(newDateTime);
-    }, 60000);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [dateTime]);
+      const newOffer = await webRTCService.createOffer();
+      socketService.emit("newOffer", newOffer);
 
-  const router = useRouter();
+    } else {
+      // ── PATIENT (answerer) ───────────────────────────────────────────────
+      if (!incomingOffer) {
+        toast.error("No offer available yet — please wait for the provider.");
+        return;
+      }
 
-  const joinCall = () => {
-    const meetingCode = meetLink.trim();
-    if (!meetingCode) return;
-    router.push(`/${meetingCode}?userId=guest`);
+      await setupPeerConnection();
+
+      const answer = await webRTCService.createAnswer(incomingOffer);
+      socketService.emit("newAnswer", answer);
+    }
+
+    dispatch(setHasJoined(true));
   };
 
-  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { value } = event.target;
-    setMeetLink(value);
+  const playNotificationAudio = () => {
+    if (audioBuffer && audioContext) {
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start(0);
+    }
   };
 
-  return (
-    <div className="min-h-screen">
-      {/* header */}
-      <div className="p-4 flex justify-between items-center">
-        <div className="flex gap-4 items-center">
-          <Image
-            src="/favicon.ico"
-            alt="Veridoctor Logo"
-            width={50}
-            height={50}
+  const toggleAudio = () => {
+    if (webRTCService.localStream) {
+      const audioTracks = webRTCService.localStream.getAudioTracks();
+      audioTracks.forEach((track) => {
+        track.enabled = audioMuted;
+      });
+      setAudioMuted(!audioMuted);
+      playNotificationAudio();
+      toast.success(`Microphone ${audioMuted ? "on" : "off"}`);
+    }
+  };
+
+  const toggleVideo = () => {
+    if (webRTCService.localStream) {
+      const videoTracks = webRTCService.localStream.getVideoTracks();
+      videoTracks.forEach((track) => {
+        track.enabled = videoOff;
+      });
+      setVideoOff(!videoOff);
+      playNotificationAudio();
+      toast.success(`Camera ${videoOff ? "on" : "off"}`);
+    }
+  };
+
+  const endCall = () => {
+    webRTCService.peerConnection?.close();
+    socketService.disconnect();
+    window.close();
+  };
+
+  // ─── PRE-CALL LOBBY ───────────────────────────────────────────────────────
+  if (!hasJoined) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-6 text-white">
+        <p className="text-lg font-medium text-gray-300">
+          {isOffererParam ? "Ready to start your call?" : "Waiting to join..."}
+        </p>
+
+        <div className="relative">
+          <video
+            ref={initLocalVideoRef}
+            className="w-[420px] h-[280px] bg-gray-800 rounded-2xl object-cover scale-x-[-1]"
+            autoPlay
+            playsInline
           />
-          <p className="font-bold text-lg">Telehealth</p>
+          {!localMediaAvailable && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+              Loading camera...
+            </div>
+          )}
         </div>
-        <div className="flex gap-4">
-          <p>{dateTime}</p>
-          <LucideCog className="cursor-pointer" />
+
+        {isOffererParam ? (
+          localMediaAvailable ? (
+            <button
+              onClick={() => joinMeeting()}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full text-white font-medium transition-colors"
+            >
+              <Video size={18} /> Start Call
+            </button>
+          ) : (
+            <p className="text-gray-400 text-sm">Accessing camera...</p>
+          )
+        ) : offer ? (
+          <button
+            onClick={() => joinMeeting(offer)}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-8 py-3 rounded-full text-white font-medium transition-colors"
+          >
+            <Video size={18} /> Join Call
+          </button>
+        ) : (
+          <p className="text-gray-400 text-sm">
+            Waiting for the provider to start the call...
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // ─── ACTIVE CALL ──────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-gray-900 flex flex-col">
+      <div className="relative flex-1 bg-gray-800 flex items-center justify-center overflow-hidden">
+        {remoteConnected ? (
+          <video
+            ref={remoteVideoRef}
+            className="w-full h-full object-cover"
+            autoPlay
+            playsInline
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-3 text-gray-400">
+            <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
+              ?
+            </div>
+            <p className="text-sm">Waiting for the other participant...</p>
+          </div>
+        )}
+
+        <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-lg border border-gray-700 w-[140px] h-[100px] bg-gray-900">
+          {videoOff ? (
+            <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-xs">
+              Camera off
+            </div>
+          ) : (
+            <video
+              ref={localVideoRef}
+              className="w-full h-full object-cover scale-x-[-1]"
+              autoPlay
+              playsInline
+              muted
+            />
+          )}
         </div>
       </div>
-      {/* main section */}
-      <div className="flex flex-col items-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-semibold tracking-wide">
-            Veridoctor telehealth
-          </h1>
-          <p className="text-lg max-w-lg mx-auto mt-4">
-            Connect with healthcare professionals from the comfort of your home
-            and get the care you need, when you need it.
-          </p>
+
+      <div className="h-20 bg-gray-900 flex items-center justify-center gap-6 px-6 border-t border-gray-800">
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={toggleAudio}
+            className={
+              "p-3 rounded-full transition-colors " +
+              (audioMuted
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-gray-700 hover:bg-gray-600 text-white")
+            }
+          >
+            {audioMuted ? <MicOffIcon size={20} /> : <MicIcon size={20} />}
+          </button>
+          <span className="text-gray-400 text-xs">
+            {audioMuted ? "Unmute" : "Mute"}
+          </span>
         </div>
-        <div className="flex gap-4 mt-4">
-          <input
-            type="text"
-            placeholder="Enter meeting code"
-            className="border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary px-2 w-full h-10"
-            onChange={handleInputChange}
-          ></input>
-          <Button variant="rounded" onClick={joinCall}>
-            Join call
-          </Button>
+
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={toggleVideo}
+            className={
+              "p-3 rounded-full transition-colors " +
+              (videoOff
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-gray-700 hover:bg-gray-600 text-white")
+            }
+          >
+            {videoOff ? <VideoOff size={20} /> : <Video size={20} />}
+          </button>
+          <span className="text-gray-400 text-xs">
+            {videoOff ? "Start" : "Stop"}
+          </span>
         </div>
-        <div className="absolute  bottom-10 flex gap-4 justify-center items-center">
-          <Button variant="link">Learn more</Button>
-          <Button variant="link">Contact us</Button>
-          <p className="text-sm">&copy;2026 Veri doctor</p>
+
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={endCall}
+            className="p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
+          >
+            <PhoneOff size={20} />
+          </button>
+          <span className="text-gray-400 text-xs">End call</span>
         </div>
       </div>
     </div>

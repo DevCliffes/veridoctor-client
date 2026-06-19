@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ChevronDown,
@@ -35,60 +35,52 @@ import {
 } from "@veridoctor/store";
 import { axiosClient } from "@veridoctor/api-client";
 
+export const dynamic = "force-dynamic";
+
 export default function MainAppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { access_token, identity, auth_code } = useAppSelector(
+  const { access_token, identity, auth_code, user } = useAppSelector(
     (store) => store.auth
   );
   const dispatch = useAppDispatch();
+  const [profileReady, setProfileReady] = useState(false);
+
   const authInfo = {
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
   };
+
   const navItems: navITem[] = [
-    {
-      linkTo: "/dashboard",
-      icon: <LayoutDashboard />,
-      name: "Dashboard",
-    },
-    {
-      linkTo: "/appointments",
-      icon: <LucideCalendarCheck />,
-      name: "Appointments",
-    },
-    {
-      linkTo: "/book",
-      icon: <LucideSearch />,
-      name: "Find a Doctor",
-    },
-    {
-      linkTo: "/records",
-      icon: <LucideActivitySquare />,
-      name: "Health Records",
-    },
-    {
-      linkTo: "/prescriptions",
-      icon: <LucideFileText />,
-      name: "Prescriptions",
-    },
+    { linkTo: "/dashboard", icon: <LayoutDashboard />, name: "Dashboard" },
+    { linkTo: "/appointments", icon: <LucideCalendarCheck />, name: "Appointments" },
+    { linkTo: "/book", icon: <LucideSearch />, name: "Find a Doctor" },
+    { linkTo: "/records", icon: <LucideActivitySquare />, name: "Health Records" },
+    { linkTo: "/prescriptions", icon: <LucideFileText />, name: "Prescriptions" },
   ];
+
   const setAuthInfo = (token: TokenPayload) => {
     dispatch(setAccessToken(token.a_token));
     dispatch(setRefreshToken(token.refresh_token));
     dispatch(setIsLoggedIn());
   };
 
-  // Fetch the full profile (including email) once we have an identity,
-  // and store it in Redux so any page (e.g. Appointments) can read it.
   useEffect(() => {
-    if (!identity || typeof identity !== "string") return;
+    // If user is already in Redux (e.g. from localStorage), mark ready immediately
+    if (user?.email) {
+      setProfileReady(true);
+      return;
+    }
+    if (!identity || typeof identity !== "string") {
+      setProfileReady(true); // nothing to fetch, let pages handle empty state
+      return;
+    }
     axiosClient
-      .get(`/identity/register/${identity}`)
+      .get("/identity/register/" + identity)
       .then((res) => {
         dispatch(
           setUser({
@@ -100,10 +92,12 @@ export default function MainAppLayout({
         );
       })
       .catch(() => {
-        // Silently ignore — pages relying on user.email will just see it empty
-        // until this succeeds (e.g. on next page load/refresh).
+        // profile fetch failed — pages will see empty email
+      })
+      .finally(() => {
+        setProfileReady(true);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity]);
 
   return (
@@ -116,7 +110,11 @@ export default function MainAppLayout({
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
           <div className="w-full overflow-y-scroll bg-gray-200 p-4 rounded-lg">
-            {children}
+            {profileReady ? children : (
+              <div className="flex items-center justify-center h-full">
+                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
           </div>
         </div>
       </div>

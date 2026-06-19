@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ChevronDown,
@@ -30,7 +31,9 @@ import {
   setIsLoggedIn,
   setAccessToken,
   setRefreshToken,
+  setUser,
 } from "@veridoctor/store";
+import { axiosClient } from "@veridoctor/api-client";
 
 export default function MainAppLayout({
   children,
@@ -42,13 +45,11 @@ export default function MainAppLayout({
     (store) => store.auth
   );
   const dispatch = useAppDispatch();
-
   const authInfo = {
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
   };
-
   const navItems: navITem[] = [
     {
       linkTo: "/dashboard",
@@ -76,12 +77,34 @@ export default function MainAppLayout({
       name: "Prescriptions",
     },
   ];
-
   const setAuthInfo = (token: TokenPayload) => {
     dispatch(setAccessToken(token.a_token));
     dispatch(setRefreshToken(token.refresh_token));
     dispatch(setIsLoggedIn());
   };
+
+  // Fetch the full profile (including email) once we have an identity,
+  // and store it in Redux so any page (e.g. Appointments) can read it.
+  useEffect(() => {
+    if (!identity || typeof identity !== "string") return;
+    axiosClient
+      .get(`/identity/register/${identity}`)
+      .then((res) => {
+        dispatch(
+          setUser({
+            id: res.data.id ?? identity,
+            first_name: res.data.first_name ?? "",
+            last_name: res.data.last_name ?? "",
+            email: res.data.email ?? "",
+          })
+        );
+      })
+      .catch(() => {
+        // Silently ignore — pages relying on user.email will just see it empty
+        // until this succeeds (e.g. on next page load/refresh).
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity]);
 
   return (
     <AuthWrapper
@@ -104,7 +127,6 @@ export default function MainAppLayout({
 function ProfileDropdown() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-
   const handleLogout = () => {
     dispatch(setAccessToken(""));
     dispatch(setRefreshToken(""));
@@ -112,7 +134,6 @@ function ProfileDropdown() {
       window.location.href = process.env.NEXT_PUBLIC_WEB_APP_URL || "/";
     }
   };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex gap-2 border-2 hover:cursor-pointer items-center p-1 md:border-2 md:rounded-full">

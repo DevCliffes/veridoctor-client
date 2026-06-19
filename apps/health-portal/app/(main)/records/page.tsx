@@ -13,14 +13,22 @@ import {
   LucideShieldAlert,
   LucideShieldCheck,
   LucideBell,
+  LucidePill,
 } from "@veridoctor/design/icons";
 
 interface Drug {
+  id?: string;
   drug_name: string;
-  dosage: string;
+  dosage?: string;
   frequency: string;
   duration: string;
-  instructions: string;
+  instructions?: string;
+}
+
+interface PrescriptionValue {
+  diagnosis?: string;
+  notes?: string;
+  drugs?: Drug[];
 }
 
 interface FormField {
@@ -97,26 +105,99 @@ function buildLabelMap(snapshot: FormSection[]): Record<string, string> {
   return map;
 }
 
-function renderValue(val: unknown): string {
-  if (val === null || val === undefined) return "—";
+// ── Detect if a value looks like a prescription object ───────────────────────
+function isPrescriptionValue(val: unknown): val is PrescriptionValue {
+  if (!val || typeof val !== "object" || Array.isArray(val)) return false;
+  const obj = val as Record<string, unknown>;
+  return "drugs" in obj || "diagnosis" in obj;
+}
+
+function parsePrescription(val: unknown): PrescriptionValue | null {
+  // Already an object
+  if (isPrescriptionValue(val)) return val as PrescriptionValue;
+  // JSON string
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (isPrescriptionValue(parsed)) return parsed;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// ── Inline prescription renderer used inside CaptureBlock ────────────────────
+function InlinePrescription({ value }: { value: PrescriptionValue }) {
+  return (
+    <div className="mt-1 space-y-2">
+      {value.diagnosis && (
+        <p className="text-xs text-gray-600">
+          <span className="font-medium text-gray-700">Diagnosis: </span>
+          {value.diagnosis}
+        </p>
+      )}
+      {value.drugs && value.drugs.length > 0 && (
+        <div className="space-y-2">
+          {value.drugs.map((drug, i) => (
+            <div
+              key={drug.id ?? i}
+              className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-start gap-3"
+            >
+              <div className="w-7 h-7 rounded-lg bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
+                <LucidePill size={13} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">
+                  {drug.drug_name}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {[drug.dosage, drug.frequency, drug.duration]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {drug.instructions && (
+                  <p className="text-xs text-gray-400 mt-0.5 italic">
+                    {drug.instructions}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {value.notes && (
+        <p className="text-xs text-gray-500 italic">
+          <span className="font-medium not-italic text-gray-600">Notes: </span>
+          {value.notes}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function renderValue(val: unknown): React.ReactNode {
+  if (val === null || val === undefined || val === "") return "—";
+  if (typeof val === "boolean") return val ? "Yes" : "No";
+  if (typeof val === "number") return String(val);
   if (typeof val === "string") return val;
-  if (typeof val === "number" || typeof val === "boolean") return String(val);
+
+  // Check if it's a prescription object/string before generic rendering
+  const prescription = parsePrescription(val);
+  if (prescription) return <InlinePrescription value={prescription} />;
+
   if (Array.isArray(val)) return val.map(renderValue).join(", ");
   if (typeof val === "object") {
     const obj = val as Record<string, unknown>;
+    if (obj.drug_name) return renderValue(obj.drug_name);
     if (obj.name) return String(obj.name);
-    if (obj.drug_name) return String(obj.drug_name);
     if (obj.label) return String(obj.label);
     return JSON.stringify(val);
   }
   return String(val);
 }
 
-function AccessRequestsPanel({
-  identityId,
-}: {
-  identityId: string;
-}) {
+function AccessRequestsPanel({ identityId }: { identityId: string }) {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState<string | null>(null);
@@ -142,7 +223,9 @@ function AccessRequestsPanel({
       });
       setRequests((prev) =>
         prev.map((r) =>
-          r.id === grantId ? { ...r, status: newStatus, responded_at: new Date().toISOString() } : r
+          r.id === grantId
+            ? { ...r, status: newStatus, responded_at: new Date().toISOString() }
+            : r
         )
       );
     } catch {
@@ -172,10 +255,7 @@ function AccessRequestsPanel({
       {pending.length > 0 && (
         <div className="space-y-2">
           {pending.map((req) => (
-            <div
-              key={req.id}
-              className="bg-amber-50 border border-amber-100 rounded-xl p-4"
-            >
+            <div key={req.id} className="bg-amber-50 border border-amber-100 rounded-xl p-4">
               <div className="flex items-start gap-2">
                 <LucideShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
@@ -219,16 +299,8 @@ function AccessRequestsPanel({
               key={req.id}
               className="flex items-center justify-between text-xs text-gray-500 py-1.5 border-b border-gray-50 last:border-0"
             >
-              <span>
-                {req.provider_name} · {req.requested_category}
-              </span>
-              <span
-                className={
-                  req.status === "approved"
-                    ? "text-green-600 font-medium"
-                    : "text-red-500 font-medium"
-                }
-              >
+              <span>{req.provider_name} · {req.requested_category}</span>
+              <span className={req.status === "approved" ? "text-green-600 font-medium" : "text-red-500 font-medium"}>
                 {req.status}
               </span>
             </div>
@@ -246,13 +318,21 @@ function CaptureBlock({ capture }: { capture: Capture }) {
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
         {capture.form_name || "Clinical Notes"}
       </p>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {Object.entries(capture.values).map(([key, val]) => {
           const label = labelMap[key] ?? key.replace(/_/g, " ");
+          const rendered = renderValue(val);
+          const isPrescription = parsePrescription(val) !== null;
           return (
-            <div key={key} className="flex gap-2 text-sm">
-              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">{label}</span>
-              <span className="text-gray-800 font-medium">{renderValue(val)}</span>
+            <div key={key} className={isPrescription ? "flex flex-col gap-1" : "flex gap-2 text-sm"}>
+              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize text-sm">
+                {label}
+              </span>
+              {isPrescription ? (
+                rendered
+              ) : (
+                <span className="text-gray-800 font-medium text-sm">{rendered}</span>
+              )}
             </div>
           );
         })}
@@ -376,23 +456,32 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-3">
           {record.notes && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Doctor's Notes</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Doctor's Notes
+              </p>
               <p className="text-sm text-gray-700">{record.notes}</p>
             </div>
           )}
           {record.drugs && record.drugs.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Medications</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Medications
+              </p>
               <div className="space-y-2">
                 {record.drugs.map((drug, i) => (
-                  <div key={i} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-                    <p className="text-sm font-semibold text-gray-800">{drug.drug_name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {[drug.dosage, drug.frequency, drug.duration].filter(Boolean).join(" · ")}
-                    </p>
-                    {drug.instructions && (
-                      <p className="text-xs text-gray-400 mt-1">{drug.instructions}</p>
-                    )}
+                  <div key={i} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
+                      <LucidePill size={13} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{drug.drug_name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[drug.dosage, drug.frequency, drug.duration].filter(Boolean).join(" · ")}
+                      </p>
+                      {drug.instructions && (
+                        <p className="text-xs text-gray-400 mt-0.5 italic">{drug.instructions}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -432,7 +521,6 @@ export default function RecordsPage() {
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
-      {/* Access requests — only renders if there are any */}
       {identityId && <AccessRequestsPanel identityId={identityId} />}
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -507,5 +595,3 @@ export default function RecordsPage() {
     </div>
   );
 }
-
-

@@ -1,0 +1,13 @@
+{
+  "name": "veridoctor-signaling-server",
+  "version": "1.0.0",
+  "description": "WebRTC signaling server for Veridoctor telehealth",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.3"
+  }
+}

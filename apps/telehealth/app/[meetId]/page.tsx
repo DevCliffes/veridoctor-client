@@ -27,7 +27,7 @@ export default function TelehealthVideoPlayer() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  const { hasJoined, offer } = UseAppSelector((state: any) => state.webrtc);
+  const { hasJoined, offer } = UseAppSelector((state) => state.webrtc);
   const [localMediaAvailable, setLocalMediaAvailable] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -38,8 +38,9 @@ export default function TelehealthVideoPlayer() {
 
   // Initialize notification audio
   useEffect(() => {
+    let context: AudioContext;
     const initAudio = async () => {
-      const context = new window.AudioContext();
+      context = new window.AudioContext();
       setAudioContext(context);
       try {
         const response = await fetch("/sounds/notification.mp3");
@@ -52,7 +53,7 @@ export default function TelehealthVideoPlayer() {
     };
     initAudio();
     return () => {
-      if (audioContext) audioContext.close();
+      context?.close();
     };
   }, []);
 
@@ -68,6 +69,8 @@ export default function TelehealthVideoPlayer() {
       setLocalMediaAvailable(true);
       setLocalStream(stream);
     });
+    // Intentional: media should only initialize once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Attach local stream to local video element
@@ -98,6 +101,8 @@ export default function TelehealthVideoPlayer() {
         webRTCService.setOffererType(false);
       });
     }
+    // Intentional: signaling connection should only be established once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const joinMeeting = async (offer?: RTCSessionDescriptionInit) => {

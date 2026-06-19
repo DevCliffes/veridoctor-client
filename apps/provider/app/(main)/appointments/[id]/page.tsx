@@ -678,16 +678,12 @@ function PatientRecordPanel({
       .finally(() => setLoadingSummary(false));
   };
 
-  // Fetch this provider's own past records for the patient via the timeline
   const fetchOwnRecords = () => {
     if (!summary?.patient?.identity_id) return;
     axiosClient
       .get(`/records/patient/${summary.patient.identity_id}/timeline?type=consultation`)
       .then((res) => {
-        // Filter to only records from this provider (the logged-in one)
-        const all: OwnRecord[] = (res.data.records ?? []).filter(
-          (r: OwnRecord) => r.has_clinical_notes || true // show all own consultations
-        );
+        const all: OwnRecord[] = res.data.records ?? [];
         setOwnRecords(all);
       })
       .catch(() => {})
@@ -698,7 +694,6 @@ function PatientRecordPanel({
     fetchSummary();
   }, [appointmentId]);
 
-  // Once we have the patient identity, fetch own records
   useEffect(() => {
     if (summary?.patient?.identity_id) {
       fetchOwnRecords();
@@ -724,9 +719,7 @@ function PatientRecordPanel({
     }
   };
 
-  const loading = loadingSummary;
-
-  if (loading) {
+  if (loadingSummary) {
     return (
       <div className="flex items-center justify-center py-16">
         <LucideLoader2 size={24} className="animate-spin text-blue-400" />
@@ -798,10 +791,7 @@ function PatientRecordPanel({
       <div className="grid grid-cols-4 gap-2">
         {[
           { label: "Total records", value: stats.total_records },
-          {
-            label: "Most recent",
-            value: stats.most_recent ? timeAgo(stats.most_recent) : "—",
-          },
+          { label: "Most recent", value: stats.most_recent ? timeAgo(stats.most_recent) : "—" },
           { label: "Active meds", value: stats.active_medications },
           { label: "Prior facilities", value: stats.prior_facilities },
         ].map((stat) => (
@@ -820,7 +810,6 @@ function PatientRecordPanel({
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
           Always visible
         </p>
-
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
@@ -839,16 +828,13 @@ function PatientRecordPanel({
             Always shown
           </span>
         </div>
-
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-orange-50 border border-orange-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
               <LucidePill size={15} />
             </div>
             <div>
-              <p className="text-sm font-semibold text-gray-800">
-                Active medications
-              </p>
+              <p className="text-sm font-semibold text-gray-800">Active medications</p>
               <p className="text-xs text-gray-500 mt-0.5">
                 {always_visible.active_medications_count > 0
                   ? `${always_visible.active_medications_count} active prescription${always_visible.active_medications_count > 1 ? "s" : ""} on record`
@@ -862,9 +848,9 @@ function PatientRecordPanel({
         </div>
       </div>
 
-      {/* ── OWN RECORDS — no consent needed ─────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <div className="flex items-center justify-between">
+      {/* ── OWN RECORDS — scrollable, no consent needed ──────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
             Your records for this patient
           </p>
@@ -882,11 +868,19 @@ function PatientRecordPanel({
             No previous consultations on record for this patient.
           </p>
         ) : (
-          <div className="space-y-2">
-            {ownRecords.map((rec) => (
-              <OwnRecordCard key={rec.id} record={rec} />
-            ))}
-          </div>
+          <>
+            {/* ✅ Fixed: scrollable window — capped at ~5 records height */}
+            <div className="overflow-y-auto max-h-72 space-y-2 pr-1">
+              {ownRecords.map((rec) => (
+                <OwnRecordCard key={rec.id} record={rec} />
+              ))}
+            </div>
+            {ownRecords.length > 4 && (
+              <p className="text-xs text-gray-400 text-center mt-2">
+                Scroll to see all {ownRecords.length} records
+              </p>
+            )}
+          </>
         )}
       </div>
 
@@ -907,17 +901,13 @@ function PatientRecordPanel({
                     <LucideFileText size={14} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">
-                      {cat.speciality}
-                    </p>
+                    <p className="text-sm font-semibold text-gray-800">{cat.speciality}</p>
                     <p className="text-xs text-gray-400">
                       {[
                         cat.facility_name,
                         cat.record_count > 0 ? `${cat.record_count} records` : null,
                         cat.last_record_at ? timeAgo(cat.last_record_at) : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
+                      ].filter(Boolean).join(" · ")}
                     </p>
                     {cat.sensitivity === "ask_first" && (
                       <p className="text-xs text-gray-400 italic mt-0.5">
@@ -954,7 +944,7 @@ function PatientRecordPanel({
         </div>
       )}
 
-      {/* Access granted */}
+      {/* Access granted — always visible at bottom */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
           Access granted this consultation
@@ -962,16 +952,12 @@ function PatientRecordPanel({
         {access_granted.length === 0 ? (
           <p className="text-xs text-gray-400 flex items-center gap-1.5">
             <LucideLock size={12} />
-            No records shared yet. Requests sent to patient appear here once
-            approved.
+            No records shared yet. Requests sent to patient appear here once approved.
           </p>
         ) : (
           <div className="space-y-2">
             {access_granted.map((g) => (
-              <div
-                key={g.id}
-                className="flex items-center gap-2 text-sm text-gray-700"
-              >
+              <div key={g.id} className="flex items-center gap-2 text-sm text-gray-700">
                 <LucideShieldCheck size={14} className="text-green-500 shrink-0" />
                 <span className="font-medium">{g.requested_category}</span>
                 <span className="text-xs text-gray-400">— access approved</span>

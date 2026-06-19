@@ -332,6 +332,10 @@ function BookingModal({
   const [error, setError] = useState("");
 
   const handleConfirm = async () => {
+    if (!patientEmail) {
+      setError("We couldn't verify your account email. Please refresh the page and try again.");
+      return;
+    }
     if (!patientFirst || !patientLast) {
       setError("Your profile is missing a name. Please update your profile first.");
       return;
@@ -355,8 +359,9 @@ function BookingModal({
         }
       );
       onConfirmed();
-    } catch {
-      setError("Booking failed. Please try again.");
+    } catch (err: any) {
+      const backendError = err?.response?.data?.error;
+      setError(backendError || "Booking failed. Please try again.");
       setSaving(false);
     }
   };
@@ -461,6 +466,8 @@ export default function BookPage() {
   const [patientFirst, setPatientFirst] = useState("");
   const [patientLast, setPatientLast] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState(false);
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -472,7 +479,12 @@ export default function BookPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!identityId) return;
+    if (!identityId) {
+      // No identity in store yet — keep profileLoading true rather than
+      // falsely resolving to "loaded with no email", so booking stays
+      // gated until we actually know who the patient is.
+      return;
+    }
     axiosClient
       .get(`/identity/register/${identityId}`)
       .then((res) => {
@@ -480,8 +492,10 @@ export default function BookPage() {
         setPatientFirst(res.data.first_name ?? "");
         setPatientLast(res.data.last_name ?? "");
         setPatientPhone(res.data.phone_number ?? "");
+        setProfileError(false);
       })
-      .catch(() => {});
+      .catch(() => setProfileError(true))
+      .finally(() => setProfileLoading(false));
   }, [identityId]);
 
   useEffect(() => {
@@ -507,6 +521,27 @@ export default function BookPage() {
   const specialities = [
     ...new Set(providers.map((p) => p.speciality).filter(Boolean)),
   ];
+
+  // Booking requires a verified patient email — block the whole booking
+  // interaction (not just the submit button) until the profile fetch
+  // has actually resolved, so we never open the modal with a blank email.
+  const handleBookClick = (state: BookingState) => {
+    if (profileLoading) {
+      setToast({
+        message: "Still loading your profile, please wait a moment...",
+        type: "error",
+      });
+      return;
+    }
+    if (profileError || !patientEmail) {
+      setToast({
+        message: "We couldn't load your account details. Please refresh and try again.",
+        type: "error",
+      });
+      return;
+    }
+    setBooking(state);
+  };
 
   return (
     <div className="space-y-4">
@@ -579,7 +614,7 @@ export default function BookPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((p) => (
-            <ProviderCard key={p.id} provider={p} onBook={setBooking} />
+            <ProviderCard key={p.id} provider={p} onBook={handleBookClick} />
           ))}
         </div>
       )}

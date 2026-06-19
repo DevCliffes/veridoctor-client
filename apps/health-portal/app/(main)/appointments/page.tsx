@@ -3,11 +3,18 @@ import { useEffect, useState, useCallback } from "react";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
-  LucideCalendarX,
-  LucideVideo,
-  LucideMapPin,
-  LucideLoader2,
-} from "@veridoctor/design/icons";
+  DataTable,
+  DatatableColumnHeader,
+  DatatableFilterTabs,
+} from "@veridoctor/design/shared";
+import { LucideVideo } from "@veridoctor/design/icons";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import type { ReactNode } from "react";
+
+const TELEHEALTH_URL =
+  process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
+  "https://veridoctor-client-telehealth.vercel.app";
 
 interface Appointment {
   id: string;
@@ -21,22 +28,16 @@ interface Appointment {
   message?: string;
 }
 
-type FilterTab = "upcoming" | "today" | "past";
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-KE", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+function getEmail(identity: unknown): string {
+  if (identity && typeof identity === "object" && "email" in identity) {
+    const val = (identity as Record<string, unknown>).email;
+    if (typeof val === "string") return val;
+  }
+  return "";
 }
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-KE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-KE");
 }
 
 function minutesUntil(iso: string) {
@@ -47,248 +48,273 @@ const STATUS_STYLES: Record<string, string> = {
   confirmed: "bg-green-100 text-green-700",
   scheduled: "bg-yellow-100 text-yellow-700",
   cancelled: "bg-red-100 text-red-700",
+  completed: "bg-blue-100 text-blue-700",
   "in-progress": "bg-blue-100 text-blue-700",
   "no-show": "bg-gray-100 text-gray-500",
 };
 
-function Toast({
-  message,
-  type,
-  onClose,
-}: {
-  message: string;
-  type: "success" | "error";
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3000);
-    return () => clearTimeout(t);
-  }, [onClose]);
+function StatusBadge({ status }: { status: string }) {
   return (
-    <div
+    <span
       className={
-        "fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " +
-        (type === "success" ? "bg-green-600" : "bg-red-600")
+        "text-xs px-2 py-1 rounded-full font-medium capitalize " +
+        (STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600")
       }
     >
-      {message}
-    </div>
+      {status}
+    </span>
   );
-}
-
-function JoinButton({ meetId, mins }: { meetId: string; mins: number }) {
-  function handleJoin() {
-    window.location.href = "/calls/" + meetId;
-  }
-  return (
-    <button
-      onClick={handleJoin}
-      className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 font-medium"
-    >
-      {mins <= 0 ? "Join Now" : "Join in " + mins + "m"}
-    </button>
-  );
-}
-
-function getEmail(identity: unknown): string {
-  if (identity && typeof identity === "object" && "email" in identity) {
-    const val = (identity as Record<string, unknown>).email;
-    if (typeof val === "string") return val;
-  }
-  return "";
 }
 
 export default function Appointments() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { identity } = useAppSelector((store) => store.auth);
+  const patientEmail = getEmail(identity);
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<FilterTab>("upcoming");
-  const [cancelling, setCancelling] = useState<string | null>(null);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleSaving, setRescheduleSaving] = useState(false);
 
-  const patientEmail = getEmail(identity);
+  const filter = searchParams.get("filter") ?? "upcoming";
+
+  const updateQueryParams = (name: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(name, value);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   const fetchAppointments = useCallback(() => {
     if (!patientEmail) return;
     setLoading(true);
     axiosClient
-      .get("/appointments?patient_email=" + patientEmail + "&filter=" + activeTab)
+      .get("/appointments?patient_email=" + patientEmail + "&filter=" + filter)
       .then((res) => setAppointments(res.data ?? []))
-      .catch(() =>
-        setToast({ message: "Failed to load appointments", type: "error" })
-      )
+      .catch(() => toast.error("Failed to load appointments"))
       .finally(() => setLoading(false));
-  }, [patientEmail, activeTab]);
+  }, [patientEmail, filter]);
 
   useEffect(() => {
     fetchAppointments();
   }, [fetchAppointments]);
 
+  // ✅ Patient joins as answerer (isOfferer=false)
+  const joinCall = (meetId: string) => {
+    window.location.href = `${TELEHEALTH_URL}/${meetId}?userId=${patientEmail}&isOfferer=false`;
+  };
+
+  const isJoinable = (appt: Appointment) => {
+    if (appt.appointment_type !== "virtual" || !appt.meet_id) return false;
+    const mins = minutesUntil(appt.start_time);
+    return mins > -30 && mins < 60;
+  };
+
   const handleCancel = async (id: string) => {
-    setCancelling(id);
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    setCancellingId(id);
     try {
       await axiosClient.patch("/appointments/" + id, { status: "cancelled" });
-      setToast({ message: "Appointment cancelled", type: "success" });
-      fetchAppointments();
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a))
+      );
+      toast.success("Appointment cancelled");
     } catch {
-      setToast({ message: "Failed to cancel appointment", type: "error" });
+      toast.error("Failed to cancel appointment");
     } finally {
-      setCancelling(null);
+      setCancellingId(null);
     }
   };
 
-  const tabs: { label: string; value: FilterTab }[] = [
-    { label: "Upcoming", value: "upcoming" },
-    { label: "Today", value: "today" },
-    { label: "Past", value: "past" },
+  const openReschedule = (appt: Appointment) => {
+    setReschedulingAppt(appt);
+    const d = new Date(appt.start_time);
+    setRescheduleDate(d.toISOString().split("T")[0]);
+    setRescheduleTime(d.toTimeString().slice(0, 5));
+  };
+
+  const handleReschedule = async () => {
+    if (!reschedulingAppt || !rescheduleDate || !rescheduleTime) {
+      toast.error("Please select a new date and time");
+      return;
+    }
+    setRescheduleSaving(true);
+    const newStart = new Date(`${rescheduleDate}T${rescheduleTime}`).toISOString();
+    const duration =
+      new Date(reschedulingAppt.end_time).getTime() -
+      new Date(reschedulingAppt.start_time).getTime();
+    const newEnd = new Date(new Date(newStart).getTime() + duration).toISOString();
+    try {
+      await axiosClient.patch("/appointments/" + reschedulingAppt.id, {
+        start_time: newStart,
+        end_time: newEnd,
+        status: "scheduled",
+      });
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a.id === reschedulingAppt.id
+            ? { ...a, start_time: newStart, end_time: newEnd, status: "scheduled" }
+            : a
+        )
+      );
+      toast.success("Appointment rescheduled");
+      setReschedulingAppt(null);
+    } catch {
+      toast.error("Failed to reschedule appointment");
+    } finally {
+      setRescheduleSaving(false);
+    }
+  };
+
+  const tableColumns: DatatableColumnHeader[] = [
+    { name: "Doctor", type: "string", key: "name" },
+    { name: "Date/Time", type: "string", key: "date" },
+    { name: "Status", type: "string", key: "status" },
+    { name: "Call", type: "string", key: "call" },
+    { name: "Actions", type: "string", key: "actions" },
   ];
 
+  const tableRows: {
+    id: string;
+    name: ReactNode;
+    date: string;
+    status: ReactNode;
+    call: ReactNode;
+    actions: ReactNode;
+  }[] = appointments.map((appt) => ({
+    id: appt.id,
+    name: (
+      <button
+        className="text-blue-600 hover:underline font-medium text-left"
+        onClick={() => router.push("/appointments/" + appt.id)}
+      >
+        {appt.patient_first_name} {appt.patient_last_name}
+      </button>
+    ),
+    date: formatDateTime(appt.start_time),
+    status: <StatusBadge status={appt.status} />,
+    call:
+      appt.appointment_type === "virtual" ? (
+        <button
+          onClick={() => appt.meet_id && joinCall(appt.meet_id)}
+          disabled={!isJoinable(appt)}
+          className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <LucideVideo size={13} /> Join call
+        </button>
+      ) : (
+        <span className="text-xs text-gray-500">In-person</span>
+      ),
+    actions:
+      appt.status === "cancelled" || appt.status === "completed" ? (
+        <span className="text-xs text-gray-400">—</span>
+      ) : (
+        <div className="flex gap-1">
+          <button
+            onClick={() => openReschedule(appt)}
+            className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+          >
+            Reschedule
+          </button>
+          <button
+            onClick={() => handleCancel(appt.id)}
+            disabled={cancellingId === appt.id}
+            className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            {cancellingId === appt.id ? "..." : "Cancel"}
+          </button>
+        </div>
+      ),
+  }));
+
+  const filterTabs: DatatableFilterTabs = {
+    tabs: [
+      {
+        name: "Today",
+        value: "today",
+        action: (f) => updateQueryParams("filter", f),
+      },
+      {
+        name: "Upcoming",
+        value: "upcoming",
+        action: (f) => updateQueryParams("filter", f),
+      },
+      {
+        name: "Past",
+        value: "past",
+        action: (f) => updateQueryParams("filter", f),
+      },
+    ],
+    defaultTab: filter,
+  };
+
   return (
-    <div className="space-y-4">
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+    <div className="p-4 bg-white rounded-lg mx-4">
+      {/* Reschedule dialog */}
+      {reschedulingAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-semibold text-gray-800">
+              Reschedule Appointment
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">
+                  New Date
+                </label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  className="w-full mt-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">
+                  New Time
+                </label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  className="w-full mt-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setReschedulingAppt(null)}
+                className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReschedule}
+                disabled={rescheduleSaving}
+                className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
+              >
+                {rescheduleSaving ? "Saving..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <h1 className="text-xl font-bold text-gray-800">My Appointments</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          View and manage your consultations
-        </p>
+      <div className="mb-4">
+        <h1 className="text-xl font-bold">My Appointments</h1>
+        <p className="text-gray-600 mt-1">View and manage your consultations.</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1 flex gap-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
-            className={
-              "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors " +
-              (activeTab === tab.value
-                ? "bg-blue-600 text-white"
-                : "text-gray-500 hover:bg-gray-100")
-            }
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <LucideLoader2 size={24} className="animate-spin text-blue-500" />
-          </div>
-        ) : appointments.length === 0 ? (
-          <div className="text-center py-12">
-            <LucideCalendarX size={36} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">
-              No {activeTab} appointments
-            </p>
-            <p className="text-gray-400 text-sm mt-1">
-              {activeTab === "upcoming"
-                ? "You have no upcoming appointments booked."
-                : "No " + activeTab + " appointments found."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {appointments.map((appt) => {
-              const mins = minutesUntil(appt.start_time);
-              const canJoin =
-                appt.appointment_type === "virtual" &&
-                appt.meet_id &&
-                mins > -30 &&
-                mins < 60;
-              const canCancel =
-                ["scheduled", "confirmed"].includes(appt.status) && mins > 60;
-
-              return (
-                <div
-                  key={appt.id}
-                  className="border border-gray-100 rounded-xl p-4 hover:border-blue-100 hover:bg-blue-50/30 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={
-                          "w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-0.5 " +
-                          (appt.appointment_type === "virtual"
-                            ? "bg-indigo-100 text-indigo-600"
-                            : "bg-green-100 text-green-600")
-                        }
-                      >
-                        {appt.appointment_type === "virtual" ? (
-                          <LucideVideo size={18} />
-                        ) : (
-                          <LucideMapPin size={18} />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800 text-sm">
-                          {appt.appointment_type === "virtual"
-                            ? "Virtual"
-                            : "In-person"}{" "}
-                          Consultation
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {formatDate(appt.start_time)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatTime(appt.start_time)} –{" "}
-                          {formatTime(appt.end_time)}
-                        </p>
-                        {appt.message && (
-                          <p className="text-xs text-gray-400 mt-1 italic">
-                            &quot;{appt.message}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <span
-                        className={
-                          "text-xs px-2 py-0.5 rounded-full font-medium capitalize " +
-                          (STATUS_STYLES[appt.status] ??
-                            "bg-gray-100 text-gray-500")
-                        }
-                      >
-                        {appt.status}
-                      </span>
-
-                      {canJoin && appt.meet_id && (
-                        <JoinButton meetId={appt.meet_id} mins={mins} />
-                      )}
-
-                      {canCancel && (
-                        <button
-                          onClick={() => handleCancel(appt.id)}
-                          disabled={cancelling === appt.id}
-                          className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1"
-                        >
-                          {cancelling === appt.id ? (
-                            <LucideLoader2 size={12} className="animate-spin" />
-                          ) : (
-                            <LucideCalendarX size={12} />
-                          )}
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <DataTable
+        rows={tableRows}
+        columns={tableColumns}
+        isLoading={loading}
+        filterTabs={filterTabs}
+      />
     </div>
   );
 }

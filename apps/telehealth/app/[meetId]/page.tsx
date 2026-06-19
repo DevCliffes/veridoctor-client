@@ -2,7 +2,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import socketService from "@/utils/socketService";
 import webRTCService from "@/utils/webRTCService";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import {
   Video,
   VideoOff,
@@ -14,7 +14,8 @@ import { toast } from "sonner";
 import { useAppDispatch, UseAppSelector } from "@/states/store/hooks";
 import { setHasJoined, setIsOfferer, setOffer } from "@/states/features/webrtc";
 
-export default function TelehealthVideoPlayer() {
+// Inner component that uses useSearchParams — must be inside Suspense
+function TelehealthInner() {
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
   const initLocalVideoRef = useRef<HTMLVideoElement>(null);
@@ -32,6 +33,7 @@ export default function TelehealthVideoPlayer() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [remoteConnected, setRemoteConnected] = useState(false);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   const TELEHEALTH_BACKEND_URL =
     process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
@@ -66,22 +68,21 @@ export default function TelehealthVideoPlayer() {
         initLocalVideoRef.current.srcObject = stream;
         initLocalVideoRef.current.muted = true;
       }
+      localStreamRef.current = stream;
       setLocalMediaAvailable(true);
       setLocalStream(stream);
     });
-    // Intentional: media should only initialize once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Attach local stream to local video element
+  // Attach local stream after joining
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream, hasJoined]);
 
-  // ✅ Fixed: watch remoteStream state (not remoteVideoRef.current) so this
-  // fires whenever the remote track actually arrives
+  // Attach remote stream when it arrives
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -95,17 +96,17 @@ export default function TelehealthVideoPlayer() {
       userName: userId,
       roomName: meetId,
     });
+
     if (!isOffererParam) {
-      socketService.on("availableOffer", (offer: RTCSessionDescriptionInit) => {
-        dispatch(setOffer(offer));
+      socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
+        dispatch(setOffer(incomingOffer));
         webRTCService.setOffererType(false);
       });
     }
-    // Intentional: signaling connection should only be established once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const joinMeeting = async (offer?: RTCSessionDescriptionInit) => {
+  const setupPeerConnection = async () => {
     const pc = await webRTCService.createPeerConnection();
 
     pc.addEventListener("icecandidate", (event: RTCPeerConnectionIceEvent) => {
@@ -118,16 +119,16 @@ export default function TelehealthVideoPlayer() {
       }
     });
 
-    if (localStream) {
-      localStream.getTracks().forEach((track) => {
-        pc.addTrack(track, localStream);
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
       });
     }
 
-    // ✅ Fixed: this now sets remoteStream state, triggering the useEffect above
     pc.addEventListener("track", (event: RTCTrackEvent) => {
-      const [stream] = event.streams;
-      setRemoteStream(stream);
+      const [remoteStr] = event.streams;
+      setRemoteStream(remoteStr);
     });
 
     pc.addEventListener("connectionstatechange", () => {
@@ -141,20 +142,30 @@ export default function TelehealthVideoPlayer() {
     });
 
     socketService.on("receiveIceCandidate", (candidate: RTCIceCandidate) => {
-      webRTCService.addIceCandidate(candidate);
+      webRTCService.addIceCandidate(candidate).catch(console.error);
     });
 
+    return pc;
+  };
+
+  const joinMeeting = async (incomingOffer?: RTCSessionDescriptionInit) => {
     if (isOffererParam) {
-      socketService.on("remoteAnswer", (answer) => {
-        webRTCService.handleRemoteAnswer(answer);
+      await setupPeerConnection();
+
+      socketService.on("remoteAnswer", (answer: RTCSessionDescriptionInit) => {
+        webRTCService.handleRemoteAnswer(answer).catch(console.error);
       });
+
       const newOffer = await webRTCService.createOffer();
       socketService.emit("newOffer", newOffer);
-    } else if (offer) {
-      const answer = await webRTCService.createAnswer(offer);
-      socketService.emit("newAnswer", answer);
     } else {
-      return toast.error("No offer available");
+      if (!incomingOffer) {
+        toast.error("No offer available yet — please wait for the provider.");
+        return;
+      }
+      await setupPeerConnection();
+      const answer = await webRTCService.createAnswer(incomingOffer);
+      socketService.emit("newAnswer", answer);
     }
 
     dispatch(setHasJoined(true));
@@ -172,9 +183,7 @@ export default function TelehealthVideoPlayer() {
   const toggleAudio = () => {
     if (webRTCService.localStream) {
       const audioTracks = webRTCService.localStream.getAudioTracks();
-      audioTracks.forEach((track) => {
-        track.enabled = audioMuted;
-      });
+      audioTracks.forEach((track) => { track.enabled = audioMuted; });
       setAudioMuted(!audioMuted);
       playNotificationAudio();
       toast.success(`Microphone ${audioMuted ? "on" : "off"}`);
@@ -184,9 +193,7 @@ export default function TelehealthVideoPlayer() {
   const toggleVideo = () => {
     if (webRTCService.localStream) {
       const videoTracks = webRTCService.localStream.getVideoTracks();
-      videoTracks.forEach((track) => {
-        track.enabled = videoOff;
-      });
+      videoTracks.forEach((track) => { track.enabled = videoOff; });
       setVideoOff(!videoOff);
       playNotificationAudio();
       toast.success(`Camera ${videoOff ? "on" : "off"}`);
@@ -248,11 +255,9 @@ export default function TelehealthVideoPlayer() {
     );
   }
 
-  // ─── ACTIVE CALL — Google Meet style ──────────────────────────────────────
+  // ─── ACTIVE CALL ──────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
-
-      {/* Remote video — full screen background */}
       <div className="relative flex-1 bg-gray-800 flex items-center justify-center overflow-hidden">
         {remoteConnected ? (
           <video
@@ -262,7 +267,6 @@ export default function TelehealthVideoPlayer() {
             playsInline
           />
         ) : (
-          // Placeholder while waiting for remote peer's stream
           <div className="flex flex-col items-center gap-3 text-gray-400">
             <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
               ?
@@ -271,7 +275,6 @@ export default function TelehealthVideoPlayer() {
           </div>
         )}
 
-        {/* Self-preview — small overlay bottom-right (mirrored, like Meet) */}
         <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-lg border border-gray-700 w-[140px] h-[100px] bg-gray-900">
           {videoOff ? (
             <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-xs">
@@ -289,51 +292,66 @@ export default function TelehealthVideoPlayer() {
         </div>
       </div>
 
-      {/* Controls bar — bottom, dark, Google Meet style */}
-      <div className="h-20 bg-gray-900 flex items-center justify-center gap-4 px-6 border-t border-gray-800">
+      <div className="h-20 bg-gray-900 flex items-center justify-center gap-6 px-6 border-t border-gray-800">
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={toggleAudio}
+            className={
+              "p-3 rounded-full transition-colors " +
+              (audioMuted
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-gray-700 hover:bg-gray-600 text-white")
+            }
+          >
+            {audioMuted ? <MicOffIcon size={20} /> : <MicIcon size={20} />}
+          </button>
+          <span className="text-gray-400 text-xs">
+            {audioMuted ? "Unmute" : "Mute"}
+          </span>
+        </div>
 
-        {/* Mic */}
-        <button
-          onClick={toggleAudio}
-          className={`flex flex-col items-center gap-1 p-3 rounded-full transition-colors ${
-            audioMuted
-              ? "bg-red-600 hover:bg-red-700 text-white"
-              : "bg-gray-700 hover:bg-gray-600 text-white"
-          }`}
-        >
-          {audioMuted ? <MicOffIcon size={20} /> : <MicIcon size={20} />}
-        </button>
-        <span className="text-gray-400 text-xs -mt-4 w-8 text-center">
-          {audioMuted ? "Unmute" : "Mute"}
-        </span>
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={toggleVideo}
+            className={
+              "p-3 rounded-full transition-colors " +
+              (videoOff
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-gray-700 hover:bg-gray-600 text-white")
+            }
+          >
+            {videoOff ? <VideoOff size={20} /> : <Video size={20} />}
+          </button>
+          <span className="text-gray-400 text-xs">
+            {videoOff ? "Start" : "Stop"}
+          </span>
+        </div>
 
-        {/* Camera */}
-        <button
-          onClick={toggleVideo}
-          className={`flex flex-col items-center gap-1 p-3 rounded-full transition-colors ${
-            videoOff
-              ? "bg-red-600 hover:bg-red-700 text-white"
-              : "bg-gray-700 hover:bg-gray-600 text-white"
-          }`}
-        >
-          {videoOff ? <VideoOff size={20} /> : <Video size={20} />}
-        </button>
-        <span className="text-gray-400 text-xs -mt-4 w-8 text-center">
-          {videoOff ? "Start" : "Stop"}
-        </span>
-
-        {/* End call */}
-        <button
-          onClick={endCall}
-          className="flex flex-col items-center gap-1 p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
-        >
-          <PhoneOff size={20} />
-        </button>
-        <span className="text-gray-400 text-xs -mt-4 w-16 text-center">
-          End call
-        </span>
-
+        <div className="flex flex-col items-center gap-1">
+          <button
+            onClick={endCall}
+            className="p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
+          >
+            <PhoneOff size={20} />
+          </button>
+          <span className="text-gray-400 text-xs">End call</span>
+        </div>
       </div>
     </div>
+  );
+}
+
+// Outer component wraps inner in Suspense (required by Next.js for useSearchParams)
+export default function TelehealthVideoPlayer() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <TelehealthInner />
+    </Suspense>
   );
 }

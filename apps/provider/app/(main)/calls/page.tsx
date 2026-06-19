@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
@@ -9,6 +8,11 @@ import {
   LucideLoader2,
   LucidePhone,
 } from "@veridoctor/design/icons";
+
+// ✅ Update this to your actual Vercel telehealth URL once deployed
+const TELEHEALTH_URL =
+  process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
+  "https://veridoctor-client-telehealth.vercel.app";
 
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
@@ -69,7 +73,6 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function Calls() {
-  const router = useRouter();
   const { identity } = useAppSelector((store) => store.auth);
   const userId = getIdentityId(identity);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -91,6 +94,12 @@ export default function Calls() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [userId, activeTab]);
+
+  // ✅ Doctor opens telehealth app as the offerer (call starter) — same tab
+  const startCall = (meetId: string) => {
+    const url = `${TELEHEALTH_URL}/${meetId}?userId=${userId}&isOfferer=true`;
+    window.location.href = url;
+  };
 
   const tabs: { label: string; value: FilterTab }[] = [
     { label: "Today", value: "today" },
@@ -134,7 +143,9 @@ export default function Calls() {
       ) : appointments.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-gray-400">
           <LucideVideoOff size={48} className="mb-3 text-gray-300" />
-          <p className="font-medium text-gray-500">No virtual calls {activeTab}</p>
+          <p className="font-medium text-gray-500">
+            No virtual calls {activeTab}
+          </p>
           <p className="text-sm mt-1">
             {activeTab === "today"
               ? "No virtual consultations scheduled for today."
@@ -188,38 +199,35 @@ export default function Calls() {
                   <span
                     className={
                       "text-xs px-2 py-0.5 rounded-full font-medium capitalize " +
-                      (STATUS_STYLES[appt.status] ?? "bg-gray-100 text-gray-500")
+                      (STATUS_STYLES[appt.status] ??
+                        "bg-gray-100 text-gray-500")
                     }
                   >
                     {appt.status}
                   </span>
 
                   {isPast ? (
-                    <button
-                      onClick={() =>
-                        router.push("/appointments/" + appt.id)
-                      }
+                    <a
+                      href={"/appointments/" + appt.id}
                       className="text-xs text-blue-600 hover:underline"
                     >
                       View record
-                    </button>
+                    </a>
                   ) : isJoinable ? (
                     <button
-                      onClick={() => router.push("/calls/" + appt.meet_id)}
+                      onClick={() => startCall(appt.meet_id)}
                       className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium"
                     >
                       <LucidePhone size={12} />
-                      {mins <= 0 ? "Join Now" : "Join in " + mins + "m"}
+                      {mins <= 0 ? "Join Now" : "Start in " + mins + "m"}
                     </button>
                   ) : (
-                    <button
-                      onClick={() =>
-                        router.push("/appointments/" + appt.id)
-                      }
+                    <a
+                      href={"/appointments/" + appt.id}
                       className="text-xs text-gray-400 hover:text-blue-600 hover:underline"
                     >
                       View details
-                    </button>
+                    </a>
                   )}
                 </div>
               </div>

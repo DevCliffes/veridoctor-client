@@ -18,8 +18,8 @@ const TELEHEALTH_URL =
 
 interface Appointment {
   id: string;
-  patient_first_name: string;
-  patient_last_name: string;
+  provider_first_name: string | null;
+  provider_last_name: string | null;
   start_time: string;
   end_time: string;
   appointment_type: "virtual" | "physical";
@@ -58,6 +58,21 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function JoinButton({ meetId, patientEmail }: { meetId: string; patientEmail: string }) {
+  function handleJoin() {
+    window.location.href =
+      TELEHEALTH_URL + "/" + meetId + "?userId=" + patientEmail + "&isOfferer=false";
+  }
+  return (
+    <button
+      onClick={handleJoin}
+      className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium"
+    >
+      <LucideVideo size={13} /> Join call
+    </button>
+  );
+}
+
 export default function Appointments() {
   const router = useRouter();
   const pathname = usePathname();
@@ -78,7 +93,7 @@ export default function Appointments() {
   const updateQueryParams = (name: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set(name, value);
-    router.replace(`${pathname}?${params.toString()}`);
+    router.replace(pathname + "?" + params.toString());
   };
 
   const fetchAppointments = useCallback(() => {
@@ -97,11 +112,6 @@ export default function Appointments() {
   useEffect(() => {
     fetchAppointments();
   }, [fetchAppointments]);
-
-  // ✅ Patient joins as answerer (isOfferer=false)
-  const joinCall = (meetId: string) => {
-    window.location.href = `${TELEHEALTH_URL}/${meetId}?userId=${patientEmail}&isOfferer=false`;
-  };
 
   const isJoinable = (appt: Appointment) => {
     if (appt.appointment_type !== "virtual" || !appt.meet_id) return false;
@@ -138,7 +148,7 @@ export default function Appointments() {
       return;
     }
     setRescheduleSaving(true);
-    const newStart = new Date(`${rescheduleDate}T${rescheduleTime}`).toISOString();
+    const newStart = new Date(rescheduleDate + "T" + rescheduleTime).toISOString();
     const duration =
       new Date(reschedulingAppt.end_time).getTime() -
       new Date(reschedulingAppt.start_time).getTime();
@@ -187,20 +197,25 @@ export default function Appointments() {
         className="text-blue-600 hover:underline font-medium text-left"
         onClick={() => router.push("/appointments/" + appt.id)}
       >
-        {appt.patient_first_name} {appt.patient_last_name}
+        {appt.provider_first_name
+          ? "Dr. " + appt.provider_first_name + " " + (appt.provider_last_name ?? "")
+          : "Your Provider"}
       </button>
     ),
     date: formatDateTime(appt.start_time),
     status: <StatusBadge status={appt.status} />,
     call:
       appt.appointment_type === "virtual" ? (
-        <button
-          onClick={() => appt.meet_id && joinCall(appt.meet_id)}
-          disabled={!isJoinable(appt)}
-          className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <LucideVideo size={13} /> Join call
-        </button>
+        isJoinable(appt) && appt.meet_id ? (
+          <JoinButton meetId={appt.meet_id} patientEmail={patientEmail} />
+        ) : (
+          <button
+            disabled
+            className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium opacity-40 cursor-not-allowed"
+          >
+            <LucideVideo size={13} /> Join call
+          </button>
+        )
       ) : (
         <span className="text-xs text-gray-500">In-person</span>
       ),
@@ -249,13 +264,10 @@ export default function Appointments() {
 
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
-      {/* Reschedule dialog */}
       {reschedulingAppt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
-            <h3 className="font-semibold text-gray-800">
-              Reschedule Appointment
-            </h3>
+            <h3 className="font-semibold text-gray-800">Reschedule Appointment</h3>
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">

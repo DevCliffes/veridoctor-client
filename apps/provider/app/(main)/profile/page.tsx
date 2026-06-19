@@ -57,6 +57,8 @@ const SPECIALITIES = [
   "Nutritionist","Pharmacist","Anesthesiologist","General Surgeon",
 ];
 
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB
+
 // `identity` from Redux is a raw ID string (rehydrated from localStorage),
 // but handle object/JSON-string shapes defensively.
 function getIdentityId(identity: unknown): string {
@@ -132,6 +134,7 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [insuranceInput, setInsuranceInput] = useState("");
   const [languageInput, setLanguageInput] = useState("");
@@ -186,6 +189,61 @@ export default function ProfilePage() {
     setProfile((prev) => ({ ...prev, languages: prev.languages.filter((l) => l !== lang) }));
   };
 
+  // ✅ NEW: actually handles the file the provider picked.
+  // Previously the hidden <input> had no onChange at all, so selecting
+  // a photo did nothing.
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset the input value so selecting the same file again still fires onChange
+    e.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setToast({ message: "Please select an image file.", type: "error" });
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setToast({ message: "Image is too large. Max size is 5MB.", type: "error" });
+      return;
+    }
+    if (!identityId) {
+      setToast({ message: "Could not determine your account. Try logging in again.", type: "error" });
+      return;
+    }
+
+    // Optimistic local preview while the upload is in flight
+    const localPreviewUrl = URL.createObjectURL(file);
+    setProfile((prev) => ({ ...prev, profile_picture_url: localPreviewUrl }));
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+
+      const res = await axiosClient.post(
+        "/provider/" + identityId + "/photo",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      const uploadedUrl = res.data?.profile_picture_url;
+      if (uploadedUrl) {
+        setProfile((prev) => ({ ...prev, profile_picture_url: uploadedUrl }));
+        setToast({ message: "Profile photo updated!", type: "success" });
+      } else {
+        setToast({ message: "Upload succeeded but no image URL was returned.", type: "error" });
+      }
+    } catch {
+      // Roll back the optimistic preview on failure
+      setProfile((prev) => ({ ...prev, profile_picture_url: prev.profile_picture_url === localPreviewUrl ? "" : prev.profile_picture_url }));
+      setToast({ message: "Failed to upload photo. Please try again.", type: "error" });
+    } finally {
+      URL.revokeObjectURL(localPreviewUrl);
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!identityId) return;
     setSaving(true);
@@ -233,8 +291,10 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white flex items-center gap-5">
         <div className="relative">
-          <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold border-2 border-white/40">
-            {profile.profile_picture_url ? (
+          <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold border-2 border-white/40 overflow-hidden">
+            {uploadingPhoto ? (
+              <LucideLoader2 size={22} className="animate-spin" />
+            ) : profile.profile_picture_url ? (
               <img
                 src={profile.profile_picture_url}
                 alt="Profile"
@@ -245,12 +305,20 @@ export default function ProfilePage() {
             )}
           </div>
           <button
+            type="button"
             onClick={() => fileRef.current?.click()}
-            className="absolute -bottom-1 -right-1 w-7 h-7 bg-white rounded-full flex items-center justify-center shadow text-blue-600 hover:bg-blue-50"
+            disabled={uploadingPhoto}
+            className="absolute -bottom-1 -right-1 w-7 h-7 bg-white rounded-full flex items-center justify-center shadow text-blue-600 hover:bg-blue-50 disabled:opacity-60"
           >
             <LucideCamera size={14} />
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoChange}
+          />
         </div>
         <div>
           <h1 className="text-xl font-bold">

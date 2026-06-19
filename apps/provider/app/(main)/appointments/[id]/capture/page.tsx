@@ -35,6 +35,8 @@ type Appointment = {
   patient_last_name: string;
   patient_email: string;
   patient_phone_number: string;
+  // patient_identity is the UUID of their Identity record (null if guest)
+  patient_identity: string | null;
 };
 
 type Drug = {
@@ -77,7 +79,9 @@ export default function CapturePage() {
   const userId = useSelector((state: RootState) => state.auth.identity);
 
   const [form, setForm] = useState<Form | null>(null);
+  // appointment holds the resolved data including phone (possibly fetched from identity)
   const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [appointmentReady, setAppointmentReady] = useState(false);
   const [values, setValues] = useState<FieldValues>({});
   const [prescriptionValues, setPrescriptionValues] = useState<Record<string, PrescriptionValue>>({});
   const [loading, setLoading] = useState(true);
@@ -88,35 +92,54 @@ export default function CapturePage() {
   const draftKey = `vd_capture_${appointmentId}`;
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch appointment for demographics autofill
+  // ── Step 1: Fetch appointment, then resolve phone number if missing ──────────
   useEffect(() => {
     if (!userId || !appointmentId) return;
+
     axiosClient
       .get(`provider/${userId}/appointments/${appointmentId}`)
-      .then((res) => setAppointment(res.data))
-      .catch(() => {}); // non-critical
+      .then(async (res) => {
+        const appt: Appointment = res.data;
+
+        // If phone is already present, we're done
+        if (appt.patient_phone_number) {
+          setAppointment(appt);
+          setAppointmentReady(true);
+          return;
+        }
+
+        // Phone missing — try to pull it from the patient's Identity profile
+        if (appt.patient_identity) {
+          try {
+            // This endpoint returns the patient's profile. Check your backend:
+            //   provider/<provider_id>/patients/<patient_identity_id>/
+            // The response should include a `phone_number` field.
+            const profileRes = await axiosClient.get(
+              `provider/${userId}/patients/${appt.patient_identity}`
+            );
+            const phone: string =
+              profileRes.data?.phone_number ??
+              profileRes.data?.patient_phone_number ??
+              "";
+            setAppointment({ ...appt, patient_phone_number: phone });
+          } catch {
+            // Profile fetch failed — proceed without phone
+            setAppointment(appt);
+          }
+        } else {
+          // Guest booking with no linked account; phone simply isn't available
+          setAppointment(appt);
+        }
+
+        setAppointmentReady(true);
+      })
+      .catch(() => {
+        // Non-critical — proceed without autofill
+        setAppointmentReady(true);
+      });
   }, [userId, appointmentId]);
 
-  // Auto-fill demographics fields once both form and appointment are loaded
-  useEffect(() => {
-    if (!form || !appointment) return;
-    const demographicsSection = form.sections.find(
-      (s) => s.id === "demographics" || s.title.toLowerCase().includes("demographic")
-    );
-    if (!demographicsSection) return;
-    const autofilled: FieldValues = {};
-    for (const field of demographicsSection.fields) {
-      const filler = DEMOGRAPHICS_AUTOFILL[field.label];
-      if (filler) {
-        const val = filler(appointment);
-        if (val) autofilled[field.id] = val;
-      }
-    }
-    if (Object.keys(autofilled).length > 0) {
-      setValues((prev) => ({ ...autofilled, ...prev }));
-    }
-  }, [form, appointment]);
-
+  // ── Step 2: Load form + restore draft ────────────────────────────────────────
   useEffect(() => {
     if (!userId || !formId) return;
     axiosClient
@@ -141,6 +164,42 @@ export default function CapturePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, formId]);
 
+  // ── Step 3: Autofill demographics once BOTH form AND appointment are ready ───
+  // KEY FIX: only fills slots that are empty — draft values are never overwritten,
+  // but a missing/empty phone will be filled from the resolved appointment.
+  useEffect(() => {
+    if (!form || !appointment || !appointmentReady) return;
+
+    const demographicsSection = form.sections.find(
+      (s) => s.id === "demographics" || s.title.toLowerCase().includes("demographic")
+    );
+    if (!demographicsSection) return;
+
+    const autofilled: FieldValues = {};
+    for (const field of demographicsSection.fields) {
+      const filler = DEMOGRAPHICS_AUTOFILL[field.label];
+      if (filler) {
+        const val = filler(appointment);
+        if (val) autofilled[field.id] = val;
+      }
+    }
+
+    if (Object.keys(autofilled).length === 0) return;
+
+    setValues((prev) => {
+      const merged = { ...prev };
+      for (const [key, val] of Object.entries(autofilled)) {
+        // Only fill if the current value is empty/missing
+        // This handles: undefined, null, "" (empty string from old draft)
+        if (!merged[key]) {
+          merged[key] = val;
+        }
+      }
+      return merged;
+    });
+  }, [form, appointment, appointmentReady]);
+
+  // ── Draft save ────────────────────────────────────────────────────────────────
   const saveDraft = useCallback(
     (currentValues: FieldValues, currentPrescriptions: Record<string, PrescriptionValue>) => {
       try {
@@ -352,7 +411,7 @@ export default function CapturePage() {
                         field={field}
                         value={values[field.id]}
                         onChange={(val) => handleChange(field.id, val)}
-                        readOnly={isDemographicsAutofill && !!appointment}
+                        readOnly={isDemographicsAutofill && appointmentReady}
                       />
                     );
                   })
@@ -400,7 +459,6 @@ function PrescriptionSection({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Diagnosis */}
       <div>
         <label className="text-sm font-medium text-gray-700 block mb-1.5">Diagnosis / Indication</label>
         <input
@@ -412,7 +470,6 @@ function PrescriptionSection({
         />
       </div>
 
-      {/* Medications */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-gray-800">Medications</h3>
@@ -475,7 +532,6 @@ function PrescriptionSection({
         </div>
       </div>
 
-      {/* Additional notes */}
       <div>
         <label className="text-sm font-medium text-gray-700 block mb-1.5">Additional notes</label>
         <textarea
@@ -518,7 +574,7 @@ function FieldInput({
         )}
       </label>
       {readOnly ? (
-        <div className={readOnlyCls}>{(value as string) ?? "—"}</div>
+        <div className={readOnlyCls}>{(value as string) || "—"}</div>
       ) : (
         <>
           {field.type === "textarea" && (

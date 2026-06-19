@@ -13,6 +13,7 @@ import {
   LucideMapPin,
   LucideClipboardPen,
   LucideChevronDown,
+  LucideChevronUp,
   LucideFileText,
   LucideHistory,
   LucideShieldAlert,
@@ -20,6 +21,7 @@ import {
   LucidePill,
   LucideLock,
   LucideLoader2,
+  LucideStethoscope,
 } from "@veridoctor/design/icons";
 
 type Appointment = {
@@ -49,9 +51,24 @@ type Capture = {
   created_at: string;
 };
 
-type RecordEntry = {
-  appointment: Appointment;
-  captures: Capture[];
+type OwnCapture = {
+  form_name: string;
+  form_snapshot: { title?: string; fields?: { id: string; label?: string; name?: string }[] }[];
+  values: Record<string, unknown>;
+  captured_at: string;
+};
+
+type OwnRecord = {
+  id: string;
+  date: string;
+  provider_name: string;
+  speciality: string;
+  facility_name: string;
+  service_name: string | null;
+  appointment_type: string;
+  status: string;
+  captures: OwnCapture[];
+  has_clinical_notes: boolean;
 };
 
 type RecordCategory = {
@@ -124,6 +141,34 @@ function formatDOB(iso: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function buildLabelMap(
+  snapshot: { title?: string; fields?: { id: string; label?: string; name?: string }[] }[]
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!Array.isArray(snapshot)) return map;
+  for (const section of snapshot) {
+    for (const field of section.fields ?? []) {
+      if (field.id) map[field.id] = field.label ?? field.name ?? field.id;
+    }
+  }
+  return map;
+}
+
+function renderValue(val: unknown): string {
+  if (val === null || val === undefined) return "—";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (Array.isArray(val)) return val.map(renderValue).join(", ");
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    if (obj.name) return String(obj.name);
+    if (obj.drug_name) return String(obj.drug_name);
+    if (obj.label) return String(obj.label);
+    return JSON.stringify(val);
+  }
+  return String(val);
 }
 
 export default function AppointmentDetailPage() {
@@ -521,6 +566,96 @@ function PastCaptures({
   );
 }
 
+// ─── Own record card (expandable) ────────────────────────────────────────────
+function OwnRecordCard({ record }: { record: OwnRecord }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full text-left px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex gap-3 items-start flex-1 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+            <LucideStethoscope size={14} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-gray-800">
+                {record.service_name ?? "Consultation"}
+              </p>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium capitalize">
+                {record.appointment_type}
+              </span>
+              {record.has_clinical_notes && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
+                  {record.captures?.length} capture{(record.captures?.length ?? 0) > 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {new Date(record.date).toLocaleDateString("en-KE", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+              {" · "}
+              <span
+                className={`font-medium ${
+                  record.status === "completed"
+                    ? "text-gray-500"
+                    : record.status === "in-progress"
+                    ? "text-blue-600"
+                    : "text-gray-400"
+                }`}
+              >
+                {record.status}
+              </span>
+            </p>
+          </div>
+        </div>
+        {record.has_clinical_notes &&
+          (expanded ? (
+            <LucideChevronUp size={15} className="text-gray-400 shrink-0 mt-1" />
+          ) : (
+            <LucideChevronDown size={15} className="text-gray-400 shrink-0 mt-1" />
+          ))}
+      </button>
+
+      {expanded && record.captures && record.captures.length > 0 && (
+        <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 space-y-5">
+          {record.captures.map((cap, i) => {
+            const labelMap = buildLabelMap(cap.form_snapshot ?? []);
+            return (
+              <div key={i}>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  {cap.form_name || "Clinical Notes"}
+                </p>
+                <div className="space-y-2">
+                  {Object.entries(cap.values).map(([key, val]) => {
+                    const label = labelMap[key] ?? key.replace(/_/g, " ");
+                    return (
+                      <div key={key} className="flex gap-2 text-sm">
+                        <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">
+                          {label}
+                        </span>
+                        <span className="text-gray-800 font-medium">
+                          {renderValue(val)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Patient Record Panel (Medical Records tab) ───────────────────────────────
 function PatientRecordPanel({
   appointmentId,
@@ -530,7 +665,9 @@ function PatientRecordPanel({
   userId: string;
 }) {
   const [summary, setSummary] = useState<PatientSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [ownRecords, setOwnRecords] = useState<OwnRecord[]>([]);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [loadingOwn, setLoadingOwn] = useState(true);
   const [requesting, setRequesting] = useState<string | null>(null);
 
   const fetchSummary = () => {
@@ -538,12 +675,37 @@ function PatientRecordPanel({
       .get(`/records/appointment/${appointmentId}/patient-summary`)
       .then((res) => setSummary(res.data))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => setLoadingSummary(false));
+  };
+
+  // Fetch this provider's own past records for the patient via the timeline
+  const fetchOwnRecords = () => {
+    if (!summary?.patient?.identity_id) return;
+    axiosClient
+      .get(`/records/patient/${summary.patient.identity_id}/timeline?type=consultation`)
+      .then((res) => {
+        // Filter to only records from this provider (the logged-in one)
+        const all: OwnRecord[] = (res.data.records ?? []).filter(
+          (r: OwnRecord) => r.has_clinical_notes || true // show all own consultations
+        );
+        setOwnRecords(all);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingOwn(false));
   };
 
   useEffect(() => {
     fetchSummary();
   }, [appointmentId]);
+
+  // Once we have the patient identity, fetch own records
+  useEffect(() => {
+    if (summary?.patient?.identity_id) {
+      fetchOwnRecords();
+    } else if (!loadingSummary) {
+      setLoadingOwn(false);
+    }
+  }, [summary?.patient?.identity_id, loadingSummary]);
 
   const handleRequest = async (category: string) => {
     setRequesting(category);
@@ -561,6 +723,8 @@ function PatientRecordPanel({
       setRequesting(null);
     }
   };
+
+  const loading = loadingSummary;
 
   if (loading) {
     return (
@@ -583,7 +747,6 @@ function PatientRecordPanel({
   }
 
   const { patient, stats, always_visible, record_categories, access_granted } = summary;
-
   const dobFormatted = patient.date_of_birth ? formatDOB(patient.date_of_birth) : null;
 
   return (
@@ -699,7 +862,35 @@ function PatientRecordPanel({
         </div>
       </div>
 
-      {/* Record categories */}
+      {/* ── OWN RECORDS — no consent needed ─────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Your records for this patient
+          </p>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-blue-200 text-blue-700 font-medium">
+            No consent needed
+          </span>
+        </div>
+
+        {loadingOwn ? (
+          <div className="flex justify-center py-4">
+            <LucideLoader2 size={18} className="animate-spin text-blue-400" />
+          </div>
+        ) : ownRecords.length === 0 ? (
+          <p className="text-xs text-gray-400 py-2">
+            No previous consultations on record for this patient.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {ownRecords.map((rec) => (
+              <OwnRecordCard key={rec.id} record={rec} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Record categories — other providers */}
       {record_categories.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">

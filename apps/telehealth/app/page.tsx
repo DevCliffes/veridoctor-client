@@ -2,7 +2,7 @@
 import { useParams, useSearchParams } from "next/navigation";
 import socketService from "@/utils/socketService";
 import webRTCService from "@/utils/webRTCService";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import {
   Video,
   VideoOff,
@@ -14,7 +14,8 @@ import { toast } from "sonner";
 import { useAppDispatch, UseAppSelector } from "@/states/store/hooks";
 import { setHasJoined, setIsOfferer, setOffer } from "@/states/features/webrtc";
 
-export default function TelehealthVideoPlayer() {
+// ─── Inner component — uses useSearchParams so must be inside Suspense ────────
+function TelehealthInner() {
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
   const initLocalVideoRef = useRef<HTMLVideoElement>(null);
@@ -32,8 +33,6 @@ export default function TelehealthVideoPlayer() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [remoteConnected, setRemoteConnected] = useState(false);
-
-  // Keep a ref to localStream so joinMeeting always sees the latest value
   const localStreamRef = useRef<MediaStream | null>(null);
 
   const TELEHEALTH_BACKEND_URL =
@@ -76,14 +75,14 @@ export default function TelehealthVideoPlayer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Attach local stream to local video element after joining
+  // Attach local stream after joining
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream, hasJoined]);
 
-  // Attach remote stream to video element whenever it arrives
+  // Attach remote stream when it arrives
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -91,7 +90,7 @@ export default function TelehealthVideoPlayer() {
     }
   }, [remoteStream]);
 
-  // Connect to signaling server and set up ALL listeners before anything else
+  // Connect to signaling server and register ALL listeners upfront
   useEffect(() => {
     socketService.connect(TELEHEALTH_BACKEND_URL, {
       userName: userId,
@@ -99,14 +98,12 @@ export default function TelehealthVideoPlayer() {
     });
 
     if (!isOffererParam) {
-      // Patient: listen for the offer. Store it in Redux so the "Join Call"
-      // button becomes active. The offer may arrive at any time after connect.
+      // Patient: listen for offer before clicking Join — offer may arrive any time
       socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
         dispatch(setOffer(incomingOffer));
         webRTCService.setOffererType(false);
       });
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -123,7 +120,6 @@ export default function TelehealthVideoPlayer() {
       }
     });
 
-    // Add local tracks
     const stream = localStreamRef.current;
     if (stream) {
       stream.getTracks().forEach((track) => {
@@ -131,7 +127,6 @@ export default function TelehealthVideoPlayer() {
       });
     }
 
-    // When remote tracks arrive, update state to trigger the video element
     pc.addEventListener("track", (event: RTCTrackEvent) => {
       const [remoteStr] = event.streams;
       setRemoteStream(remoteStr);
@@ -147,7 +142,6 @@ export default function TelehealthVideoPlayer() {
       }
     });
 
-    // ICE candidates from the remote peer
     socketService.on("receiveIceCandidate", (candidate: RTCIceCandidate) => {
       webRTCService.addIceCandidate(candidate).catch(console.error);
     });
@@ -157,31 +151,22 @@ export default function TelehealthVideoPlayer() {
 
   const joinMeeting = async (incomingOffer?: RTCSessionDescriptionInit) => {
     if (isOffererParam) {
-      // ── PROVIDER (offerer) ───────────────────────────────────────────────
-      // Register remoteAnswer listener BEFORE sending the offer so we never
-      // miss the answer that comes back from the patient.
+      // Provider: register remoteAnswer listener BEFORE emitting offer
       await setupPeerConnection();
-
       socketService.on("remoteAnswer", (answer: RTCSessionDescriptionInit) => {
         webRTCService.handleRemoteAnswer(answer).catch(console.error);
       });
-
       const newOffer = await webRTCService.createOffer();
       socketService.emit("newOffer", newOffer);
-
     } else {
-      // ── PATIENT (answerer) ───────────────────────────────────────────────
       if (!incomingOffer) {
         toast.error("No offer available yet — please wait for the provider.");
         return;
       }
-
       await setupPeerConnection();
-
       const answer = await webRTCService.createAnswer(incomingOffer);
       socketService.emit("newAnswer", answer);
     }
-
     dispatch(setHasJoined(true));
   };
 
@@ -196,8 +181,7 @@ export default function TelehealthVideoPlayer() {
 
   const toggleAudio = () => {
     if (webRTCService.localStream) {
-      const audioTracks = webRTCService.localStream.getAudioTracks();
-      audioTracks.forEach((track) => {
+      webRTCService.localStream.getAudioTracks().forEach((track) => {
         track.enabled = audioMuted;
       });
       setAudioMuted(!audioMuted);
@@ -208,8 +192,7 @@ export default function TelehealthVideoPlayer() {
 
   const toggleVideo = () => {
     if (webRTCService.localStream) {
-      const videoTracks = webRTCService.localStream.getVideoTracks();
-      videoTracks.forEach((track) => {
+      webRTCService.localStream.getVideoTracks().forEach((track) => {
         track.enabled = videoOff;
       });
       setVideoOff(!videoOff);
@@ -356,5 +339,20 @@ export default function TelehealthVideoPlayer() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Outer wrapper — required by Next.js for useSearchParams ──────────────────
+export default function TelehealthVideoPlayer() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <TelehealthInner />
+    </Suspense>
   );
 }

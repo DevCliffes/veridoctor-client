@@ -10,6 +10,7 @@ import {
   LucideChevronRight,
 } from "@veridoctor/design/icons";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Appointment {
   id: string;
@@ -18,11 +19,31 @@ interface Appointment {
   appointment_type: "virtual" | "physical";
   status: string;
   meet_id?: string;
+  provider_first_name?: string;
+  provider_last_name?: string;
+  provider_id?: string;
 }
 
 function getField(identity: unknown, field: string): string {
   if (identity && typeof identity === "object" && field in identity) {
     const val = (identity as Record<string, unknown>)[field];
+    if (typeof val === "string") return val;
+  }
+  return "";
+}
+
+function getIdentityId(identity: unknown): string {
+  if (typeof identity === "string") {
+    if (!identity) return "";
+    try {
+      const parsed = JSON.parse(identity);
+      if (parsed && typeof parsed === "object" && typeof parsed.id === "string")
+        return parsed.id;
+    } catch {}
+    return identity;
+  }
+  if (identity && typeof identity === "object" && "id" in identity) {
+    const val = (identity as Record<string, unknown>).id;
     if (typeof val === "string") return val;
   }
   return "";
@@ -47,22 +68,49 @@ function minutesUntil(iso: string) {
   return Math.round((new Date(iso).getTime() - Date.now()) / 60000);
 }
 
+const TELEHEALTH_URL =
+  process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
+  "https://veridoctor-client-telehealth.vercel.app";
+
 export default function Dashboard() {
+  const router = useRouter();
   const { identity } = useAppSelector((store) => store.auth);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [firstName, setFirstName] = useState("there");
 
+  // ✅ Fixed: get email from identity regardless of shape
   const patientEmail = getField(identity, "email");
-  const firstName = getField(identity, "first_name") || "there";
+  const identityId = getIdentityId(identity);
 
+  // ✅ Fixed: fetch patient name from profile so greeting shows real name
   useEffect(() => {
-    if (!patientEmail) return;
+    if (!identityId) return;
+    axiosClient
+      .get(`/identity/register/${identityId}`)
+      .then((res) => {
+        const name = res.data?.first_name;
+        if (name) setFirstName(name);
+      })
+      .catch(() => {});
+  }, [identityId]);
+
+  // ✅ Fixed: only fetch appointments once patientEmail is available
+  useEffect(() => {
+    if (!patientEmail) {
+      // If no email yet, don't spin forever — check identity resolved
+      if (identity !== null && identity !== undefined && identity !== "") {
+        setLoading(false);
+      }
+      return;
+    }
+    setLoading(true);
     axiosClient
       .get("/appointments?patient_email=" + patientEmail + "&filter=upcoming")
       .then((res) => setAppointments((res.data ?? []).slice(0, 3)))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [patientEmail]);
+  }, [patientEmail, identity]);
 
   const nextAppt = appointments[0];
   const minsUntilNext = nextAppt ? minutesUntil(nextAppt.start_time) : null;
@@ -150,6 +198,11 @@ export default function Dashboard() {
                 mins > -30 &&
                 mins < 60;
 
+              const doctorName =
+                appt.provider_first_name || appt.provider_last_name
+                  ? `Dr. ${appt.provider_first_name ?? ""} ${appt.provider_last_name ?? ""}`.trim()
+                  : null;
+
               return (
                 <div
                   key={appt.id}
@@ -170,12 +223,24 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">
-                      {appt.appointment_type === "virtual"
-                        ? "Virtual"
-                        : "In-person"}{" "}
-                      Consultation
-                    </p>
+                    {/* ✅ Fixed: doctor name links to provider public profile */}
+                    {doctorName && appt.provider_id ? (
+                      <button
+                        onClick={() =>
+                          router.push(`/book/provider/${appt.provider_id}`)
+                        }
+                        className="text-sm font-medium text-blue-600 hover:underline text-left"
+                      >
+                        {doctorName}
+                      </button>
+                    ) : (
+                      <p className="text-sm font-medium text-gray-800">
+                        {doctorName ??
+                          (appt.appointment_type === "virtual"
+                            ? "Virtual Consultation"
+                            : "In-person Consultation")}
+                      </p>
+                    )}
                     <p className="text-xs text-gray-500">
                       {formatDate(appt.start_time)} ·{" "}
                       {formatTime(appt.start_time)}
@@ -184,7 +249,7 @@ export default function Dashboard() {
                   {isJoinable && appt.meet_id && (
                     <button
                       onClick={() => {
-                        window.location.href = "/calls/" + appt.meet_id;
+                        window.location.href = `${TELEHEALTH_URL}/${appt.meet_id}?userId=${patientEmail}&isOfferer=false`;
                       }}
                       className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700 shrink-0"
                     >
@@ -200,4 +265,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

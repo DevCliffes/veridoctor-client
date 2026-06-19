@@ -28,14 +28,6 @@ interface Appointment {
   message?: string;
 }
 
-function getEmail(identity: unknown): string {
-  if (identity && typeof identity === "object" && "email" in identity) {
-    const val = (identity as Record<string, unknown>).email;
-    if (typeof val === "string") return val;
-  }
-  return "";
-}
-
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("en-KE");
 }
@@ -70,8 +62,8 @@ export default function Appointments() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { identity } = useAppSelector((store) => store.auth);
-  const patientEmail = getEmail(identity);
+  const { user } = useAppSelector((store) => store.auth);
+  const patientEmail = user?.email ?? "";
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +82,10 @@ export default function Appointments() {
   };
 
   const fetchAppointments = useCallback(() => {
-    if (!patientEmail) return;
+    if (!patientEmail) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     axiosClient
       .get("/appointments?patient_email=" + patientEmail + "&filter=" + filter)

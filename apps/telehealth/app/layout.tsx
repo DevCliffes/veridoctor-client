@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "@veridoctor/design/styles/globals.css";
-import { store } from "@/states/store/store";
 import StoreProvider from "./components/StoreProvider";
 
 export const metadata: Metadata = {

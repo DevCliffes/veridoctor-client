@@ -3,18 +3,21 @@ import { io, Socket } from "socket.io-client";
 class SocketService {
   socket: Socket | null;
   listeners: { [key: string]: (...args: any[]) => void };
+  // Listeners registered before connect() is called are queued here
+  // and attached to the socket automatically once connect() runs.
+  pendingListeners: { event: string; callback: (...args: any[]) => void }[];
   isConnected: boolean;
 
   constructor() {
     this.socket = null;
     this.listeners = {};
+    this.pendingListeners = [];
     this.isConnected = false;
   }
 
   /**
    * Initialize WebSocket connection.
-   * @param {string} url - WebSocket server URL.
-   * @param {object} auth - Authentication data (e.g., userId, meetId).
+   * Any listeners registered via on() before this call are attached now.
    */
   connect(
     url: string,
@@ -34,13 +37,18 @@ class SocketService {
       auth: auth,
     });
 
+    // Attach any listeners that were registered before connect() was called
+    this.pendingListeners.forEach(({ event, callback }) => {
+      this.socket!.on(event, callback);
+      this.listeners[event] = callback;
+    });
+    this.pendingListeners = [];
+
     this.socket.connect();
 
-    // default listeners
     this.socket.on("connect", () => {
       this.isConnected = true;
     });
-
     this.socket.on("disconnect", () => {
       this.isConnected = false;
       console.error("DISCONNECTED FROM SIGNALING SERVER");
@@ -60,8 +68,6 @@ class SocketService {
 
   /**
    * Emit an event to the server.
-   * @param {string} event - Event name.
-   * @param {any} data - Data to send.
    */
   emit(event: string, data: any) {
     if (!this.socket) {
@@ -72,12 +78,14 @@ class SocketService {
 
   /**
    * Register a custom event listener.
-   * @param {string} event - Event name (e.g., 'message', 'error').
-   * @param {function} callback - Callback function.
+   * Safe to call before connect() — the listener will be queued and
+   * attached automatically when connect() is called.
    */
   on(event: string, callback: (...args: any[]) => void) {
     if (!this.socket) {
-      throw new Error("Socket not connected");
+      // Queue for when connect() is called
+      this.pendingListeners.push({ event, callback });
+      return;
     }
     this.socket.on(event, callback);
     this.listeners[event] = callback;
@@ -85,12 +93,13 @@ class SocketService {
 
   /**
    * Remove a specific event listener.
-   * @param {string} event - Event name.
    */
   off(event: string) {
-    if (!this.socket) {
-      throw new Error("Socket not connected");
-    }
+    // Also remove from pending queue if not yet connected
+    this.pendingListeners = this.pendingListeners.filter(
+      (p) => p.event !== event
+    );
+    if (!this.socket) return;
     this.socket.off(event, this.listeners[event]);
     delete this.listeners[event];
   }
@@ -99,9 +108,8 @@ class SocketService {
    * Remove all listeners and cleanup.
    */
   removeAllListeners() {
-    if (!this.socket) {
-      throw new Error("Socket not connected");
-    }
+    this.pendingListeners = [];
+    if (!this.socket) return;
     Object.keys(this.listeners).forEach((event) => {
       this.socket?.off(event, this.listeners[event]);
     });

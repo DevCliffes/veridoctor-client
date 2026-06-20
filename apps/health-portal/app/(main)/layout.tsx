@@ -37,6 +37,9 @@ import { axiosClient } from "@veridoctor/api-client";
 
 export const dynamic = "force-dynamic";
 
+// ✅ Hardcoded — avoids blank env var issue
+const WEB_APP_URL = "https://veridoctor-client-web.vercel.app";
+
 export default function MainAppLayout({
   children,
 }: {
@@ -53,6 +56,8 @@ export default function MainAppLayout({
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
+    // ✅ Tell AuthWrapper to redirect to web app instead of /auth/login
+    loginUrl: WEB_APP_URL,
   };
 
   const navItems: navITem[] = [
@@ -70,13 +75,12 @@ export default function MainAppLayout({
   };
 
   useEffect(() => {
-    // If user is already in Redux (e.g. from localStorage), mark ready immediately
     if (user?.email) {
       setProfileReady(true);
       return;
     }
     if (!identity || typeof identity !== "string") {
-      setProfileReady(true); // nothing to fetch, let pages handle empty state
+      setProfileReady(true);
       return;
     }
     axiosClient
@@ -91,9 +95,7 @@ export default function MainAppLayout({
           })
         );
       })
-      .catch(() => {
-        // profile fetch failed — pages will see empty email
-      })
+      .catch(() => {})
       .finally(() => {
         setProfileReady(true);
       });
@@ -125,13 +127,16 @@ export default function MainAppLayout({
 function ProfileDropdown() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+
   const handleLogout = () => {
     dispatch(setAccessToken(""));
     dispatch(setRefreshToken(""));
-    if (typeof window !== "undefined") {
-      window.location.href = process.env.NEXT_PUBLIC_WEB_APP_URL || "/";
-    }
+    // ✅ Small delay so Redux clears before redirect
+    setTimeout(() => {
+      window.location.href = WEB_APP_URL;
+    }, 100);
   };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex gap-2 border-2 hover:cursor-pointer items-center p-1 md:border-2 md:rounded-full">

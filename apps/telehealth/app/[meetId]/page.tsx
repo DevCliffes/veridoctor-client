@@ -92,11 +92,8 @@ function TelehealthInner() {
 
   // Connect to signaling server
   useEffect(() => {
-    // FIX: Register the availableOffer listener BEFORE connecting.
-    // The server emits availableOffer immediately on connection if an offer
-    // already exists in the room. If we connect first and register the listener
-    // after, the event fires before anyone is listening and the patient is
-    // stuck forever on "Waiting for the provider to start the call...".
+    // Register the availableOffer listener BEFORE connecting, so the
+    // immediate replay from the server (if an offer already exists) isn't missed.
     if (!isOffererParam) {
       socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
         console.log("[telehealth] availableOffer received");
@@ -105,13 +102,11 @@ function TelehealthInner() {
       });
     }
 
-    // Connect AFTER the listener is registered
     socketService.connect(TELEHEALTH_BACKEND_URL, {
       userName: userId,
       roomName: meetId,
     });
 
-    // Cleanup on unmount
     return () => {
       socketService.removeAllListeners();
       socketService.disconnect();
@@ -154,11 +149,19 @@ function TelehealthInner() {
       }
     });
 
+    // Register the listener for incoming candidates...
     socketService.on("receiveIceCandidate", (candidate: RTCIceCandidate) => {
       webRTCService.addIceCandidate(candidate).catch(console.error);
     });
 
-    // Handle the other peer disconnecting mid-call
+    // ✅ NEW: ...then immediately ask the server for any candidates from
+    // the OTHER peer that were already buffered before this listener
+    // existed. Without this, candidates sent by the offerer in the gap
+    // between "offer created" and "answerer clicked Join Call" were lost
+    // forever, since the server's broadcast-on-arrival only reaches
+    // listeners that exist at that exact instant.
+    socketService.emit("requestIceCandidates", { isOfferer: isOffererParam });
+
     socketService.on("peerLeft", () => {
       toast.error("The other participant has left the call.");
       setRemoteConnected(false);

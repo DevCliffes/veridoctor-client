@@ -37,6 +37,13 @@ interface ProviderProfile {
   services: Service[];
 }
 
+// Display-only formatting — capitalizes the first letter for presentation
+// without ever mutating the underlying stored value (e.g. provider.bio).
+function capitalizeFirst(text: string) {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export default function ProviderProfilePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -134,7 +141,7 @@ export default function ProviderProfilePage() {
             About
           </h2>
           <p className="text-sm text-gray-600 whitespace-pre-wrap">
-            {provider.bio}
+            {capitalizeFirst(provider.bio)}
           </p>
         </div>
       )}

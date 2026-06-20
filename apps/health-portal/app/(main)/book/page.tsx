@@ -34,6 +34,7 @@ interface Provider {
   bio: string;
   languages: string[];
   insurances_accepted: string[];
+  profile_picture_url?: string;
   services: Service[];
 }
 
@@ -107,6 +108,46 @@ function getNext7Days() {
   });
 }
 
+// Shared avatar — shows the provider's photo when available,
+// falls back to initials on a colored circle otherwise.
+function ProviderAvatar({
+  provider,
+  size = "md",
+}: {
+  provider: Provider;
+  size?: "md" | "sm";
+}) {
+  const initials =
+    (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
+  const dimension = size === "md" ? "w-16 h-16" : "w-12 h-12";
+  const textSize = size === "md" ? "text-xl" : "text-base";
+
+  if (provider.profile_picture_url) {
+    return (
+      <img
+        src={provider.profile_picture_url}
+        alt={`Dr. ${provider.first_name} ${provider.last_name}`}
+        className={
+          dimension +
+          " rounded-full object-cover shrink-0 border border-gray-100"
+        }
+      />
+    );
+  }
+
+  return (
+    <div
+      className={
+        dimension +
+        " rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0 " +
+        textSize
+      }
+    >
+      {initials.toUpperCase()}
+    </div>
+  );
+}
+
 function ProviderCard({
   provider,
   onBook,
@@ -143,9 +184,6 @@ function ProviderCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayOffset, provider.id]);
 
-  const initials =
-    (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
-
   const hasExtraInfo =
     provider.bio ||
     provider.clinic_name ||
@@ -157,9 +195,7 @@ function ProviderCard({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
       {/* Header */}
       <div className="flex gap-4">
-        <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold shrink-0">
-          {initials.toUpperCase()}
-        </div>
+        <ProviderAvatar provider={provider} size="md" />
         <div className="flex-1 min-w-0">
           <h3
             onClick={() => router.push("/book/provider/" + provider.id)}
@@ -475,22 +511,25 @@ function BookingModal({
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          <div className="bg-blue-50 rounded-xl p-4">
-            <p className="font-semibold text-gray-800">
-              Dr. {booking.provider.first_name} {booking.provider.last_name}
-            </p>
-            <p className="text-sm text-blue-600 mt-0.5">
-              {booking.provider.speciality}
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              {dateLabel(booking.date)} · {formatTime(booking.slot.start_time)}{" "}
-              – {formatTime(booking.slot.end_time)}
-            </p>
-            {booking.slot.service_name && (
-              <p className="text-xs text-gray-400 mt-1">
-                {booking.slot.service_name}
+          <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-3">
+            <ProviderAvatar provider={booking.provider} size="sm" />
+            <div>
+              <p className="font-semibold text-gray-800">
+                Dr. {booking.provider.first_name} {booking.provider.last_name}
               </p>
-            )}
+              <p className="text-sm text-blue-600 mt-0.5">
+                {booking.provider.speciality}
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                {dateLabel(booking.date)} · {formatTime(booking.slot.start_time)}{" "}
+                – {formatTime(booking.slot.end_time)}
+              </p>
+              {booking.slot.service_name && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {booking.slot.service_name}
+                </p>
+              )}
+            </div>
           </div>
 
           {(patientFirst || patientEmail) && (

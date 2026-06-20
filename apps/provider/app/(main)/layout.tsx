@@ -144,6 +144,12 @@ function ProfileDropdown({
 }) {
   const router = useRouter();
 
+  const handleLogout = () => {
+    dispatch(setAccessToken(""));
+    dispatch(setRefreshToken(""));
+    window.location.href = "https://veridoctor-client-web.vercel.app/";
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex gap-2 border-2 hover:cursor-pointer items-center p-1 md:border-2 md:rounded-full">
@@ -164,11 +170,7 @@ function ProfileDropdown({
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer text-red-600 focus:text-red-600"
-          onClick={() => {
-            dispatch(setAccessToken(""));
-            dispatch(setRefreshToken(""));
-            router.push("/auth/login");
-          }}
+          onClick={handleLogout}
         >
           <LucideLogOut size={16} />
           <p>Logout</p>
@@ -177,4 +179,3 @@ function ProfileDropdown({
     </DropdownMenu>
   );
 }
-

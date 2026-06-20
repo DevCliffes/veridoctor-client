@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 import { useParams, useSearchParams } from "next/navigation";
 import socketService from "@/utils/socketService";
 import webRTCService from "@/utils/webRTCService";

@@ -12,8 +12,7 @@ import {
   LucideX,
   LucideChevronLeft,
   LucideChevronRight,
-  LucideChevronDown,
-  LucideChevronUp,
+  LucideChevronRightCircle,
 } from "@veridoctor/design/icons";
 
 interface Service {
@@ -119,8 +118,8 @@ function ProviderAvatar({
 }) {
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
-  const dimension = size === "md" ? "w-16 h-16" : "w-12 h-12";
-  const textSize = size === "md" ? "text-xl" : "text-base";
+  const dimension = size === "md" ? "w-14 h-14" : "w-12 h-12";
+  const textSize = size === "md" ? "text-lg" : "text-base";
 
   if (provider.profile_picture_url) {
     return (
@@ -164,7 +163,6 @@ function ProviderCard({
     provider.services[0]?.id ?? null
   );
   const [selectedApptType, setSelectedApptType] = useState<"virtual" | "physical">("virtual");
-  const [expanded, setExpanded] = useState(false);
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
 
   useEffect(() => {
@@ -184,186 +182,177 @@ function ProviderCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayOffset, provider.id]);
 
-  const hasExtraInfo =
-    provider.bio ||
-    provider.clinic_name ||
-    provider.county ||
-    (provider.languages && provider.languages.length > 0) ||
-    (provider.insurances_accepted && provider.insurances_accepted.length > 0);
-
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      {/* Header */}
-      <div className="flex gap-4">
-        <ProviderAvatar provider={provider} size="md" />
-        <div className="flex-1 min-w-0">
-          <h3
-            onClick={() => router.push("/book/provider/" + provider.id)}
-            className="font-bold text-gray-800 text-base hover:text-blue-600 cursor-pointer transition-colors"
-          >
-            Dr. {provider.first_name} {provider.last_name}
-          </h3>
-          <p className="text-sm text-blue-600 font-medium mt-0.5">
-            {provider.speciality ?? "General Practitioner"}
-          </p>
-          {provider.clinic_name && (
-            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-              <LucideMapPin size={11} className="shrink-0" />
-              {provider.clinic_name}
-              {provider.county ? ", " + provider.county : ""}
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[240px_minmax(0,1fr)]">
+      {/* Left rail — identity + price + link to full profile */}
+      <div className="p-5 md:border-r border-gray-100 flex flex-col gap-3">
+        <div className="flex flex-col items-center text-center gap-2">
+          <ProviderAvatar provider={provider} size="md" />
+          <div>
+            <h3 className="font-bold text-gray-800 text-[15px]">
+              Dr. {provider.first_name} {provider.last_name}
+            </h3>
+            <p className="text-xs text-blue-600 font-medium mt-0.5">
+              {provider.speciality || "General Practitioner"}
             </p>
-          )}
-          {provider.services.length > 0 && (
-            <p className="text-xs text-gray-500 mt-1">
-              {provider.services.map((s) => s.name).join(" · ")}
-            </p>
-          )}
-          {provider.services[0] && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              From {provider.services[0].currency}{" "}
-              {Number(provider.services[0].price).toLocaleString()} ·{" "}
-              {provider.services[0].estimated_duration} min
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Expandable extra info */}
-      {hasExtraInfo && (
-        <div className="mt-3">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
-          >
-            {expanded ? (
-              <>
-                <LucideChevronUp size={13} /> Less info
-              </>
-            ) : (
-              <>
-                <LucideChevronDown size={13} /> More info
-              </>
-            )}
-          </button>
-
-          {expanded && (
-            <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
-              {provider.bio && (
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">
-                    About
-                  </p>
-                  <p className="text-sm text-gray-600">{provider.bio}</p>
-                </div>
-              )}
-
-              {provider.languages && provider.languages.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
-                    Languages
-                  </p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {provider.languages.map((lang) => (
-                      <span
-                        key={lang}
-                        className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 font-medium"
-                      >
-                        {lang}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {provider.insurances_accepted && provider.insurances_accepted.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
-                    Accepted Insurance
-                  </p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {provider.insurances_accepted.map((ins) => (
-                      <span
-                        key={ins}
-                        className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 font-medium border border-blue-100"
-                      >
-                        {ins}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Service selector */}
-      {provider.services.length > 0 && (
-        <div className="mt-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
-            Service
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {provider.services.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelectedServiceId(s.id)}
-                className={
-                  "text-xs px-3 py-1.5 rounded-full border transition-colors " +
-                  (selectedServiceId === s.id
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "border-gray-200 text-gray-600 hover:border-gray-300")
-                }
-              >
-                {s.name} · {s.estimated_duration}m
-              </button>
-            ))}
           </div>
         </div>
-      )}
 
-      {/* Appointment type */}
-      <div className="mt-3">
-        <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
-          Appointment type
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setSelectedApptType("virtual")}
-            className={
-              "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
-              (selectedApptType === "virtual"
-                ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
-                : "border-gray-200 text-gray-600")
-            }
-          >
-            <LucideVideo size={13} /> Virtual
-          </button>
-          <button
-            onClick={() => setSelectedApptType("physical")}
-            className={
-              "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
-              (selectedApptType === "physical"
-                ? "bg-green-50 border-green-300 text-green-700 font-medium"
-                : "border-gray-200 text-gray-600")
-            }
-          >
-            <LucideMapPin size={13} /> In-person
-          </button>
-        </div>
+        {(provider.clinic_name || provider.county) && (
+          <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5 text-center">
+            <LucideMapPin size={13} className="shrink-0" />
+            {[provider.clinic_name, provider.county].filter(Boolean).join(", ")}
+          </p>
+        )}
+
+        {provider.services[0] && (
+          <div className="border-t border-gray-100 pt-2.5 text-center">
+            <p className="text-xs text-gray-400">{provider.services[0].name}</p>
+            <p className="text-[15px] font-bold text-gray-800 mt-0.5">
+              {provider.services[0].currency}{" "}
+              {Number(provider.services[0].price).toLocaleString()}
+              <span className="text-xs font-normal text-gray-400">
+                {" "}
+                · {provider.services[0].estimated_duration}m
+              </span>
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={() => router.push("/book/provider/" + provider.id)}
+          className="mt-auto flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium bg-gray-50 hover:bg-gray-100 rounded-lg py-2 transition-colors"
+        >
+          More info <LucideChevronRightCircle size={13} />
+        </button>
       </div>
 
-      {/* Date slots */}
-      <div className="mt-4 flex gap-2 items-start">
-        <button
-          onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
-          disabled={dayOffset === 0}
-          className="p-1 mt-1 rounded hover:bg-gray-100 disabled:opacity-30"
-        >
-          <LucideChevronLeft size={16} />
-        </button>
+      {/* Right side — booking */}
+      <div className="p-5 flex flex-col gap-4">
+        {provider.services.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+              Service
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {provider.services.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedServiceId(s.id)}
+                  className={
+                    "text-xs px-3 py-1.5 rounded-full border transition-colors " +
+                    (selectedServiceId === s.id
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "border-gray-200 text-gray-600 hover:border-gray-300")
+                  }
+                >
+                  {s.name} · {s.estimated_duration}m
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-        <div className="flex gap-2 flex-1">
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+            Appointment type
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedApptType("virtual")}
+              className={
+                "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
+                (selectedApptType === "virtual"
+                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
+                  : "border-gray-200 text-gray-600")
+              }
+            >
+              <LucideVideo size={13} /> Virtual
+            </button>
+            <button
+              onClick={() => setSelectedApptType("physical")}
+              className={
+                "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
+                (selectedApptType === "physical"
+                  ? "bg-green-50 border-green-300 text-green-700 font-medium"
+                  : "border-gray-200 text-gray-600")
+              }
+            >
+              <LucideMapPin size={13} /> In-person
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs text-gray-400 uppercase tracking-wide">
+              Availability
+            </p>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
+                disabled={dayOffset === 0}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+              >
+                <LucideChevronLeft size={14} />
+              </button>
+              <button
+                onClick={() =>
+                  setDayOffset(Math.min(days.length - 3, dayOffset + 3))
+                }
+                disabled={dayOffset + 3 >= days.length}
+                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+              >
+                <LucideChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {visibleDays.map((day) => {
+              const allSlots = daySlots[day] ?? [];
+              const now = new Date();
+              const futureSlots = allSlots.filter((slot) => {
+                if (new Date(slot.start_time) <= now) return false;
+                if (
+                  selectedServiceId &&
+                  slot.service_id &&
+                  slot.service_id !== selectedServiceId
+                )
+                  return false;
+                if (
+                  slot.location_type !== "both" &&
+                  slot.location_type !== selectedApptType
+                )
+                  return false;
+                return true;
+              });
+              const loading = loadingDays[day];
+              return (
+                <div
+                  key={day}
+                  className="border border-gray-100 rounded-lg p-2.5 text-center"
+                >
+                  <p className="text-xs font-medium text-gray-700">
+                    {dateLabel(day)}
+                  </p>
+                  {loading ? (
+                    <LucideLoader2
+                      size={14}
+                      className="animate-spin text-gray-300 mx-auto my-1.5"
+                    />
+                  ) : (
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      {futureSlots.length === 0
+                        ? "No slots"
+                        : futureSlots.length + " slots"}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
           {visibleDays.map((day) => {
             const allSlots = daySlots[day] ?? [];
             const now = new Date();
@@ -382,60 +371,37 @@ function ProviderCard({
                 return false;
               return true;
             });
-            const loading = loadingDays[day];
+            if (loadingDays[day] || futureSlots.length === 0) return null;
             return (
-              <div key={day} className="flex-1 flex flex-col items-center gap-1.5">
-                <p className="text-xs font-semibold text-gray-500 text-center">
-                  {dateLabel(day)}
-                </p>
-                {loading ? (
-                  <LucideLoader2
-                    size={16}
-                    className="animate-spin text-gray-300 my-2"
-                  />
-                ) : futureSlots.length === 0 ? (
-                  <p className="text-xs text-gray-300 text-center py-2">
-                    No slots
+              <div key={day + "-slots"} className="mt-3">
+                <p className="text-xs text-gray-400 mb-1.5">{dateLabel(day)}</p>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {futureSlots.slice(0, 10).map((slot) => (
+                    <button
+                      key={slot.start_time}
+                      onClick={() =>
+                        onBook({
+                          provider,
+                          slot,
+                          date: day,
+                          appointmentType: selectedApptType,
+                        })
+                      }
+                      className="text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors"
+                    >
+                      {formatTime(slot.start_time)}
+                    </button>
+                  ))}
+                </div>
+                {futureSlots.length > 10 && (
+                  <p className="text-xs text-gray-400 text-center mt-1.5">
+                    +{futureSlots.length - 10} more
                   </p>
-                ) : (
-                  <div className="flex flex-col gap-1 w-full">
-                    {futureSlots.slice(0, 3).map((slot) => (
-                      <button
-                        key={slot.start_time}
-                        onClick={() =>
-                          onBook({
-                            provider,
-                            slot,
-                            date: day,
-                            appointmentType: selectedApptType,
-                          })
-                        }
-                        className="w-full text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors"
-                      >
-                        {formatTime(slot.start_time)}
-                      </button>
-                    ))}
-                    {futureSlots.length > 3 && (
-                      <p className="text-xs text-gray-400 text-center">
-                        +{futureSlots.length - 3} more
-                      </p>
-                    )}
-                  </div>
                 )}
               </div>
             );
           })}
         </div>
-
-        <button
-          onClick={() =>
-            setDayOffset(Math.min(days.length - 3, dayOffset + 3))
-          }
-          disabled={dayOffset + 3 >= days.length}
-          className="p-1 mt-1 rounded hover:bg-gray-100 disabled:opacity-30"
-        >
-          <LucideChevronRight size={16} />
-        </button>
       </div>
     </div>
   );

@@ -39,6 +39,8 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { GlobalNewAppointmentDialog } from "../../components/GlobalNewAppointmentDialog";
 
+const WEB_APP_URL = "https://veridoctor-client-web.vercel.app";
+
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
     if (!identity) return "";
@@ -93,6 +95,8 @@ export default function MainAppLayout({
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
+    // ✅ Tell AuthWrapper to redirect to web app, not /auth/login
+    loginUrl: WEB_APP_URL,
   };
 
   const navItems: navITem[] = [
@@ -118,7 +122,6 @@ export default function MainAppLayout({
       authInfo={authInfo}
       setAuthInfo={(token) => setAuthInfo(token)}
     >
-      {/* Global dialog — opens from any page via window.dispatchEvent(new CustomEvent("vd:new-appointment")) */}
       <GlobalNewAppointmentDialog userId={identityId} />
 
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
@@ -147,7 +150,10 @@ function ProfileDropdown({
   const handleLogout = () => {
     dispatch(setAccessToken(""));
     dispatch(setRefreshToken(""));
-    window.location.href = "https://veridoctor-client-web.vercel.app/";
+    // Small delay so Redux state clears before redirect
+    setTimeout(() => {
+      window.location.href = WEB_APP_URL;
+    }, 100);
   };
 
   return (

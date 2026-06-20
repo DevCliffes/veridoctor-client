@@ -9,7 +9,11 @@ const io = new Server(httpServer, {
   },
 });
 
-// rooms[roomId] = { offererSocketId, offer, answer, members: Map<socketId, userName> }
+// rooms[roomId] = {
+//   offer, answer, offererSocketId,
+//   members: Map<socketId, userName>,
+//   candidates: { offerer: [...], answerer: [...] }  -- buffered ICE candidates
+// }
 const rooms = {};
 
 function getRoom(roomName) {
@@ -19,6 +23,7 @@ function getRoom(roomName) {
       answer: null,
       offererSocketId: null,
       members: new Map(),
+      candidates: { offerer: [], answerer: [] },
     };
   }
   return rooms[roomName];
@@ -38,11 +43,7 @@ io.on("connection", (socket) => {
 
   console.log(`[${roomName}] ${userName} connected (socket ${socket.id})`);
 
-  // ✅ FIX 1 — replay the stored offer to anyone who joins after it
-  // was created. Without this, a patient joining even a fraction of a
-  // second after the doctor's offer was emitted would never receive it,
-  // since socket.to(room).emit() only reaches sockets already in the
-  // room at the exact moment it fires.
+  // Replay the stored offer to anyone who joins after it was created.
   if (room.offer && socket.id !== room.offererSocketId) {
     socket.emit("availableOffer", room.offer);
     console.log(`[${roomName}] replayed stored offer to ${userName}`);
@@ -53,7 +54,6 @@ io.on("connection", (socket) => {
     room.offer = offer;
     room.offererSocketId = socket.id;
     console.log(`[${roomName}] offer stored`);
-    // Tell anyone already in the room (the answerer) that an offer is available
     socket.to(roomName).emit("availableOffer", offer);
   });
 
@@ -61,16 +61,42 @@ io.on("connection", (socket) => {
   socket.on("newAnswer", (answer) => {
     room.answer = answer;
     console.log(`[${roomName}] answer stored`);
-    // Send answer back to the offerer
     if (room.offererSocketId) {
       io.to(room.offererSocketId).emit("remoteAnswer", answer);
     }
   });
 
-  // ── ICE candidates (relay between peers) ──────────────────────────────────
+  // ── ICE candidates (relay between peers, with buffering) ───────────────────
+  // ✅ FIX: candidates are now buffered per-role in the room, not just
+  // broadcast-and-forgotten. The offerer typically starts gathering and
+  // sending candidates the instant they create their offer — well before
+  // the answerer has even seen "Join Call", let alone clicked it and
+  // registered their receiveIceCandidate listener. A plain broadcast at
+  // that moment reaches nobody, and the candidate is lost forever. Buffering
+  // means whoever asks for them later (via "requestIceCandidates") gets the
+  // full backlog, not just whatever arrives after they happen to be ready.
   socket.on("icecandidate", ({ candidate, roomId, isOfferer }) => {
-    // Send to everyone else in the room
+    const targetRoom = getRoom(roomId || roomName);
+    const bucket = isOfferer ? "offerer" : "answerer";
+    targetRoom.candidates[bucket].push(candidate);
     socket.to(roomId || roomName).emit("receiveIceCandidate", candidate);
+  });
+
+  // ✅ NEW: a peer can explicitly ask for any candidates buffered from the
+  // OTHER role, replayed to them directly. Call this right after
+  // setupPeerConnection() registers the receiveIceCandidate listener.
+  socket.on("requestIceCandidates", ({ isOfferer }) => {
+    // If I am the offerer, I want the answerer's candidates, and vice versa.
+    const wantedBucket = isOfferer ? "answerer" : "offerer";
+    const buffered = room.candidates[wantedBucket] || [];
+    buffered.forEach((candidate) => {
+      socket.emit("receiveIceCandidate", candidate);
+    });
+    if (buffered.length > 0) {
+      console.log(
+        `[${roomName}] replayed ${buffered.length} buffered ${wantedBucket} candidate(s) to ${userName}`
+      );
+    }
   });
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
@@ -78,25 +104,16 @@ io.on("connection", (socket) => {
     room.members.delete(socket.id);
     console.log(`[${roomName}] ${userName} disconnected (socket ${socket.id})`);
 
-    // ✅ FIX 2 — only announce peerLeft if this userName has no other
-    // active socket still in the room. Without this guard, a transient
-    // reconnect (e.g. React StrictMode double-mount, or a brief network
-    // blip) would broadcast a false "peer left" to the room, including
-    // to the SAME person's new, still-connected socket — confusing the
-    // client into thinking the other participant disconnected when
-    // nothing actually happened.
     const stillPresent = [...room.members.values()].includes(userName);
     if (!stillPresent) {
       socket.to(roomName).emit("peerLeft", { userName });
     }
 
-    // Clear offerer reference if the offerer's socket was the one that left
     if (room.offererSocketId === socket.id && !stillPresent) {
       room.offererSocketId = null;
       room.offer = null;
     }
 
-    // Clean up empty rooms to avoid unbounded memory growth
     if (room.members.size === 0) {
       delete rooms[roomName];
     }

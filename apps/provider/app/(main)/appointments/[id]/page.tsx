@@ -171,6 +171,18 @@ function renderValue(val: unknown): string {
   return String(val);
 }
 
+// ✅ Builds the external telehealth app URL for the provider (always the offerer)
+function buildTelehealthUrl(meetId: string, userId: string | null) {
+  const base =
+    process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
+    "https://veridoctor-client-telehealth.vercel.app";
+  const params = new URLSearchParams({
+    userId: userId ?? "provider",
+    isOfferer: "true",
+  });
+  return `${base}/${meetId}?${params.toString()}`;
+}
+
 export default function AppointmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -225,6 +237,13 @@ export default function AppointmentDetailPage() {
     } finally {
       setUpdatingStatus(false);
     }
+  };
+
+  // ✅ Join call now redirects externally to the standalone telehealth app
+  const handleJoinCall = () => {
+    if (!appointment?.meet_id) return;
+    const url = buildTelehealthUrl(appointment.meet_id, String(userId ?? ""));
+    window.location.href = url;
   };
 
   const draftKey = `vd_capture_${id}`;
@@ -432,7 +451,7 @@ export default function AppointmentDetailPage() {
                     <p className="text-xs text-gray-400 uppercase tracking-wide">Call</p>
                     {canJoinCall ? (
                       <button
-                        onClick={() => router.push(`/calls/${appointment.meet_id}`)}
+                        onClick={handleJoinCall}
                         className="text-sm text-blue-600 hover:underline font-medium"
                       >
                         Join video call →
@@ -869,7 +888,6 @@ function PatientRecordPanel({
           </p>
         ) : (
           <>
-            {/* ✅ Fixed: scrollable window — capped at ~5 records height */}
             <div className="overflow-y-auto max-h-72 space-y-2 pr-1">
               {ownRecords.map((rec) => (
                 <OwnRecordCard key={rec.id} record={rec} />

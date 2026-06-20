@@ -34,6 +34,7 @@ import {
   setUser,
 } from "@veridoctor/store";
 import { axiosClient } from "@veridoctor/api-client";
+import NotificationBell from "../../components/NotificationBell";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,8 @@ export default function MainAppLayout({
   );
   const dispatch = useAppDispatch();
   const [profileReady, setProfileReady] = useState(false);
+
+  const identityId = typeof identity === "string" ? identity : "";
 
   const authInfo = {
     isLoggedIn: access_token ? true : false,
@@ -108,7 +111,15 @@ export default function MainAppLayout({
       setAuthInfo={(token) => setAuthInfo(token)}
     >
       <div className="fixed bg-gray-50 top-0 left-0 h-svh w-full flex flex-col">
-        <TopNav center={<p>Health portal</p>} right={<ProfileDropdown />} />
+        <TopNav
+          center={<p>Health portal</p>}
+          right={
+            <div className="flex items-center gap-2">
+              <NotificationBell identityId={identityId} />
+              <ProfileDropdown />
+            </div>
+          }
+        />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />
           <div className="w-full overflow-y-scroll bg-gray-200 p-4 rounded-lg">

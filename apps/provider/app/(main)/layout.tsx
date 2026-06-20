@@ -38,6 +38,7 @@ import {
 } from "@veridoctor/store";
 import { usePathname, useRouter } from "next/navigation";
 import { GlobalNewAppointmentDialog } from "../../components/GlobalNewAppointmentDialog";
+import NotificationBell from "../../components/NotificationBell";
 
 const WEB_APP_URL = "https://veridoctor-client-web.vercel.app";
 
@@ -127,7 +128,12 @@ export default function MainAppLayout({
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
         <TopNav
           center={<p>{displayName}</p>}
-          right={<ProfileDropdown dispatch={dispatch} />}
+          right={
+            <div className="flex items-center gap-2">
+              <NotificationBell identityId={identityId} />
+              <ProfileDropdown dispatch={dispatch} />
+            </div>
+          }
         />
         <div className="flex h-full">
           <SideNav navItems={navItems} activePath={pathname} />

@@ -13,6 +13,8 @@ import {
   LucideChevronLeft,
   LucideChevronRight,
   LucideChevronRightCircle,
+  LucideLanguages,
+  LucideShieldCheck,
 } from "@veridoctor/design/icons";
 
 interface Service {
@@ -111,15 +113,15 @@ function getNext7Days() {
 // falls back to initials on a colored circle otherwise.
 function ProviderAvatar({
   provider,
-  size = "md",
+  size = "lg",
 }: {
   provider: Provider;
-  size?: "md" | "sm";
+  size?: "lg" | "sm";
 }) {
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
-  const dimension = size === "md" ? "w-14 h-14" : "w-12 h-12";
-  const textSize = size === "md" ? "text-lg" : "text-base";
+  const dimension = size === "lg" ? "w-20 h-20" : "w-12 h-12";
+  const textSize = size === "lg" ? "text-2xl" : "text-base";
 
   if (provider.profile_picture_url) {
     return (
@@ -182,56 +184,117 @@ function ProviderCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayOffset, provider.id]);
 
+  const selectedService =
+    provider.services.find((s) => s.id === selectedServiceId) ??
+    provider.services[0] ??
+    null;
+
+  const insuranceSummary =
+    provider.insurances_accepted && provider.insurances_accepted.length > 0
+      ? provider.insurances_accepted.length > 2
+        ? provider.insurances_accepted.slice(0, 2).join(", ") +
+          " +" +
+          (provider.insurances_accepted.length - 2) +
+          " more"
+        : provider.insurances_accepted.join(", ")
+      : null;
+
+  const languageSummary =
+    provider.languages && provider.languages.length > 0
+      ? provider.languages.join(", ")
+      : null;
+
+  function slotsForDay(day: string) {
+    const allSlots = daySlots[day] ?? [];
+    const now = new Date();
+    return allSlots.filter((slot) => {
+      if (new Date(slot.start_time) <= now) return false;
+      if (
+        selectedServiceId &&
+        slot.service_id &&
+        slot.service_id !== selectedServiceId
+      )
+        return false;
+      if (
+        slot.location_type !== "both" &&
+        slot.location_type !== selectedApptType
+      )
+        return false;
+      return true;
+    });
+  }
+
+  const anyVisibleDayHasSlots = visibleDays.some(
+    (day) => !loadingDays[day] && slotsForDay(day).length > 0
+  );
+  const allVisibleDaysLoaded = visibleDays.every((day) => !loadingDays[day]);
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[240px_minmax(0,1fr)]">
-      {/* Left rail — identity + price + link to full profile */}
-      <div className="p-5 md:border-r border-gray-100 flex flex-col gap-3">
-        <div className="flex flex-col items-center text-center gap-2">
-          <ProviderAvatar provider={provider} size="md" />
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[280px_minmax(0,1fr)]">
+      {/* Left rail — identity, selected service price, contact summary */}
+      <div className="p-6 md:border-r border-gray-100 flex flex-col gap-4">
+        <div className="flex flex-col items-center text-center gap-2.5">
+          <ProviderAvatar provider={provider} size="lg" />
           <div>
-            <h3 className="font-bold text-gray-800 text-[15px]">
+            <h3 className="font-bold text-gray-800 text-lg">
               Dr. {provider.first_name} {provider.last_name}
             </h3>
-            <p className="text-xs text-blue-600 font-medium mt-0.5">
+            <p className="text-sm text-blue-600 font-medium mt-1">
               {provider.speciality || "General Practitioner"}
             </p>
           </div>
         </div>
 
         {(provider.clinic_name || provider.county) && (
-          <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5 text-center">
-            <LucideMapPin size={13} className="shrink-0" />
+          <p className="text-[13px] text-gray-500 flex items-center justify-center gap-1.5 text-center">
+            <LucideMapPin size={15} className="shrink-0" />
             {[provider.clinic_name, provider.county].filter(Boolean).join(", ")}
           </p>
         )}
 
-        {provider.services[0] && (
-          <div className="border-t border-gray-100 pt-2.5 text-center">
-            <p className="text-xs text-gray-400">{provider.services[0].name}</p>
-            <p className="text-[15px] font-bold text-gray-800 mt-0.5">
-              {provider.services[0].currency}{" "}
-              {Number(provider.services[0].price).toLocaleString()}
-              <span className="text-xs font-normal text-gray-400">
-                {" "}
-                · {provider.services[0].estimated_duration}m
-              </span>
+        {selectedService && (
+          <div className="border-t border-gray-100 pt-3.5 text-center">
+            <p className="text-[13px] text-gray-500">{selectedService.name}</p>
+            <p className="text-xl font-bold text-gray-800 mt-1">
+              {selectedService.currency}{" "}
+              {Number(selectedService.price).toLocaleString()}
             </p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {selectedService.estimated_duration} min
+            </p>
+          </div>
+        )}
+
+        {(languageSummary || insuranceSummary) && (
+          <div className="border-t border-gray-100 pt-3.5 flex flex-col gap-2">
+            {languageSummary && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <LucideLanguages size={15} className="shrink-0" />
+                <span>{languageSummary}</span>
+              </div>
+            )}
+            {insuranceSummary && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <LucideShieldCheck size={15} className="shrink-0" />
+                <span>{insuranceSummary}</span>
+              </div>
+            )}
           </div>
         )}
 
         <button
           onClick={() => router.push("/book/provider/" + provider.id)}
-          className="mt-auto flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium bg-gray-50 hover:bg-gray-100 rounded-lg py-2 transition-colors"
+          className="mt-auto flex items-center justify-center gap-1.5 text-[13px] text-blue-600 hover:text-blue-700 font-medium bg-gray-50 hover:bg-gray-100 rounded-lg py-2.5 transition-colors"
         >
-          More info <LucideChevronRightCircle size={13} />
+          Full profile <LucideChevronRightCircle size={14} />
         </button>
       </div>
 
       {/* Right side — booking */}
-      <div className="p-5 flex flex-col gap-4">
+      <div className="p-6 flex flex-col gap-4">
         {provider.services.length > 0 && (
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               Service
             </p>
             <div className="flex gap-2 flex-wrap">
@@ -240,7 +303,7 @@ function ProviderCard({
                   key={s.id}
                   onClick={() => setSelectedServiceId(s.id)}
                   className={
-                    "text-xs px-3 py-1.5 rounded-full border transition-colors " +
+                    "text-xs px-3 py-1.5 rounded-lg border transition-colors " +
                     (selectedServiceId === s.id
                       ? "bg-blue-600 text-white border-blue-600"
                       : "border-gray-200 text-gray-600 hover:border-gray-300")
@@ -254,14 +317,14 @@ function ProviderCard({
         )}
 
         <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
             Appointment type
           </p>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setSelectedApptType("virtual")}
               className={
-                "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
+                "flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs border transition-colors " +
                 (selectedApptType === "virtual"
                   ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
                   : "border-gray-200 text-gray-600")
@@ -272,7 +335,7 @@ function ProviderCard({
             <button
               onClick={() => setSelectedApptType("physical")}
               className={
-                "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs border transition-colors " +
+                "flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs border transition-colors " +
                 (selectedApptType === "physical"
                   ? "bg-green-50 border-green-300 text-green-700 font-medium"
                   : "border-gray-200 text-gray-600")
@@ -284,7 +347,7 @@ function ProviderCard({
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between mb-2.5">
             <p className="text-xs text-gray-400 uppercase tracking-wide">
               Availability
             </p>
@@ -308,99 +371,67 @@ function ProviderCard({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2.5">
             {visibleDays.map((day) => {
-              const allSlots = daySlots[day] ?? [];
-              const now = new Date();
-              const futureSlots = allSlots.filter((slot) => {
-                if (new Date(slot.start_time) <= now) return false;
-                if (
-                  selectedServiceId &&
-                  slot.service_id &&
-                  slot.service_id !== selectedServiceId
-                )
-                  return false;
-                if (
-                  slot.location_type !== "both" &&
-                  slot.location_type !== selectedApptType
-                )
-                  return false;
-                return true;
-              });
+              const futureSlots = slotsForDay(day);
               const loading = loadingDays[day];
               return (
-                <div
-                  key={day}
-                  className="border border-gray-100 rounded-lg p-2.5 text-center"
-                >
-                  <p className="text-xs font-medium text-gray-700">
-                    {dateLabel(day)}
-                  </p>
-                  {loading ? (
-                    <LucideLoader2
-                      size={14}
-                      className="animate-spin text-gray-300 mx-auto my-1.5"
-                    />
-                  ) : (
-                    <p className="text-[11px] text-gray-400 mt-1">
-                      {futureSlots.length === 0
-                        ? "No slots"
-                        : futureSlots.length + " slots"}
+                <div key={day} className="flex flex-col gap-1.5">
+                  <div className="border border-gray-100 rounded-lg p-2 text-center">
+                    <p className="text-xs font-medium text-gray-700">
+                      {dateLabel(day)}
                     </p>
+                    {loading ? (
+                      <LucideLoader2
+                        size={13}
+                        className="animate-spin text-gray-300 mx-auto my-0.5"
+                      />
+                    ) : (
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {futureSlots.length === 0
+                          ? "No slots"
+                          : futureSlots.length + " slots"}
+                      </p>
+                    )}
+                  </div>
+
+                  {!loading && futureSlots.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      {futureSlots.slice(0, 5).map((slot) => (
+                        <button
+                          key={slot.start_time}
+                          onClick={() =>
+                            onBook({
+                              provider,
+                              slot,
+                              date: day,
+                              appointmentType: selectedApptType,
+                            })
+                          }
+                          className="text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors"
+                        >
+                          {formatTime(slot.start_time)}
+                        </button>
+                      ))}
+                      {futureSlots.length > 5 && (
+                        <p className="text-[11px] text-gray-400 text-center">
+                          +{futureSlots.length - 5} more
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
 
-          {visibleDays.map((day) => {
-            const allSlots = daySlots[day] ?? [];
-            const now = new Date();
-            const futureSlots = allSlots.filter((slot) => {
-              if (new Date(slot.start_time) <= now) return false;
-              if (
-                selectedServiceId &&
-                slot.service_id &&
-                slot.service_id !== selectedServiceId
-              )
-                return false;
-              if (
-                slot.location_type !== "both" &&
-                slot.location_type !== selectedApptType
-              )
-                return false;
-              return true;
-            });
-            if (loadingDays[day] || futureSlots.length === 0) return null;
-            return (
-              <div key={day + "-slots"} className="mt-3">
-                <p className="text-xs text-gray-400 mb-1.5">{dateLabel(day)}</p>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {futureSlots.slice(0, 10).map((slot) => (
-                    <button
-                      key={slot.start_time}
-                      onClick={() =>
-                        onBook({
-                          provider,
-                          slot,
-                          date: day,
-                          appointmentType: selectedApptType,
-                        })
-                      }
-                      className="text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors"
-                    >
-                      {formatTime(slot.start_time)}
-                    </button>
-                  ))}
-                </div>
-                {futureSlots.length > 10 && (
-                  <p className="text-xs text-gray-400 text-center mt-1.5">
-                    +{futureSlots.length - 10} more
-                  </p>
-                )}
-              </div>
-            );
-          })}
+          {allVisibleDaysLoaded && !anyVisibleDayHasSlots && (
+            <p className="text-xs text-gray-400 text-center mt-3">
+              No bookable times in this range for{" "}
+              {selectedService?.name ?? "this service"} ·{" "}
+              {selectedApptType === "virtual" ? "Virtual" : "In-person"}
+            </p>
+          )}
         </div>
       </div>
     </div>

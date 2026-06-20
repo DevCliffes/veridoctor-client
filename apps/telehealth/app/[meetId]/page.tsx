@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { useAppDispatch, UseAppSelector } from "@/states/store/hooks";
 import { setHasJoined, setIsOfferer, setOffer } from "@/states/features/webrtc";
 
-// Inner component that uses useSearchParams — must be inside Suspense
 function TelehealthInner() {
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
@@ -93,17 +92,30 @@ function TelehealthInner() {
 
   // Connect to signaling server
   useEffect(() => {
+    // FIX: Register the availableOffer listener BEFORE connecting.
+    // The server emits availableOffer immediately on connection if an offer
+    // already exists in the room. If we connect first and register the listener
+    // after, the event fires before anyone is listening and the patient is
+    // stuck forever on "Waiting for the provider to start the call...".
+    if (!isOffererParam) {
+      socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
+        console.log("[telehealth] availableOffer received");
+        dispatch(setOffer(incomingOffer));
+        webRTCService.setOffererType(false);
+      });
+    }
+
+    // Connect AFTER the listener is registered
     socketService.connect(TELEHEALTH_BACKEND_URL, {
       userName: userId,
       roomName: meetId,
     });
 
-    if (!isOffererParam) {
-      socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
-        dispatch(setOffer(incomingOffer));
-        webRTCService.setOffererType(false);
-      });
-    }
+    // Cleanup on unmount
+    return () => {
+      socketService.removeAllListeners();
+      socketService.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -144,6 +156,12 @@ function TelehealthInner() {
 
     socketService.on("receiveIceCandidate", (candidate: RTCIceCandidate) => {
       webRTCService.addIceCandidate(candidate).catch(console.error);
+    });
+
+    // Handle the other peer disconnecting mid-call
+    socketService.on("peerLeft", () => {
+      toast.error("The other participant has left the call.");
+      setRemoteConnected(false);
     });
 
     return pc;
@@ -342,7 +360,6 @@ function TelehealthInner() {
   );
 }
 
-// Outer component wraps inner in Suspense (required by Next.js for useSearchParams)
 export default function TelehealthVideoPlayer() {
   return (
     <Suspense

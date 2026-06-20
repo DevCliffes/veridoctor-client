@@ -82,13 +82,28 @@ function TelehealthInner() {
     }
   }, [localStream, hasJoined]);
 
-  // Attach remote stream when it arrives
+  // Attach remote stream when it arrives.
+  //
+  // BUG FIX: this effect previously only depended on [remoteStream]. But the
+  // <video ref={remoteVideoRef}> element only exists in the DOM once the
+  // component has switched out of the pre-call lobby branch (hasJoined ===
+  // true). If the "track" event fires (and setRemoteStream runs) BEFORE
+  // hasJoined flips to true and the active-call JSX mounts, this effect ran
+  // with remoteVideoRef.current still null, did nothing, and — since
+  // remoteStream itself never changes again afterwards — never got a second
+  // chance to attach the stream once the ref became available. ICE/WebRTC
+  // were fully connected (confirmed via webrtc-internals) but the UI stayed
+  // stuck on "Waiting for the other participant..." forever.
+  //
+  // Adding hasJoined to the dependency array makes this effect re-run the
+  // moment the active-call view mounts and remoteVideoRef.current becomes
+  // non-null, even if remoteStream had already arrived earlier.
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
       setRemoteConnected(true);
     }
-  }, [remoteStream]);
+  }, [remoteStream, hasJoined]);
 
   // Connect to signaling server
   useEffect(() => {
@@ -154,12 +169,8 @@ function TelehealthInner() {
       webRTCService.addIceCandidate(candidate).catch(console.error);
     });
 
-    // ✅ NEW: ...then immediately ask the server for any candidates from
-    // the OTHER peer that were already buffered before this listener
-    // existed. Without this, candidates sent by the offerer in the gap
-    // between "offer created" and "answerer clicked Join Call" were lost
-    // forever, since the server's broadcast-on-arrival only reaches
-    // listeners that exist at that exact instant.
+    // ...then immediately ask the server for any candidates from the OTHER
+    // peer that were already buffered before this listener existed.
     socketService.emit("requestIceCandidates", { isOfferer: isOffererParam });
 
     socketService.on("peerLeft", () => {
@@ -376,4 +387,3 @@ export default function TelehealthVideoPlayer() {
     </Suspense>
   );
 }
-

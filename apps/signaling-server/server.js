@@ -1,7 +1,18 @@
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 
-const httpServer = createServer();
+const httpServer = createServer((req, res) => {
+  // Health check endpoint — keeps Render's free tier awake and lets
+  // UptimeRobot confirm the server is up via a plain HTTP GET.
+  if (req.method === "GET" && (req.url === "/health" || req.url === "/")) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", uptime: process.uptime() }));
+    return;
+  }
+  res.writeHead(404);
+  res.end();
+});
+
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
@@ -67,14 +78,6 @@ io.on("connection", (socket) => {
   });
 
   // ── ICE candidates (relay between peers, with buffering) ───────────────────
-  // ✅ FIX: candidates are now buffered per-role in the room, not just
-  // broadcast-and-forgotten. The offerer typically starts gathering and
-  // sending candidates the instant they create their offer — well before
-  // the answerer has even seen "Join Call", let alone clicked it and
-  // registered their receiveIceCandidate listener. A plain broadcast at
-  // that moment reaches nobody, and the candidate is lost forever. Buffering
-  // means whoever asks for them later (via "requestIceCandidates") gets the
-  // full backlog, not just whatever arrives after they happen to be ready.
   socket.on("icecandidate", ({ candidate, roomId, isOfferer }) => {
     const targetRoom = getRoom(roomId || roomName);
     const bucket = isOfferer ? "offerer" : "answerer";
@@ -82,11 +85,8 @@ io.on("connection", (socket) => {
     socket.to(roomId || roomName).emit("receiveIceCandidate", candidate);
   });
 
-  // ✅ NEW: a peer can explicitly ask for any candidates buffered from the
-  // OTHER role, replayed to them directly. Call this right after
-  // setupPeerConnection() registers the receiveIceCandidate listener.
+  // ── Replay buffered candidates on demand ───────────────────────────────────
   socket.on("requestIceCandidates", ({ isOfferer }) => {
-    // If I am the offerer, I want the answerer's candidates, and vice versa.
     const wantedBucket = isOfferer ? "answerer" : "offerer";
     const buffered = room.candidates[wantedBucket] || [];
     buffered.forEach((candidate) => {

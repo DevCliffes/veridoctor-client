@@ -18,8 +18,8 @@ const TELEHEALTH_URL =
 
 interface Appointment {
   id: string;
-  provider_first_name: string | null;
-  provider_last_name: string | null;
+  doctor_first_name: string | null;
+  doctor_last_name: string | null;
   start_time: string;
   end_time: string;
   appointment_type: "virtual" | "physical";
@@ -115,6 +115,8 @@ export default function Appointments() {
 
   const isJoinable = (appt: Appointment) => {
     if (appt.appointment_type !== "virtual" || !appt.meet_id) return false;
+    if (appt.status === "completed" || appt.status === "cancelled" || appt.status === "no-show")
+      return false;
     const mins = minutesUntil(appt.start_time);
     return mins > -30 && mins < 60;
   };
@@ -197,15 +199,19 @@ export default function Appointments() {
         className="text-blue-600 hover:underline font-medium text-left"
         onClick={() => router.push("/appointments/" + appt.id)}
       >
-        {appt.provider_first_name
-          ? "Dr. " + appt.provider_first_name + " " + (appt.provider_last_name ?? "")
+        {appt.doctor_first_name
+          ? "Dr. " + appt.doctor_first_name + " " + (appt.doctor_last_name ?? "")
           : "Your Provider"}
       </button>
     ),
     date: formatDateTime(appt.start_time),
     status: <StatusBadge status={appt.status} />,
     call:
-      appt.appointment_type === "virtual" ? (
+      appt.status === "completed" ||
+      appt.status === "cancelled" ||
+      appt.status === "no-show" ? (
+        <span className="text-xs text-gray-400">—</span>
+      ) : appt.appointment_type === "virtual" ? (
         isJoinable(appt) && appt.meet_id ? (
           <JoinButton meetId={appt.meet_id} patientEmail={patientEmail} />
         ) : (

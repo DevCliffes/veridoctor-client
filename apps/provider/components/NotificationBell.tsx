@@ -9,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@veridoctor/design/components";
 
-const POLL_INTERVAL_MS = 40000; // 40s — lightweight, not real-time
+// Poll every 15s so new notifications appear quickly without websockets.
+const POLL_INTERVAL_MS = 15000;
 
 interface NotificationItem {
   id: string;
@@ -45,17 +46,14 @@ export default function NotificationBell({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNotifications = useCallback(() => {
-    if (!identityId) return;
+    if (!identityId || identityId.trim() === "") return;
     axiosClient
       .get(`/notifications/?identity_id=${identityId}`)
       .then((res) => {
         setNotifications(res.data?.results ?? []);
         setUnreadCount(res.data?.unread_count ?? 0);
       })
-      .catch(() => {
-        // Silent — a failed notification fetch shouldn't surface as an
-        // app-wide error, the bell just won't update this cycle.
-      });
+      .catch(() => {});
   }, [identityId]);
 
   useEffect(() => {
@@ -66,19 +64,30 @@ export default function NotificationBell({
     };
   }, [fetchNotifications]);
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) fetchNotifications();
+  };
+
   const handleNotificationClick = (notification: NotificationItem) => {
     if (!notification.is_read) {
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notification.id ? { ...n, is_read: true } : n
+        )
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
       axiosClient
-        .patch(`/notifications/${notification.id}/read`)
-        .then(() => {
+        .patch(`/notifications/${notification.id}/read/`)
+        .catch(() => {
           setNotifications((prev) =>
             prev.map((n) =>
-              n.id === notification.id ? { ...n, is_read: true } : n
+              n.id === notification.id ? { ...n, is_read: false } : n
             )
           );
-          setUnreadCount((prev) => Math.max(0, prev - 1));
-        })
-        .catch(() => {});
+          setUnreadCount((prev) => prev + 1);
+        });
     }
     setOpen(false);
     if (notification.link) {
@@ -88,17 +97,17 @@ export default function NotificationBell({
 
   const handleMarkAllRead = () => {
     if (!identityId || unreadCount === 0) return;
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    setUnreadCount(0);
     axiosClient
-      .post("/notifications/mark-all-read", { identity_id: identityId })
-      .then(() => {
-        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-        setUnreadCount(0);
-      })
-      .catch(() => {});
+      .post("/notifications/mark-all-read/", { identity_id: identityId })
+      .catch(() => {
+        fetchNotifications();
+      });
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger className="relative flex items-center justify-center p-2 rounded-full hover:bg-black/5 cursor-pointer">
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -141,9 +150,7 @@ export default function NotificationBell({
                   <span className="mt-1.5 w-2 h-2 rounded-full bg-blue-600 shrink-0" />
                 )}
                 <div className={n.is_read ? "pl-4" : ""}>
-                  <p className="text-sm font-medium text-gray-800">
-                    {n.title}
-                  </p>
+                  <p className="text-sm font-medium text-gray-800">{n.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
                   <p className="text-[11px] text-gray-400 mt-1">
                     {timeAgo(n.created_at)}

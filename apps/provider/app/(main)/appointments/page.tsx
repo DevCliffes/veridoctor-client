@@ -44,6 +44,8 @@ type Appointment = {
   meet_id: string;
 };
 
+const DONE_STATUSES = ["completed", "cancelled", "no-show"];
+
 export default function Appointments() {
   const router = useRouter();
   const pathname = usePathname();
@@ -68,9 +70,11 @@ export default function Appointments() {
 
   const joinCall = (meetId: string) => router.push(`/calls/${meetId}`);
 
-  const isJoinEnabled = (startTime: string) => {
-    if (filter === "past" || filter === "upcoming") return false;
-    return new Date(startTime).toDateString() === new Date().toDateString();
+  // Join call is only active for today's non-terminal virtual appointments
+  const isJoinEnabled = (appt: Appointment) => {
+    if (DONE_STATUSES.includes(appt.status)) return false;
+    if (appt.appointment_type !== "virtual") return false;
+    return new Date(appt.start_time).toDateString() === new Date().toDateString();
   };
 
   const handleCancel = async (id: string) => {
@@ -104,15 +108,11 @@ export default function Appointments() {
       return;
     }
     setRescheduleSaving(true);
-    const newStart = new Date(
-      `${rescheduleDate}T${rescheduleTime}`
-    ).toISOString();
+    const newStart = new Date(`${rescheduleDate}T${rescheduleTime}`).toISOString();
     const duration =
       new Date(reschedulingAppt.end_time).getTime() -
       new Date(reschedulingAppt.start_time).getTime();
-    const newEnd = new Date(
-      new Date(newStart).getTime() + duration
-    ).toISOString();
+    const newEnd = new Date(new Date(newStart).getTime() + duration).toISOString();
 
     try {
       await axiosClient.patch(
@@ -141,6 +141,8 @@ export default function Appointments() {
       confirmed: "bg-green-100 text-green-700",
       completed: "bg-blue-100 text-blue-700",
       scheduled: "bg-yellow-100 text-yellow-700",
+      "in-progress": "bg-indigo-100 text-indigo-700",
+      "no-show": "bg-gray-100 text-gray-500",
     };
     return (
       <span
@@ -172,39 +174,41 @@ export default function Appointments() {
     ),
     date: new Date(appointment.start_time).toLocaleString("en-KE"),
     status: statusBadge(appointment.status),
-    call:
-      appointment.appointment_type === "virtual" ? (
-        <Button
-          size="sm"
-          variant="rounded"
-          onClick={() => joinCall(appointment.meet_id)}
-          disabled={!isJoinEnabled(appointment.start_time)}
+    // Completed/cancelled/no-show → dash. Virtual active → Join call. Physical → In-person.
+    call: DONE_STATUSES.includes(appointment.status) ? (
+      <span className="text-xs text-gray-400">—</span>
+    ) : appointment.appointment_type === "virtual" ? (
+      <Button
+        size="sm"
+        variant="rounded"
+        onClick={() => joinCall(appointment.meet_id)}
+        disabled={!isJoinEnabled(appointment)}
+      >
+        <LucideVideo /> Join call
+      </Button>
+    ) : (
+      <span className="text-xs text-gray-500">In-person</span>
+    ),
+    // Completed/cancelled/no-show → no actions
+    actions: DONE_STATUSES.includes(appointment.status) ? (
+      <span className="text-xs text-gray-400">—</span>
+    ) : (
+      <div className="flex gap-1">
+        <button
+          onClick={() => openReschedule(appointment)}
+          className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
         >
-          <LucideVideo /> Join call
-        </Button>
-      ) : (
-        <span className="text-xs text-gray-500">In-person</span>
-      ),
-    actions:
-      appointment.status === "cancelled" ? (
-        <span className="text-xs text-gray-400">—</span>
-      ) : (
-        <div className="flex gap-1">
-          <button
-            onClick={() => openReschedule(appointment)}
-            className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
-          >
-            Reschedule
-          </button>
-          <button
-            onClick={() => handleCancel(appointment.id)}
-            disabled={cancellingId === appointment.id}
-            className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
-            {cancellingId === appointment.id ? "..." : "Cancel"}
-          </button>
-        </div>
-      ),
+          Reschedule
+        </button>
+        <button
+          onClick={() => handleCancel(appointment.id)}
+          disabled={cancellingId === appointment.id}
+          className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {cancellingId === appointment.id ? "..." : "Cancel"}
+        </button>
+      </div>
+    ),
   }));
 
   const tableColumns: DatatableColumnHeader[] = [
@@ -232,6 +236,12 @@ export default function Appointments() {
     fetchAppointments();
   }, [fetchAppointments]);
 
+  const updateQueryParams = (name: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(name, value);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
   const filterTabs: DatatableFilterTabs = {
     tabs: [
       {
@@ -253,15 +263,8 @@ export default function Appointments() {
     defaultTab: filter,
   };
 
-  const updateQueryParams = (name: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set(name, value);
-    router.replace(`${pathname}?${params.toString()}`);
-  };
-
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
-      {/* Reschedule dialog */}
       {reschedulingAppt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm space-y-4">
@@ -331,4 +334,3 @@ export default function Appointments() {
     </div>
   );
 }
-

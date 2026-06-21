@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { useParams, useSearchParams } from "next/navigation";
 import socketService from "@/utils/socketService";
 import webRTCService from "@/utils/webRTCService";
-import { useEffect, useRef, useState, Suspense } from "react";
+import { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import {
   Video,
   VideoOff,
@@ -24,7 +24,6 @@ function TelehealthInner() {
   const { meetId } = useParams<{ meetId: string }>();
   const [audioMuted, setAudioMuted] = useState(false);
   const [videoOff, setVideoOff] = useState(false);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
@@ -37,6 +36,19 @@ function TelehealthInner() {
 
   const TELEHEALTH_BACKEND_URL =
     process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
+
+  // ── Callback ref for local PIP video ──────────────────────────────────────
+  // Using a callback ref instead of useRef guarantees the stream is attached
+  // the instant the DOM element is created — no effect timing race possible.
+  const localVideoCallbackRef = useCallback(
+    (node: HTMLVideoElement | null) => {
+      if (node && localStreamRef.current) {
+        node.srcObject = localStreamRef.current;
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasJoined] // re-run when the active-call view mounts
+  );
 
   // Initialize notification audio
   useEffect(() => {
@@ -75,39 +87,7 @@ function TelehealthInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Attach local stream after joining
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream, hasJoined]);
-
-  // Attach remote stream when it arrives.
-  //
-  // BUG FIX #2 (chicken-and-egg ref dependency):
-  // The previous fix made this effect depend on [remoteStream, hasJoined]
-  // so it re-runs once the active-call view mounts. But the JSX itself had
-  // a second, nested version of the same problem one level deeper: the
-  // <video ref={remoteVideoRef}> element was only rendered when
-  // `remoteConnected` was true — and `remoteConnected` was only ever set to
-  // true INSIDE this very effect, gated on `remoteVideoRef.current` already
-  // being non-null. Since the <video> tag didn't exist in the DOM until
-  // remoteConnected was already true, remoteVideoRef.current could never
-  // become non-null in the first place — a circular dependency that no
-  // amount of re-running the effect could break out of.
-  //
-  // WebRTC itself was fully connected the whole time (confirmed via
-  // webrtc-internals on both sides — real inbound-rtp/outbound-rtp with
-  // live codecs, stable "connected"/"completed" ICE state) but the ref
-  // attaching the stream to the actual <video> element never had anywhere
-  // to attach to.
-  //
-  // Fixed in the JSX below: the remote <video> element is now ALWAYS
-  // rendered once hasJoined is true (not conditionally on remoteConnected),
-  // so remoteVideoRef.current is reliably available the moment this effect
-  // runs. remoteConnected is now used only to control the "Waiting for
-  // other participant..." overlay shown ON TOP of the video, not whether
-  // the video element exists at all.
+  // Attach remote stream when it arrives
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -117,8 +97,6 @@ function TelehealthInner() {
 
   // Connect to signaling server
   useEffect(() => {
-    // Register the availableOffer listener BEFORE connecting, so the
-    // immediate replay from the server (if an offer already exists) isn't missed.
     if (!isOffererParam) {
       socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
         console.log("[telehealth] availableOffer received");
@@ -174,13 +152,10 @@ function TelehealthInner() {
       }
     });
 
-    // Register the listener for incoming candidates...
     socketService.on("receiveIceCandidate", (candidate: RTCIceCandidate) => {
       webRTCService.addIceCandidate(candidate).catch(console.error);
     });
 
-    // ...then immediately ask the server for any candidates from the OTHER
-    // peer that were already buffered before this listener existed.
     socketService.emit("requestIceCandidates", { isOfferer: isOffererParam });
 
     socketService.on("peerLeft", () => {
@@ -300,17 +275,10 @@ function TelehealthInner() {
 
   // ─── ACTIVE CALL ──────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      <div className="relative flex-1 bg-gray-800 flex items-center justify-center overflow-hidden">
-        {/*
-          BUG FIX: the remote <video> element is now ALWAYS rendered (as
-          soon as we're past the lobby / hasJoined is true), regardless of
-          remoteConnected. This guarantees remoteVideoRef.current is a real
-          DOM node by the time the stream-attach effect runs, breaking the
-          chicken-and-egg cycle described above. remoteConnected now only
-          controls the "Waiting..." overlay drawn ON TOP of the video via
-          absolute positioning + opacity, not whether the video tag exists.
-        */}
+    <div className="fixed inset-0 bg-gray-900 flex flex-col">
+      {/* Main video area */}
+      <div className="relative flex-1 bg-gray-800 overflow-hidden">
+        {/* Remote video — always rendered so the ref is always available */}
         <video
           ref={remoteVideoRef}
           className="w-full h-full object-cover"
@@ -318,6 +286,7 @@ function TelehealthInner() {
           playsInline
         />
 
+        {/* Waiting overlay — shown ON TOP of the video, not instead of it */}
         {!remoteConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 bg-gray-800">
             <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
@@ -327,6 +296,7 @@ function TelehealthInner() {
           </div>
         )}
 
+        {/* Local PIP — callback ref attaches stream the instant this element mounts */}
         <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-lg border border-gray-700 w-[140px] h-[100px] bg-gray-900">
           {videoOff ? (
             <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-xs">
@@ -334,7 +304,7 @@ function TelehealthInner() {
             </div>
           ) : (
             <video
-              ref={localVideoRef}
+              ref={localVideoCallbackRef}
               className="w-full h-full object-cover scale-x-[-1]"
               autoPlay
               playsInline
@@ -344,7 +314,8 @@ function TelehealthInner() {
         </div>
       </div>
 
-      <div className="h-20 bg-gray-900 flex items-center justify-center gap-6 px-6 border-t border-gray-800">
+      {/* Controls bar — fixed height, always visible */}
+      <div className="flex-shrink-0 h-20 bg-gray-900 flex items-center justify-center gap-6 px-6 border-t border-gray-800">
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={toggleAudio}

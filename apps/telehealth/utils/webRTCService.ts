@@ -80,9 +80,29 @@ class WebRTCService {
     return peerConnection;
   }
 
-  async createOffer(): Promise<RTCSessionDescriptionInit> {
+  /**
+   * Creates and sets the local offer.
+   *
+   * BUG FIX: `iceRestart` was previously hardcoded to `true` on every call,
+   * including the very first offer of a brand new connection — where there
+   * is nothing to "restart" yet. `iceRestart: true` tells the browser to
+   * treat this as a fresh ICE negotiation even if the existing session is
+   * fine, which was causing repeated, unsolicited renegotiation cycles
+   * (visible in webrtc-internals as a recurring loop of
+   * setLocalDescription(offer) -> setRemoteDescription(answer) every
+   * 20-30s, with iceConnectionState bouncing through
+   * checking -> connected -> completed repeatedly instead of settling).
+   *
+   * `iceRestart` should only be passed when this is genuinely a recovery
+   * attempt on an existing, already-negotiated connection (e.g. after a
+   * "failed" or "disconnected" state) — not on the initial call.
+   *
+   * @param isRestart - true only when re-negotiating an existing connection
+   *                    to recover from a dropped/failed ICE state.
+   */
+  async createOffer(isRestart = false): Promise<RTCSessionDescriptionInit> {
     const offerOptions: RTCOfferOptions = {
-      iceRestart: true,
+      iceRestart: isRestart,
       offerToReceiveAudio: true,
       offerToReceiveVideo: true,
     };
@@ -155,4 +175,3 @@ class WebRTCService {
 }
 
 export default new WebRTCService();
-

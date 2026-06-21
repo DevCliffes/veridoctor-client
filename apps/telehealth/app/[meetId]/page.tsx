@@ -33,13 +33,16 @@ function TelehealthInner() {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [remoteConnected, setRemoteConnected] = useState(false);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const [isPiP, setIsPiP] = useState(false);
+  const [pipSupported, setPipSupported] = useState(false);
 
   const TELEHEALTH_BACKEND_URL =
     process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
 
   // ── Callback ref for local PIP video ──────────────────────────────────────
-  // Using a callback ref instead of useRef guarantees the stream is attached
-  // the instant the DOM element is created — no effect timing race possible.
+  // Replaces the old useRef + useEffect combo. A callback ref fires the
+  // instant the DOM element is created, so the stream is attached
+  // immediately with no timing race — fixes the missing self-view bug.
   const localVideoCallbackRef = useCallback(
     (node: HTMLVideoElement | null) => {
       if (node && localStreamRef.current) {
@@ -47,8 +50,91 @@ function TelehealthInner() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasJoined] // re-run when the active-call view mounts
+    [hasJoined] // re-evaluate when the active-call view mounts
   );
+
+  // ── Check PiP browser support ─────────────────────────────────────────────
+  useEffect(() => {
+    setPipSupported(
+      typeof document !== "undefined" &&
+        "pictureInPictureEnabled" in document &&
+        (document as any).pictureInPictureEnabled === true
+    );
+  }, []);
+
+  // ── Back button guard ─────────────────────────────────────────────────────
+  // Pushes a dummy history entry so the browser back button hits this
+  // handler instead of navigating away mid-call.
+  useEffect(() => {
+    if (!hasJoined) return;
+
+    window.history.pushState({ callActive: true }, "");
+
+    const handlePopState = () => {
+      window.history.pushState({ callActive: true }, "");
+      const confirmed = window.confirm(
+        "Leaving this page will end your call. Are you sure?"
+      );
+      if (confirmed) {
+        webRTCService.peerConnection?.close();
+        socketService.disconnect();
+        window.history.go(-2);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [hasJoined]);
+
+  // ── Tab visibility / wake lock ────────────────────────────────────────────
+  // Requests a screen wake lock to prevent the browser from throttling
+  // the tab when it's backgrounded. Re-acquires on tab return.
+  useEffect(() => {
+    if (!hasJoined) return;
+
+    let wakeLock: WakeLockSentinel | null = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request("screen");
+        }
+      } catch {
+        // not available on this device — silently ignore
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+
+    requestWakeLock();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      wakeLock?.release().catch(() => {});
+    };
+  }, [hasJoined]);
+
+  // ── PiP event sync ────────────────────────────────────────────────────────
+  // Keeps isPiP in sync when the user exits PiP via ESC or the browser UI.
+  useEffect(() => {
+    const video = remoteVideoRef.current;
+    if (!video) return;
+
+    const onEnter = () => setIsPiP(true);
+    const onLeave = () => setIsPiP(false);
+
+    video.addEventListener("enterpictureinpicture", onEnter);
+    video.addEventListener("leavepictureinpicture", onLeave);
+    return () => {
+      video.removeEventListener("enterpictureinpicture", onEnter);
+      video.removeEventListener("leavepictureinpicture", onLeave);
+    };
+  }, [remoteConnected]);
 
   // Initialize notification audio
   useEffect(() => {
@@ -218,7 +304,28 @@ function TelehealthInner() {
     }
   };
 
+  // ── Picture-in-Picture toggle ─────────────────────────────────────────────
+  // Pops the remote video into a floating window that stays visible while
+  // the user switches tabs or apps — on desktop and Android Chrome.
+  const togglePiP = async () => {
+    const video = remoteVideoRef.current;
+    if (!video) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await video.requestPictureInPicture();
+      }
+    } catch (err) {
+      toast.error("Picture-in-Picture is not supported on this device.");
+      console.error("PiP error:", err);
+    }
+  };
+
   const endCall = () => {
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(() => {});
+    }
     webRTCService.peerConnection?.close();
     socketService.disconnect();
     window.close();
@@ -278,6 +385,7 @@ function TelehealthInner() {
     <div className="fixed inset-0 bg-gray-900 flex flex-col">
       {/* Main video area */}
       <div className="relative flex-1 bg-gray-800 overflow-hidden">
+
         {/* Remote video — always rendered so the ref is always available */}
         <video
           ref={remoteVideoRef}
@@ -286,7 +394,7 @@ function TelehealthInner() {
           playsInline
         />
 
-        {/* Waiting overlay — shown ON TOP of the video, not instead of it */}
+        {/* Waiting overlay — on top of video, not instead of it */}
         {!remoteConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 bg-gray-800">
             <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
@@ -296,7 +404,7 @@ function TelehealthInner() {
           </div>
         )}
 
-        {/* Local PIP — callback ref attaches stream the instant this element mounts */}
+        {/* Local self-view PIP — callback ref attaches stream the instant this mounts */}
         <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-lg border border-gray-700 w-[140px] h-[100px] bg-gray-900">
           {videoOff ? (
             <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-xs">
@@ -312,10 +420,18 @@ function TelehealthInner() {
             />
           )}
         </div>
+
+        {/* Badge shown while floating PiP window is active */}
+        {isPiP && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full">
+            Call running in floating window
+          </div>
+        )}
       </div>
 
-      {/* Controls bar — fixed height, always visible */}
+      {/* Controls bar — flex-shrink-0 ensures it is never pushed off screen */}
       <div className="flex-shrink-0 h-20 bg-gray-900 flex items-center justify-center gap-6 px-6 border-t border-gray-800">
+
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={toggleAudio}
@@ -349,6 +465,41 @@ function TelehealthInner() {
             {videoOff ? "Start" : "Stop"}
           </span>
         </div>
+
+        {/* Float button — only shown if browser supports PiP (Chrome, Edge, Safari 14+) */}
+        {pipSupported && (
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={togglePiP}
+              title={isPiP ? "Exit floating window" : "Float call in a window"}
+              className={
+                "p-3 rounded-full transition-colors " +
+                (isPiP
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-gray-700 hover:bg-gray-600 text-white")
+              }
+            >
+              {/* Inline SVG — no extra icon import needed */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <rect x="12" y="11" width="8" height="6" rx="1" />
+              </svg>
+            </button>
+            <span className="text-gray-400 text-xs">
+              {isPiP ? "Exit float" : "Float"}
+            </span>
+          </div>
+        )}
 
         <div className="flex flex-col items-center gap-1">
           <button

@@ -109,8 +109,6 @@ function getNext7Days() {
   });
 }
 
-// Shared avatar — shows the provider's photo when available,
-// falls back to initials on a colored circle otherwise.
 function ProviderAvatar({
   provider,
   size = "lg",
@@ -152,9 +150,14 @@ function ProviderAvatar({
 function ProviderCard({
   provider,
   onBook,
+  onSlotBooked,
 }: {
   provider: Provider;
   onBook: (state: BookingState) => void;
+  // Called after a successful booking with the provider id + date so this
+  // card can immediately drop the booked slot from its local cache and
+  // refetch that day — no page refresh needed.
+  onSlotBooked: (providerId: string, date: string) => void;
 }) {
   const router = useRouter();
   const days = getNext7Days();
@@ -167,22 +170,51 @@ function ProviderCard({
   const [selectedApptType, setSelectedApptType] = useState<"virtual" | "physical">("virtual");
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
 
+  const fetchDay = (day: string) => {
+    setLoadingDays((prev) => ({ ...prev, [day]: true }));
+    axiosClient
+      .get("/provider/" + provider.id + "/available-slots?date=" + day)
+      .then((res) =>
+        setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] }))
+      )
+      .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
+      .finally(() =>
+        setLoadingDays((prev) => ({ ...prev, [day]: false }))
+      );
+  };
+
   useEffect(() => {
     visibleDays.forEach((day) => {
       if (daySlots[day] !== undefined) return;
-      setLoadingDays((prev) => ({ ...prev, [day]: true }));
-      axiosClient
-        .get("/provider/" + provider.id + "/available-slots?date=" + day)
-        .then((res) =>
-          setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] }))
-        )
-        .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
-        .finally(() =>
-          setLoadingDays((prev) => ({ ...prev, [day]: false }))
-        );
+      fetchDay(day);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayOffset, provider.id]);
+
+  // Called by BookingModal (via onSlotBooked) after a confirmed booking.
+  // Drops the cached slots for that day so the card immediately refetches
+  // from the server — the booked slot disappears without a page refresh.
+  const invalidateDay = (date: string) => {
+    setDaySlots((prev) => {
+      const next = { ...prev };
+      delete next[date];
+      return next;
+    });
+    fetchDay(date);
+  };
+
+  // Expose invalidateDay upward so BookingModal can call it
+  // via the onSlotBooked callback from the parent.
+  // We pass a wrapped version that also carries the providerId.
+  const handleBookClick = (state: BookingState) => {
+    onBook({
+      ...state,
+      // Attach the invalidation callback so BookingModal can call it
+      // after a confirmed booking. We smuggle it via a field on state.
+      // (TypeScript: we extend BookingState below with an optional field)
+      _invalidate: () => invalidateDay(state.date),
+    } as BookingState & { _invalidate: () => void });
+  };
 
   const selectedService =
     provider.services.find((s) => s.id === selectedServiceId) ??
@@ -231,7 +263,6 @@ function ProviderCard({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[280px_minmax(0,1fr)]">
-      {/* Left rail — identity, selected service price, contact summary */}
       <div className="p-6 md:border-r border-gray-100 flex flex-col gap-4">
         <div className="flex flex-col items-center text-center gap-2.5">
           <ProviderAvatar provider={provider} size="lg" />
@@ -290,7 +321,6 @@ function ProviderCard({
         </button>
       </div>
 
-      {/* Right side — booking */}
       <div className="p-6 flex flex-col gap-4">
         {provider.services.length > 0 && (
           <div>
@@ -401,7 +431,7 @@ function ProviderCard({
                         <button
                           key={slot.start_time}
                           onClick={() =>
-                            onBook({
+                            handleBookClick({
                               provider,
                               slot,
                               date: day,
@@ -447,7 +477,7 @@ function BookingModal({
   onClose,
   onConfirmed,
 }: {
-  booking: BookingState;
+  booking: BookingState & { _invalidate?: () => void };
   patientEmail: string;
   patientFirst: string;
   patientLast: string;
@@ -486,6 +516,9 @@ function BookingModal({
           status: "scheduled",
         }
       );
+      // Immediately drop the booked slot from the card's cache so the
+      // UI updates without a page refresh.
+      booking._invalidate?.();
       onConfirmed();
     } catch (err: any) {
       const backendError = err?.response?.data?.error;
@@ -603,7 +636,7 @@ export default function BookPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [booking, setBooking] = useState<BookingState | null>(null);
+  const [booking, setBooking] = useState<(BookingState & { _invalidate?: () => void }) | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -652,7 +685,7 @@ export default function BookPage() {
     ...new Set(providers.map((p) => p.speciality).filter(Boolean)),
   ];
 
-  const handleBookClick = (state: BookingState) => {
+  const handleBookClick = (state: BookingState & { _invalidate?: () => void }) => {
     if (profileLoading) {
       setToast({
         message: "Still loading your profile, please wait a moment...",
@@ -741,7 +774,12 @@ export default function BookPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((p) => (
-            <ProviderCard key={p.id} provider={p} onBook={handleBookClick} />
+            <ProviderCard
+              key={p.id}
+              provider={p}
+              onBook={handleBookClick}
+              onSlotBooked={() => {}}
+            />
           ))}
         </div>
       )}

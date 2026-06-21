@@ -12,7 +12,7 @@ type Service = {
   description: string;
   estimated_duration: number;
   currency: string;
-  price: string;
+  price: string | null;
   price_visible: boolean;
 };
 
@@ -62,12 +62,16 @@ export default function Services() {
     setPriceVisible(true);
   };
 
+  // Send null when price is empty so the backend stores it as NULL,
+  // not as an empty string (which would fail DecimalField validation).
+  const pricePayload = (raw: string) => (raw.trim() === "" ? null : raw);
+
   const handleSave = () => {
     axiosClient
       .post(`provider/${userId}/services`, {
         name,
         estimated_duration: duration,
-        price,
+        price: pricePayload(price),
         currency,
         description,
         price_visible: priceVisible,
@@ -88,7 +92,7 @@ export default function Services() {
       .patch(`provider/${userId}/services/${editingService.id}`, {
         name,
         estimated_duration: duration,
-        price,
+        price: pricePayload(price),
         currency,
         description,
         price_visible: priceVisible,
@@ -120,12 +124,23 @@ export default function Services() {
     setEditingService(service);
     setName(service.name);
     setDuration(String(service.estimated_duration));
-    setPrice(service.price);
+    setPrice(service.price ?? "");
     setCurrency(service.currency);
     setDescription(service.description);
     setPriceVisible(service.price_visible ?? true);
     setShowEditModal(true);
     setOpenMenuId(null);
+  };
+
+  // How to display a service's price on the card
+  const displayPrice = (service: Service) => {
+    if (!service.price || service.price === "0.00") {
+      return <span className="text-gray-400 italic">Price negotiable</span>;
+    }
+    if (!service.price_visible) {
+      return <span className="text-gray-400 italic">Price hidden</span>;
+    }
+    return `${service.currency} ${service.price}`;
   };
 
   const PriceVisibilityField = ({
@@ -207,10 +222,18 @@ export default function Services() {
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="text-sm font-medium">Price</label>
+                  <label className="text-sm font-medium">
+                    Price{" "}
+                    <span className="text-gray-400 font-normal text-xs">
+                      (optional — leave blank if negotiable)
+                    </span>
+                  </label>
                   <input
-                    defaultValue={editingService.price}
+                    defaultValue={editingService.price ?? ""}
                     onChange={(e) => setPrice(e.target.value)}
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 1500"
                     className="w-full p-2 border border-gray-300 rounded mt-1"
                   />
                 </div>
@@ -290,9 +313,17 @@ export default function Services() {
             </div>
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="text-sm font-medium">Price</label>
+                <label className="text-sm font-medium">
+                  Price{" "}
+                  <span className="text-gray-400 font-normal text-xs">
+                    (optional — leave blank if negotiable)
+                  </span>
+                </label>
                 <input
                   onChange={(e) => setPrice(e.target.value)}
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 1500"
                   className="w-full p-2 border border-gray-300 rounded mt-1"
                 />
               </div>
@@ -323,7 +354,9 @@ export default function Services() {
       {/* Service cards */}
       {services.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-sm">No services yet. Add your first service above.</p>
+          <p className="text-sm">
+            No services yet. Add your first service above.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -370,17 +403,16 @@ export default function Services() {
 
               <h3 className="font-bold pr-8">{service.name}</h3>
               {service.description && (
-                <p className="text-sm text-gray-600 mt-1">{service.description}</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {service.description}
+                </p>
               )}
               <p className="text-sm mt-2 text-gray-500">
                 {service.estimated_duration} mins
               </p>
               <div className="flex items-center justify-between mt-1">
                 <p className="text-sm font-medium text-gray-700">
-                  {service.currency}{" "}
-                  {service.price_visible
-                    ? service.price
-                    : <span className="text-gray-400 italic">Price hidden</span>}
+                  {displayPrice(service)}
                 </p>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${

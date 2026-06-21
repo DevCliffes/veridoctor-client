@@ -84,20 +84,30 @@ function TelehealthInner() {
 
   // Attach remote stream when it arrives.
   //
-  // BUG FIX: this effect previously only depended on [remoteStream]. But the
-  // <video ref={remoteVideoRef}> element only exists in the DOM once the
-  // component has switched out of the pre-call lobby branch (hasJoined ===
-  // true). If the "track" event fires (and setRemoteStream runs) BEFORE
-  // hasJoined flips to true and the active-call JSX mounts, this effect ran
-  // with remoteVideoRef.current still null, did nothing, and — since
-  // remoteStream itself never changes again afterwards — never got a second
-  // chance to attach the stream once the ref became available. ICE/WebRTC
-  // were fully connected (confirmed via webrtc-internals) but the UI stayed
-  // stuck on "Waiting for the other participant..." forever.
+  // BUG FIX #2 (chicken-and-egg ref dependency):
+  // The previous fix made this effect depend on [remoteStream, hasJoined]
+  // so it re-runs once the active-call view mounts. But the JSX itself had
+  // a second, nested version of the same problem one level deeper: the
+  // <video ref={remoteVideoRef}> element was only rendered when
+  // `remoteConnected` was true — and `remoteConnected` was only ever set to
+  // true INSIDE this very effect, gated on `remoteVideoRef.current` already
+  // being non-null. Since the <video> tag didn't exist in the DOM until
+  // remoteConnected was already true, remoteVideoRef.current could never
+  // become non-null in the first place — a circular dependency that no
+  // amount of re-running the effect could break out of.
   //
-  // Adding hasJoined to the dependency array makes this effect re-run the
-  // moment the active-call view mounts and remoteVideoRef.current becomes
-  // non-null, even if remoteStream had already arrived earlier.
+  // WebRTC itself was fully connected the whole time (confirmed via
+  // webrtc-internals on both sides — real inbound-rtp/outbound-rtp with
+  // live codecs, stable "connected"/"completed" ICE state) but the ref
+  // attaching the stream to the actual <video> element never had anywhere
+  // to attach to.
+  //
+  // Fixed in the JSX below: the remote <video> element is now ALWAYS
+  // rendered once hasJoined is true (not conditionally on remoteConnected),
+  // so remoteVideoRef.current is reliably available the moment this effect
+  // runs. remoteConnected is now used only to control the "Waiting for
+  // other participant..." overlay shown ON TOP of the video, not whether
+  // the video element exists at all.
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -292,15 +302,24 @@ function TelehealthInner() {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <div className="relative flex-1 bg-gray-800 flex items-center justify-center overflow-hidden">
-        {remoteConnected ? (
-          <video
-            ref={remoteVideoRef}
-            className="w-full h-full object-cover"
-            autoPlay
-            playsInline
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-3 text-gray-400">
+        {/*
+          BUG FIX: the remote <video> element is now ALWAYS rendered (as
+          soon as we're past the lobby / hasJoined is true), regardless of
+          remoteConnected. This guarantees remoteVideoRef.current is a real
+          DOM node by the time the stream-attach effect runs, breaking the
+          chicken-and-egg cycle described above. remoteConnected now only
+          controls the "Waiting..." overlay drawn ON TOP of the video via
+          absolute positioning + opacity, not whether the video tag exists.
+        */}
+        <video
+          ref={remoteVideoRef}
+          className="w-full h-full object-cover"
+          autoPlay
+          playsInline
+        />
+
+        {!remoteConnected && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 bg-gray-800">
             <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
               ?
             </div>
@@ -387,4 +406,3 @@ export default function TelehealthVideoPlayer() {
     </Suspense>
   );
 }
-

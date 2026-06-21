@@ -15,6 +15,19 @@ import { toast } from "sonner";
 import { useAppDispatch, UseAppSelector } from "@/states/store/hooks";
 import { setHasJoined, setIsOfferer, setOffer } from "@/states/features/webrtc";
 
+// Minimal typed extensions for browser APIs not yet fully covered by the
+// default DOM lib types — avoids `any` while still being safe regardless
+// of TS lib version.
+interface DocumentWithPiP extends Document {
+  pictureInPictureEnabled: boolean;
+}
+
+interface NavigatorWithWakeLock extends Navigator {
+  wakeLock: {
+    request: (type: "screen") => Promise<WakeLockSentinel>;
+  };
+}
+
 function TelehealthInner() {
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
@@ -29,7 +42,6 @@ function TelehealthInner() {
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const { hasJoined, offer } = UseAppSelector((state) => state.webrtc);
   const [localMediaAvailable, setLocalMediaAvailable] = useState(false);
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [remoteConnected, setRemoteConnected] = useState(false);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -58,7 +70,7 @@ function TelehealthInner() {
     setPipSupported(
       typeof document !== "undefined" &&
         "pictureInPictureEnabled" in document &&
-        (document as any).pictureInPictureEnabled === true
+        (document as DocumentWithPiP).pictureInPictureEnabled === true
     );
   }, []);
 
@@ -97,7 +109,9 @@ function TelehealthInner() {
     const requestWakeLock = async () => {
       try {
         if ("wakeLock" in navigator) {
-          wakeLock = await (navigator as any).wakeLock.request("screen");
+          wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request(
+            "screen"
+          );
         }
       } catch {
         // not available on this device — silently ignore
@@ -168,7 +182,6 @@ function TelehealthInner() {
       }
       localStreamRef.current = stream;
       setLocalMediaAvailable(true);
-      setLocalStream(stream);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

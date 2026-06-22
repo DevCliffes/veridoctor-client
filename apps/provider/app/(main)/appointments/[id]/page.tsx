@@ -22,6 +22,7 @@ import {
   LucideLock,
   LucideLoader2,
   LucideStethoscope,
+  LucideShield,
 } from "@veridoctor/design/icons";
 
 type Appointment = {
@@ -90,6 +91,7 @@ type PatientSummary = {
     gender: string;
     date_of_birth: string | null;
     blood_type: string | null;
+    insurances?: string[];
   };
   consultation_active: boolean;
   stats: {
@@ -101,6 +103,7 @@ type PatientSummary = {
   always_visible: {
     allergies: string[];
     active_medications_count: number;
+    insurances?: string[];
   };
   record_categories: RecordCategory[];
   access_granted: { id: string; requested_category: string; status: string }[];
@@ -136,11 +139,7 @@ function timeAgo(isoDate: string) {
 }
 
 function formatDOB(iso: string) {
-  return new Date(iso).toLocaleDateString("en-KE", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return new Date(iso).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function buildLabelMap(
@@ -171,15 +170,9 @@ function renderValue(val: unknown): string {
   return String(val);
 }
 
-// ✅ Builds the external telehealth app URL for the provider (always the offerer)
 function buildTelehealthUrl(meetId: string, userId: string | null) {
-  const base =
-    process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
-    "https://veridoctor-client-telehealth.vercel.app";
-  const params = new URLSearchParams({
-    userId: userId ?? "provider",
-    isOfferer: "true",
-  });
+  const base = process.env.NEXT_PUBLIC_TELEHEALTH_URL || "https://veridoctor-client-telehealth.vercel.app";
+  const params = new URLSearchParams({ userId: userId ?? "provider", isOfferer: "true" });
   return `${base}/${meetId}?${params.toString()}`;
 }
 
@@ -193,6 +186,7 @@ export default function AppointmentDetailPage() {
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"details" | "records">("details");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [patientInsurances, setPatientInsurances] = useState<string[]>([]);
 
   useEffect(() => {
     if (!userId || !id) return;
@@ -204,32 +198,29 @@ export default function AppointmentDetailPage() {
         setAppointment(apptRes.data);
         setForms(formsRes.data ?? []);
         if (formsRes.data?.length > 0) setSelectedFormId(formsRes.data[0].id);
+        // Fetch patient insurances if patient identity is linked
+        if (apptRes.data?.patient_identity) {
+          axiosClient
+            .get(`provider/${userId}/patients/${apptRes.data.patient_identity}`)
+            .then((r) => setPatientInsurances(r.data?.insurances ?? []))
+            .catch(() => {});
+        }
       })
       .catch(() => toast.error("Could not load appointment"))
       .finally(() => setLoading(false));
   }, [userId, id]);
 
   const handleStartCapture = () => {
-    if (!selectedFormId) {
-      toast.error("Please select a form first");
-      return;
-    }
+    if (!selectedFormId) { toast.error("Please select a form first"); return; }
     router.push(`/appointments/${id}/capture?form=${selectedFormId}`);
   };
 
   const handleStatusChange = async (newStatus: string) => {
     if (!appointment || newStatus === appointment.status) return;
-    if (
-      !confirm(
-        `Mark this appointment as "${STATUS_OPTIONS.find((s) => s.value === newStatus)?.label}"?`
-      )
-    )
-      return;
+    if (!confirm(`Mark this appointment as "${STATUS_OPTIONS.find((s) => s.value === newStatus)?.label}"?`)) return;
     setUpdatingStatus(true);
     try {
-      await axiosClient.patch(`provider/${userId}/appointments/${id}`, {
-        status: newStatus,
-      });
+      await axiosClient.patch(`provider/${userId}/appointments/${id}`, { status: newStatus });
       toast.success("Status updated");
       setAppointment((prev) => (prev ? { ...prev, status: newStatus } : prev));
     } catch {
@@ -239,16 +230,13 @@ export default function AppointmentDetailPage() {
     }
   };
 
-  // ✅ Join call now redirects externally to the standalone telehealth app
   const handleJoinCall = () => {
     if (!appointment?.meet_id) return;
-    const url = buildTelehealthUrl(appointment.meet_id, String(userId ?? ""));
-    window.location.href = url;
+    window.location.href = buildTelehealthUrl(appointment.meet_id, String(userId ?? ""));
   };
 
   const draftKey = `vd_capture_${id}`;
-  const hasDraft =
-    typeof window !== "undefined" && !!localStorage.getItem(draftKey);
+  const hasDraft = typeof window !== "undefined" && !!localStorage.getItem(draftKey);
 
   if (loading) {
     return (
@@ -263,12 +251,7 @@ export default function AppointmentDetailPage() {
     return (
       <div className="p-6 mx-4">
         <p className="text-gray-500">Appointment not found.</p>
-        <button
-          onClick={() => router.push("/appointments")}
-          className="mt-4 text-blue-600 text-sm hover:underline"
-        >
-          ← Back to appointments
-        </button>
+        <button onClick={() => router.push("/appointments")} className="mt-4 text-blue-600 text-sm hover:underline">← Back to appointments</button>
       </div>
     );
   }
@@ -279,21 +262,12 @@ export default function AppointmentDetailPage() {
   const isToday = startTime.toDateString() === now.toDateString();
   const isPast = endTime < now;
   const isFuture = startTime > now;
-  const isTerminal = ["cancelled", "completed", "no-show"].includes(
-    appointment.status
-  );
-
-  const canJoinCall =
-    appointment.appointment_type === "virtual" &&
-    appointment.meet_id &&
-    isToday;
+  const isTerminal = ["cancelled", "completed", "no-show"].includes(appointment.status);
+  const canJoinCall = appointment.appointment_type === "virtual" && appointment.meet_id && isToday;
 
   return (
     <div className="p-4 mx-4 space-y-4 max-w-3xl">
-      <button
-        onClick={() => router.push("/appointments")}
-        className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
-      >
+      <button onClick={() => router.push("/appointments")} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
         ← Back to appointments
       </button>
 
@@ -302,28 +276,27 @@ export default function AppointmentDetailPage() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold shrink-0">
-              {appointment.patient_first_name?.[0]}
-              {appointment.patient_last_name?.[0]}
+              {appointment.patient_first_name?.[0]}{appointment.patient_last_name?.[0]}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">
-                {appointment.patient_first_name} {appointment.patient_last_name}
-              </h1>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${
-                  STATUS_STYLES[appointment.status] ?? "bg-gray-100 text-gray-600"
-                }`}
-              >
+              <h1 className="text-xl font-bold text-gray-800">{appointment.patient_first_name} {appointment.patient_last_name}</h1>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${STATUS_STYLES[appointment.status] ?? "bg-gray-100 text-gray-600"}`}>
                 {appointment.status}
               </span>
+              {patientInsurances.length > 0 && (
+                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                  <LucideShield size={11} className="text-blue-500 shrink-0" />
+                  {patientInsurances.map((ins) => (
+                    <span key={ins} className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">{ins}</span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex flex-col items-end gap-2">
             {hasDraft && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
-                📝 Draft saved — click to resume
-              </span>
+              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">📝 Draft saved — click to resume</span>
             )}
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <div className="relative">
@@ -332,20 +305,12 @@ export default function AppointmentDetailPage() {
                   onChange={(e) => setSelectedFormId(e.target.value)}
                   className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer"
                 >
-                  {forms.length === 0 ? (
-                    <option value="">No forms available</option>
-                  ) : (
-                    forms.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))
-                  )}
+                  {forms.length === 0
+                    ? <option value="">No forms available</option>
+                    : forms.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)
+                  }
                 </select>
-                <LucideChevronDown
-                  size={14}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                />
+                <LucideChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
               <button
                 onClick={handleStartCapture}
@@ -357,12 +322,7 @@ export default function AppointmentDetailPage() {
               </button>
             </div>
             {forms.length === 0 && (
-              <button
-                onClick={() => router.push("/forms/new")}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                Create a form first →
-              </button>
+              <button onClick={() => router.push("/forms/new")} className="text-xs text-blue-600 hover:underline">Create a form first →</button>
             )}
           </div>
         </div>
@@ -372,21 +332,13 @@ export default function AppointmentDetailPage() {
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab("details")}
-          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${
-            activeTab === "details"
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === "details" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
         >
           Details
         </button>
         <button
           onClick={() => setActiveTab("records")}
-          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${
-            activeTab === "records"
-              ? "bg-white text-gray-800 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === "records" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
         >
           Patient Records
         </button>
@@ -402,19 +354,13 @@ export default function AppointmentDetailPage() {
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wide">Date</p>
                   <p className="text-sm text-gray-700 font-medium">
-                    {startTime.toLocaleDateString("en-KE", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {startTime.toLocaleDateString("en-KE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                   </p>
                   {isToday && <span className="text-xs text-green-600 font-medium">Today</span>}
                   {isFuture && !isToday && <span className="text-xs text-blue-500 font-medium">Upcoming</span>}
                   {isPast && !isToday && <span className="text-xs text-gray-400 font-medium">Past</span>}
                 </div>
               </div>
-
               <div className="flex items-start gap-3">
                 <LucideCalendarCheck size={16} className="text-blue-500 mt-0.5 shrink-0" />
                 <div>
@@ -426,41 +372,25 @@ export default function AppointmentDetailPage() {
                   </p>
                 </div>
               </div>
-
               <div className="flex items-start gap-3">
-                {appointment.appointment_type === "virtual" ? (
-                  <LucideVideo size={16} className="text-indigo-500 mt-0.5 shrink-0" />
-                ) : (
-                  <LucideMapPin size={16} className="text-green-500 mt-0.5 shrink-0" />
-                )}
+                {appointment.appointment_type === "virtual"
+                  ? <LucideVideo size={16} className="text-indigo-500 mt-0.5 shrink-0" />
+                  : <LucideMapPin size={16} className="text-green-500 mt-0.5 shrink-0" />
+                }
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wide">Type</p>
-                  <p className="text-sm text-gray-700 font-medium capitalize">
-                    {appointment.appointment_type}
-                  </p>
+                  <p className="text-sm text-gray-700 font-medium capitalize">{appointment.appointment_type}</p>
                 </div>
               </div>
-
               {appointment.appointment_type === "virtual" && appointment.meet_id && (
                 <div className="flex items-start gap-3">
-                  <LucideVideo
-                    size={16}
-                    className={canJoinCall ? "text-indigo-500 mt-0.5 shrink-0" : "text-gray-300 mt-0.5 shrink-0"}
-                  />
+                  <LucideVideo size={16} className={canJoinCall ? "text-indigo-500 mt-0.5 shrink-0" : "text-gray-300 mt-0.5 shrink-0"} />
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wide">Call</p>
-                    {canJoinCall ? (
-                      <button
-                        onClick={handleJoinCall}
-                        className="text-sm text-blue-600 hover:underline font-medium"
-                      >
-                        Join video call →
-                      </button>
-                    ) : (
-                      <p className="text-sm text-gray-400 font-medium">
-                        {isFuture ? "Available on the day" : "Call has ended"}
-                      </p>
-                    )}
+                    {canJoinCall
+                      ? <button onClick={handleJoinCall} className="text-sm text-blue-600 hover:underline font-medium">Join video call →</button>
+                      : <p className="text-sm text-gray-400 font-medium">{isFuture ? "Available on the day" : "Call has ended"}</p>
+                    }
                   </div>
                 </div>
               )}
@@ -471,28 +401,18 @@ export default function AppointmentDetailPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <h2 className="font-semibold text-gray-700 mb-3">Update Status</h2>
               <div className="flex flex-wrap gap-2">
-                {STATUS_OPTIONS.filter(
-                  (s) =>
-                    s.value !== appointment.status &&
-                    s.value !== "scheduled" &&
-                    s.value !== "confirmed"
-                ).map((s) => (
+                {STATUS_OPTIONS.filter((s) => s.value !== appointment.status && s.value !== "scheduled" && s.value !== "confirmed").map((s) => (
                   <button
                     key={s.value}
                     onClick={() => handleStatusChange(s.value)}
                     disabled={updatingStatus}
                     className={`text-sm px-4 py-2 rounded-lg border font-medium transition-colors disabled:opacity-50 ${
-                      s.value === "completed"
-                        ? "border-green-200 text-green-700 hover:bg-green-50"
-                        : s.value === "no-show"
-                        ? "border-orange-200 text-orange-700 hover:bg-orange-50"
-                        : s.value === "rescheduled"
-                        ? "border-purple-200 text-purple-700 hover:bg-purple-50"
-                        : s.value === "cancelled"
-                        ? "border-red-200 text-red-600 hover:bg-red-50"
-                        : s.value === "in-progress"
-                        ? "border-blue-200 text-blue-700 hover:bg-blue-50"
-                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      s.value === "completed" ? "border-green-200 text-green-700 hover:bg-green-50"
+                      : s.value === "no-show" ? "border-orange-200 text-orange-700 hover:bg-orange-50"
+                      : s.value === "rescheduled" ? "border-purple-200 text-purple-700 hover:bg-purple-50"
+                      : s.value === "cancelled" ? "border-red-200 text-red-600 hover:bg-red-50"
+                      : s.value === "in-progress" ? "border-blue-200 text-blue-700 hover:bg-blue-50"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
                     }`}
                   >
                     {updatingStatus ? "Updating…" : s.label}
@@ -523,25 +443,13 @@ export default function AppointmentDetailPage() {
       )}
 
       {activeTab === "records" && (
-        <PatientRecordPanel
-          appointmentId={id}
-          userId={String(userId ?? "")}
-        />
+        <PatientRecordPanel appointmentId={id} userId={String(userId ?? "")} />
       )}
     </div>
   );
 }
 
-// ─── Captures for this specific appointment ───────────────────────────────────
-function PastCaptures({
-  appointmentId,
-  userId,
-  router,
-}: {
-  appointmentId: string;
-  userId: string | null;
-  router: ReturnType<typeof useRouter>;
-}) {
+function PastCaptures({ appointmentId, userId, router }: { appointmentId: string; userId: string | null; router: ReturnType<typeof useRouter> }) {
   const [captures, setCaptures] = useState<Capture[]>([]);
 
   useEffect(() => {
@@ -559,25 +467,15 @@ function PastCaptures({
       <h2 className="font-semibold text-gray-700">Captures for this appointment</h2>
       <div className="space-y-2">
         {captures.map((c) => (
-          <div
-            key={c.id}
-            className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
-          >
+          <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
             <div className="flex items-center gap-3">
               <LucideFileText size={15} className="text-blue-400 shrink-0" />
               <div>
                 <p className="text-sm font-medium text-gray-700">{c.form_name}</p>
-                <p className="text-xs text-gray-400">
-                  {new Date(c.created_at).toLocaleString("en-KE")}
-                </p>
+                <p className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString("en-KE")}</p>
               </div>
             </div>
-            <button
-              onClick={() => router.push(`/appointments/${appointmentId}/capture/${c.id}`)}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              View →
-            </button>
+            <button onClick={() => router.push(`/appointments/${appointmentId}/capture/${c.id}`)} className="text-xs text-blue-600 hover:underline">View →</button>
           </div>
         ))}
       </div>
@@ -585,28 +483,20 @@ function PastCaptures({
   );
 }
 
-// ─── Own record card (expandable) ────────────────────────────────────────────
 function OwnRecordCard({ record }: { record: OwnRecord }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <button
-        onClick={() => setExpanded((e) => !e)}
-        className="w-full text-left px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors"
-      >
+      <button onClick={() => setExpanded((e) => !e)} className="w-full text-left px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors">
         <div className="flex gap-3 items-start flex-1 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
             <LucideStethoscope size={14} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-800">
-                {record.service_name ?? "Consultation"}
-              </p>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium capitalize">
-                {record.appointment_type}
-              </span>
+              <p className="text-sm font-semibold text-gray-800">{record.service_name ?? "Consultation"}</p>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium capitalize">{record.appointment_type}</span>
               {record.has_clinical_notes && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
                   {record.captures?.length} capture{(record.captures?.length ?? 0) > 1 ? "s" : ""}
@@ -614,32 +504,15 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
               )}
             </div>
             <p className="text-xs text-gray-400 mt-0.5">
-              {new Date(record.date).toLocaleDateString("en-KE", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
+              {new Date(record.date).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
               {" · "}
-              <span
-                className={`font-medium ${
-                  record.status === "completed"
-                    ? "text-gray-500"
-                    : record.status === "in-progress"
-                    ? "text-blue-600"
-                    : "text-gray-400"
-                }`}
-              >
+              <span className={`font-medium ${record.status === "completed" ? "text-gray-500" : record.status === "in-progress" ? "text-blue-600" : "text-gray-400"}`}>
                 {record.status}
               </span>
             </p>
           </div>
         </div>
-        {record.has_clinical_notes &&
-          (expanded ? (
-            <LucideChevronUp size={15} className="text-gray-400 shrink-0 mt-1" />
-          ) : (
-            <LucideChevronDown size={15} className="text-gray-400 shrink-0 mt-1" />
-          ))}
+        {record.has_clinical_notes && (expanded ? <LucideChevronUp size={15} className="text-gray-400 shrink-0 mt-1" /> : <LucideChevronDown size={15} className="text-gray-400 shrink-0 mt-1" />)}
       </button>
 
       {expanded && record.captures && record.captures.length > 0 && (
@@ -648,20 +521,14 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
             const labelMap = buildLabelMap(cap.form_snapshot ?? []);
             return (
               <div key={i}>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  {cap.form_name || "Clinical Notes"}
-                </p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{cap.form_name || "Clinical Notes"}</p>
                 <div className="space-y-2">
                   {Object.entries(cap.values).map(([key, val]) => {
                     const label = labelMap[key] ?? key.replace(/_/g, " ");
                     return (
                       <div key={key} className="flex gap-2 text-sm">
-                        <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">
-                          {label}
-                        </span>
-                        <span className="text-gray-800 font-medium">
-                          {renderValue(val)}
-                        </span>
+                        <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">{label}</span>
+                        <span className="text-gray-800 font-medium">{renderValue(val)}</span>
                       </div>
                     );
                   })}
@@ -675,14 +542,7 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
   );
 }
 
-// ─── Patient Record Panel (Medical Records tab) ───────────────────────────────
-function PatientRecordPanel({
-  appointmentId,
-  userId,
-}: {
-  appointmentId: string;
-  userId: string;
-}) {
+function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; userId: string }) {
   const [summary, setSummary] = useState<PatientSummary | null>(null);
   const [ownRecords, setOwnRecords] = useState<OwnRecord[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(true);
@@ -701,24 +561,15 @@ function PatientRecordPanel({
     if (!summary?.patient?.identity_id) return;
     axiosClient
       .get(`/records/patient/${summary.patient.identity_id}/timeline?type=consultation`)
-      .then((res) => {
-        const all: OwnRecord[] = res.data.records ?? [];
-        setOwnRecords(all);
-      })
+      .then((res) => setOwnRecords(res.data.records ?? []))
       .catch(() => {})
       .finally(() => setLoadingOwn(false));
   };
 
+  useEffect(() => { fetchSummary(); }, [appointmentId]);
   useEffect(() => {
-    fetchSummary();
-  }, [appointmentId]);
-
-  useEffect(() => {
-    if (summary?.patient?.identity_id) {
-      fetchOwnRecords();
-    } else if (!loadingSummary) {
-      setLoadingOwn(false);
-    }
+    if (summary?.patient?.identity_id) fetchOwnRecords();
+    else if (!loadingSummary) setLoadingOwn(false);
   }, [summary?.patient?.identity_id, loadingSummary]);
 
   const handleRequest = async (category: string) => {
@@ -729,7 +580,7 @@ function PatientRecordPanel({
         requested_category: category,
         provider_identity_id: userId,
       });
-      toast.success(`Access request sent to patient for ${category}`);
+      toast.success(`Access request sent for ${category}`);
       fetchSummary();
     } catch {
       toast.error("Could not send access request");
@@ -739,30 +590,32 @@ function PatientRecordPanel({
   };
 
   if (loadingSummary) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <LucideLoader2 size={24} className="animate-spin text-blue-400" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-16"><LucideLoader2 size={24} className="animate-spin text-blue-400" /></div>;
   }
 
   if (!summary) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
         <LucideHistory size={28} className="text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-400">
-          No patient identity linked to this appointment. Records are only
-          available for patients with a Veridoctor account.
-        </p>
+        <p className="text-sm text-gray-400">No patient identity linked to this appointment. Records are only available for patients with a Veridoctor account.</p>
       </div>
     );
   }
 
   const { patient, stats, always_visible, record_categories, access_granted } = summary;
+  const patientInsurances = always_visible.insurances ?? patient.insurances ?? [];
   const dobFormatted = patient.date_of_birth ? formatDOB(patient.date_of_birth) : null;
 
   return (
     <div className="space-y-3">
+      {/* ── DISCLAIMER FIRST — most visible position ─────────────────────────── */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+        <LucideShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-800">
+          You are viewing limited patient information. Full records from other providers require patient consent. Requests expire when this consultation ends.
+        </p>
+      </div>
+
       {/* Patient header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -771,9 +624,7 @@ function PatientRecordPanel({
               {patient.first_name[0]}{patient.last_name[0]}
             </div>
             <div>
-              <p className="font-bold text-gray-800 text-base">
-                {patient.first_name} {patient.last_name}
-              </p>
+              <p className="font-bold text-gray-800 text-base">{patient.first_name} {patient.last_name}</p>
               <p className="text-xs text-gray-400 mt-0.5">
                 {patient.uid && <span>ID · {patient.uid}</span>}
                 {dobFormatted && <span> · DOB: {dobFormatted}</span>}
@@ -784,29 +635,15 @@ function PatientRecordPanel({
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <span className="text-xs px-2.5 py-1 rounded-full border border-green-200 text-green-700 font-medium">
-              ✓ Active patient
-            </span>
+            <span className="text-xs px-2.5 py-1 rounded-full border border-green-200 text-green-700 font-medium">✓ Active patient</span>
             {summary.consultation_active && (
-              <span className="text-xs px-2.5 py-1 rounded-full border border-blue-200 text-blue-700 font-medium">
-                ⏱ Consultation active
-              </span>
+              <span className="text-xs px-2.5 py-1 rounded-full border border-blue-200 text-blue-700 font-medium">⏱ Consultation active</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Consent banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
-        <LucideShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-800">
-          You are viewing limited patient information. Full records from other
-          providers require patient consent. Requests expire when this
-          consultation ends.
-        </p>
-      </div>
-
-      {/* Stats row */}
+      {/* Stats */}
       <div className="grid grid-cols-4 gap-2">
         {[
           { label: "Total records", value: stats.total_records },
@@ -814,10 +651,7 @@ function PatientRecordPanel({
           { label: "Active meds", value: stats.active_medications },
           { label: "Prior facilities", value: stats.prior_facilities },
         ].map((stat) => (
-          <div
-            key={stat.label}
-            className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 text-center"
-          >
+          <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 text-center">
             <p className="text-lg font-bold text-gray-800">{stat.value}</p>
             <p className="text-xs text-gray-400 mt-0.5">{stat.label}</p>
           </div>
@@ -826,9 +660,8 @@ function PatientRecordPanel({
 
       {/* Always visible */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-          Always visible
-        </p>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Always visible</p>
+
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
@@ -837,16 +670,13 @@ function PatientRecordPanel({
             <div>
               <p className="text-sm font-semibold text-gray-800">Allergies</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                {always_visible.allergies.length > 0
-                  ? always_visible.allergies.join(" · ")
-                  : "None recorded"}
+                {always_visible.allergies.length > 0 ? always_visible.allergies.join(" · ") : "None recorded"}
               </p>
             </div>
           </div>
-          <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">
-            Always shown
-          </span>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
         </div>
+
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-orange-50 border border-orange-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
@@ -861,59 +691,54 @@ function PatientRecordPanel({
               </p>
             </div>
           </div>
-          <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">
-            Always shown
-          </span>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
+        </div>
+
+        {/* Patient insurance — shown if available */}
+        <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+              <LucideShield size={15} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Patient Insurance</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {patientInsurances.length > 0 ? patientInsurances.join(" · ") : "No insurance on record"}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
         </div>
       </div>
 
-      {/* ── OWN RECORDS — scrollable, no consent needed ──────────────────────── */}
+      {/* Own records */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Your records for this patient
-          </p>
-          <span className="text-xs px-2 py-0.5 rounded-full border border-blue-200 text-blue-700 font-medium">
-            No consent needed
-          </span>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Your records for this patient</p>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-blue-200 text-blue-700 font-medium">No consent needed</span>
         </div>
-
-        {loadingOwn ? (
-          <div className="flex justify-center py-4">
-            <LucideLoader2 size={18} className="animate-spin text-blue-400" />
-          </div>
-        ) : ownRecords.length === 0 ? (
-          <p className="text-xs text-gray-400 py-2">
-            No previous consultations on record for this patient.
-          </p>
-        ) : (
-          <>
-            <div className="overflow-y-auto max-h-72 space-y-2 pr-1">
-              {ownRecords.map((rec) => (
-                <OwnRecordCard key={rec.id} record={rec} />
-              ))}
-            </div>
-            {ownRecords.length > 4 && (
-              <p className="text-xs text-gray-400 text-center mt-2">
-                Scroll to see all {ownRecords.length} records
-              </p>
-            )}
-          </>
-        )}
+        {loadingOwn
+          ? <div className="flex justify-center py-4"><LucideLoader2 size={18} className="animate-spin text-blue-400" /></div>
+          : ownRecords.length === 0
+          ? <p className="text-xs text-gray-400 py-2">No previous consultations on record for this patient.</p>
+          : (
+            <>
+              <div className="overflow-y-auto max-h-72 space-y-2 pr-1">
+                {ownRecords.map((rec) => <OwnRecordCard key={rec.id} record={rec} />)}
+              </div>
+              {ownRecords.length > 4 && <p className="text-xs text-gray-400 text-center mt-2">Scroll to see all {ownRecords.length} records</p>}
+            </>
+          )
+        }
       </div>
 
-      {/* Record categories — other providers */}
+      {/* Record categories */}
       {record_categories.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Record categories — consent required
-          </p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Record categories — consent required</p>
           <div className="space-y-2">
             {record_categories.map((cat) => (
-              <div
-                key={cat.speciality + cat.facility_name}
-                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100"
-              >
+              <div key={cat.speciality + cat.facility_name} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                     <LucideFileText size={14} />
@@ -921,68 +746,51 @@ function PatientRecordPanel({
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-800">{cat.speciality}</p>
                     <p className="text-xs text-gray-400">
-                      {[
-                        cat.facility_name,
-                        cat.record_count > 0 ? `${cat.record_count} records` : null,
-                        cat.last_record_at ? timeAgo(cat.last_record_at) : null,
-                      ].filter(Boolean).join(" · ")}
+                      {[cat.facility_name, cat.record_count > 0 ? `${cat.record_count} records` : null, cat.last_record_at ? timeAgo(cat.last_record_at) : null].filter(Boolean).join(" · ")}
                     </p>
-                    {cat.sensitivity === "ask_first" && (
-                      <p className="text-xs text-gray-400 italic mt-0.5">
-                        Patient has set this to <em>ask me first</em>
-                      </p>
-                    )}
+                    {cat.sensitivity === "ask_first" && <p className="text-xs text-gray-400 italic mt-0.5">Patient set this to <em>ask me first</em></p>}
                   </div>
                 </div>
-                {cat.access_status === "approved" ? (
-                  <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full font-medium shrink-0">
-                    <LucideShieldCheck size={12} /> Approved
-                  </span>
-                ) : cat.access_status === "pending" ? (
-                  <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-medium shrink-0">
-                    Pending…
-                  </span>
-                ) : cat.access_status === "denied" ? (
-                  <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full font-medium shrink-0">
-                    Denied
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => handleRequest(cat.speciality)}
-                    disabled={requesting === cat.speciality}
-                    className="flex items-center gap-1.5 text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 shrink-0 font-medium"
-                  >
-                    <LucideLock size={11} />
-                    {requesting === cat.speciality ? "Sending…" : "Request"}
-                  </button>
-                )}
+                {cat.access_status === "approved"
+                  ? <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full font-medium shrink-0"><LucideShieldCheck size={12} /> Approved</span>
+                  : cat.access_status === "pending"
+                  ? <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-medium shrink-0">Pending…</span>
+                  : cat.access_status === "denied"
+                  ? <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full font-medium shrink-0">Denied</span>
+                  : (
+                    <button
+                      onClick={() => handleRequest(cat.speciality)}
+                      disabled={requesting === cat.speciality}
+                      className="flex items-center gap-1.5 text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 shrink-0 font-medium"
+                    >
+                      <LucideLock size={11} />
+                      {requesting === cat.speciality ? "Sending…" : "Request"}
+                    </button>
+                  )
+                }
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Access granted — always visible at bottom */}
+      {/* Access granted */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-          Access granted this consultation
-        </p>
-        {access_granted.length === 0 ? (
-          <p className="text-xs text-gray-400 flex items-center gap-1.5">
-            <LucideLock size={12} />
-            No records shared yet. Requests sent to patient appear here once approved.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {access_granted.map((g) => (
-              <div key={g.id} className="flex items-center gap-2 text-sm text-gray-700">
-                <LucideShieldCheck size={14} className="text-green-500 shrink-0" />
-                <span className="font-medium">{g.requested_category}</span>
-                <span className="text-xs text-gray-400">— access approved</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Access granted this consultation</p>
+        {access_granted.length === 0
+          ? <p className="text-xs text-gray-400 flex items-center gap-1.5"><LucideLock size={12} /> No records shared yet.</p>
+          : (
+            <div className="space-y-2">
+              {access_granted.map((g) => (
+                <div key={g.id} className="flex items-center gap-2 text-sm text-gray-700">
+                  <LucideShieldCheck size={14} className="text-green-500 shrink-0" />
+                  <span className="font-medium">{g.requested_category}</span>
+                  <span className="text-xs text-gray-400">— access approved</span>
+                </div>
+              ))}
+            </div>
+          )
+        }
       </div>
     </div>
   );

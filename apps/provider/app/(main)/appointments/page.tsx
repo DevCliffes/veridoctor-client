@@ -69,10 +69,7 @@ export default function Appointments() {
   };
 
   const joinCall = (meetId: string) => {
-  window.open(
-    `https://veridoctor-client-telehealth.vercel.app/${meetId}?userId=${userId}&isOfferer=true`,
-    "_blank"
-  );
+  window.location.href = `https://veridoctor-client-telehealth.vercel.app/${meetId}?userId=${userId}&isOfferer=true`;
 };
 
   // Join call is only active for today's non-terminal virtual appointments

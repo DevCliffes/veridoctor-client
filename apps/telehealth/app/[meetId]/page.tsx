@@ -50,7 +50,7 @@ function TelehealthInner() {
   // Guard against double-triggering reconnect
   const reconnectingRef = useRef(false);
   // Stable ref so setupPeerConnection can always call the latest reconnect
-  const reconnectRef = useRef<() => Promise<void>>();
+  const reconnectRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const TELEHEALTH_BACKEND_URL =
     process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";

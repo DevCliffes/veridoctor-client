@@ -15,9 +15,6 @@ import { toast } from "sonner";
 import { useAppDispatch, UseAppSelector } from "@/states/store/hooks";
 import { setHasJoined, setIsOfferer, setOffer } from "@/states/features/webrtc";
 
-// Minimal typed extensions for browser APIs not yet fully covered by the
-// default DOM lib types — avoids `any` while still being safe regardless
-// of TS lib version.
 interface DocumentWithPiP extends Document {
   pictureInPictureEnabled: boolean;
 }
@@ -51,10 +48,6 @@ function TelehealthInner() {
   const TELEHEALTH_BACKEND_URL =
     process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
 
-  // ── Callback ref for local PIP video ──────────────────────────────────────
-  // Replaces the old useRef + useEffect combo. A callback ref fires the
-  // instant the DOM element is created, so the stream is attached
-  // immediately with no timing race — fixes the missing self-view bug.
   const localVideoCallbackRef = useCallback(
     (node: HTMLVideoElement | null) => {
       if (node && localStreamRef.current) {
@@ -62,10 +55,9 @@ function TelehealthInner() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasJoined] // re-evaluate when the active-call view mounts
+    [hasJoined]
   );
 
-  // ── Check PiP browser support ─────────────────────────────────────────────
   useEffect(() => {
     setPipSupported(
       typeof document !== "undefined" &&
@@ -74,9 +66,6 @@ function TelehealthInner() {
     );
   }, []);
 
-  // ── Back button guard ─────────────────────────────────────────────────────
-  // Pushes a dummy history entry so the browser back button hits this
-  // handler instead of navigating away mid-call.
   useEffect(() => {
     if (!hasJoined) return;
 
@@ -98,9 +87,6 @@ function TelehealthInner() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [hasJoined]);
 
-  // ── Tab visibility / wake lock ────────────────────────────────────────────
-  // Requests a screen wake lock to prevent the browser from throttling
-  // the tab when it's backgrounded. Re-acquires on tab return.
   useEffect(() => {
     if (!hasJoined) return;
 
@@ -133,8 +119,6 @@ function TelehealthInner() {
     };
   }, [hasJoined]);
 
-  // ── PiP event sync ────────────────────────────────────────────────────────
-  // Keeps isPiP in sync when the user exits PiP via ESC or the browser UI.
   useEffect(() => {
     const video = remoteVideoRef.current;
     if (!video) return;
@@ -150,7 +134,6 @@ function TelehealthInner() {
     };
   }, [remoteConnected]);
 
-  // Initialize notification audio
   useEffect(() => {
     let context: AudioContext;
     const initAudio = async () => {
@@ -171,7 +154,6 @@ function TelehealthInner() {
     };
   }, []);
 
-  // Initialize local media
   useEffect(() => {
     webRTCService.setOffererType(isOffererParam);
     dispatch(setIsOfferer(isOffererParam));
@@ -186,7 +168,6 @@ function TelehealthInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Attach remote stream when it arrives
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -194,7 +175,6 @@ function TelehealthInner() {
     }
   }, [remoteStream, hasJoined]);
 
-  // Connect to signaling server
   useEffect(() => {
     if (!isOffererParam) {
       socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
@@ -317,12 +297,13 @@ function TelehealthInner() {
     }
   };
 
-  // ── Picture-in-Picture toggle ─────────────────────────────────────────────
-  // Pops the remote video into a floating window that stays visible while
-  // the user switches tabs or apps — on desktop and Android Chrome.
   const togglePiP = async () => {
     const video = remoteVideoRef.current;
-    if (!video) return;
+    // Guard: PiP requires an active remote stream
+    if (!video || !remoteConnected) {
+      toast.error("No remote video to float yet.");
+      return;
+    }
     try {
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
@@ -335,60 +316,67 @@ function TelehealthInner() {
     }
   };
 
+  // FIX: window.close() only works for tabs opened via window.open().
+  // Since we navigate here via window.location.href, use history.back() instead.
   const endCall = () => {
     if (document.pictureInPictureElement) {
       document.exitPictureInPicture().catch(() => {});
     }
     webRTCService.peerConnection?.close();
     socketService.disconnect();
-    window.close();
+    window.history.back();
   };
 
   // ─── PRE-CALL LOBBY ───────────────────────────────────────────────────────
   if (!hasJoined) {
     return (
-      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center gap-6 text-white">
-        <p className="text-lg font-medium text-gray-300">
-          {isOffererParam ? "Ready to start your call?" : "Waiting to join..."}
-        </p>
+      <div className="relative min-h-screen bg-gray-900 overflow-hidden">
+        {/* Full-screen camera preview */}
+        <video
+          ref={initLocalVideoRef}
+          className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+          autoPlay
+          playsInline
+        />
 
-        <div className="relative">
-          <video
-            ref={initLocalVideoRef}
-            className="w-[420px] h-[280px] bg-gray-800 rounded-2xl object-cover scale-x-[-1]"
-            autoPlay
-            playsInline
-          />
-          {!localMediaAvailable && (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-              Loading camera...
-            </div>
-          )}
-        </div>
+        {/* Dark gradient overlay at bottom for readability */}
+        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/70 to-transparent" />
 
-        {isOffererParam ? (
-          localMediaAvailable ? (
+        {/* Loading indicator when camera not yet ready */}
+        {!localMediaAvailable && (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm bg-gray-900/80">
+            Accessing camera...
+          </div>
+        )}
+
+        {/* CTA pinned to bottom */}
+        <div className="absolute inset-x-0 bottom-10 flex flex-col items-center gap-3">
+          <p className="text-white text-base font-medium drop-shadow">
+            {isOffererParam ? "Ready to start your call?" : "Waiting to join..."}
+          </p>
+
+          {isOffererParam ? (
+            localMediaAvailable ? (
+              <button
+                onClick={() => joinMeeting()}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full text-white font-medium transition-colors shadow-lg"
+              >
+                <Video size={18} /> Start Call
+              </button>
+            ) : null
+          ) : offer ? (
             <button
-              onClick={() => joinMeeting()}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full text-white font-medium transition-colors"
+              onClick={() => joinMeeting(offer)}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-8 py-3 rounded-full text-white font-medium transition-colors shadow-lg"
             >
-              <Video size={18} /> Start Call
+              <Video size={18} /> Join Call
             </button>
           ) : (
-            <p className="text-gray-400 text-sm">Accessing camera...</p>
-          )
-        ) : offer ? (
-          <button
-            onClick={() => joinMeeting(offer)}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-8 py-3 rounded-full text-white font-medium transition-colors"
-          >
-            <Video size={18} /> Join Call
-          </button>
-        ) : (
-          <p className="text-gray-400 text-sm">
-            Waiting for the provider to start the call...
-          </p>
-        )}
+            <p className="text-gray-300 text-sm">
+              Waiting for the provider to start the call...
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -399,7 +387,7 @@ function TelehealthInner() {
       {/* Main video area */}
       <div className="relative flex-1 bg-gray-800 overflow-hidden">
 
-        {/* Remote video — always rendered so the ref is always available */}
+        {/* Remote video */}
         <video
           ref={remoteVideoRef}
           className="w-full h-full object-cover"
@@ -407,7 +395,7 @@ function TelehealthInner() {
           playsInline
         />
 
-        {/* Waiting overlay — on top of video, not instead of it */}
+        {/* Waiting overlay */}
         {!remoteConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 bg-gray-800">
             <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
@@ -417,8 +405,8 @@ function TelehealthInner() {
           </div>
         )}
 
-        {/* Local self-view PIP — callback ref attaches stream the instant this mounts */}
-        <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-lg border border-gray-700 w-[140px] h-[100px] bg-gray-900">
+        {/* Local self-view — larger pip */}
+        <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-lg border border-gray-700 w-[220px] h-[160px] bg-gray-900">
           {videoOff ? (
             <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-xs">
               Camera off
@@ -434,7 +422,6 @@ function TelehealthInner() {
           )}
         </div>
 
-        {/* Badge shown while floating PiP window is active */}
         {isPiP && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full">
             Call running in floating window
@@ -442,7 +429,7 @@ function TelehealthInner() {
         )}
       </div>
 
-      {/* Controls bar — flex-shrink-0 ensures it is never pushed off screen */}
+      {/* Controls bar */}
       <div className="flex-shrink-0 h-20 bg-gray-900 flex items-center justify-center gap-6 px-6 border-t border-gray-800">
 
         <div className="flex flex-col items-center gap-1">
@@ -479,7 +466,6 @@ function TelehealthInner() {
           </span>
         </div>
 
-        {/* Float button — only shown if browser supports PiP (Chrome, Edge, Safari 14+) */}
         {pipSupported && (
           <div className="flex flex-col items-center gap-1">
             <button
@@ -492,7 +478,6 @@ function TelehealthInner() {
                   : "bg-gray-700 hover:bg-gray-600 text-white")
               }
             >
-              {/* Inline SVG — no extra icon import needed */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"

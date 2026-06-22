@@ -45,11 +45,14 @@ function TelehealthInner() {
   const [isPiP, setIsPiP] = useState(false);
   const [pipSupported, setPipSupported] = useState(false);
 
+  // ── End-call confirmation modal ───────────────────────────────────────────
+  const [showEndCallModal, setShowEndCallModal] = useState(false);
+  // Flag so popstate guard knows the user intentionally confirmed exit
+  const isEndingRef = useRef(false);
+
   // ── Reconnection state ────────────────────────────────────────────────────
   const [isReconnecting, setIsReconnecting] = useState(false);
-  // Guard against double-triggering reconnect
   const reconnectingRef = useRef(false);
-  // Stable ref so setupPeerConnection can always call the latest reconnect
   const reconnectRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   const TELEHEALTH_BACKEND_URL =
@@ -77,15 +80,11 @@ function TelehealthInner() {
     if (!hasJoined) return;
     window.history.pushState({ callActive: true }, "");
     const handlePopState = () => {
+      // If user confirmed end-call via our modal, allow navigation
+      if (isEndingRef.current) return;
+      // Otherwise intercept and show our modal instead
       window.history.pushState({ callActive: true }, "");
-      const confirmed = window.confirm(
-        "Leaving this page will end your call. Are you sure?"
-      );
-      if (confirmed) {
-        webRTCService.peerConnection?.close();
-        socketService.disconnect();
-        window.history.go(-2);
-      }
+      setShowEndCallModal(true);
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -189,10 +188,6 @@ function TelehealthInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Setup peer connection ─────────────────────────────────────────────────
-  // Called on first join AND on every reconnect, so it must be safe to call
-  // multiple times. reconnectRef is used (not reconnect directly) to avoid a
-  // circular useCallback dependency.
   const setupPeerConnection = async () => {
     const pc = await webRTCService.createPeerConnection();
 
@@ -222,7 +217,6 @@ function TelehealthInner() {
         setIsReconnecting(false);
         reconnectingRef.current = false;
       }
-      // WebRTC dropped — trigger reconnect flow
       if (
         pc.connectionState === "disconnected" ||
         pc.connectionState === "failed"
@@ -237,7 +231,6 @@ function TelehealthInner() {
 
     socketService.emit("requestIceCandidates", { isOfferer: isOffererParam });
 
-    // Socket-level disconnect — other party closed their tab / network dropped
     socketService.on("peerLeft", () => {
       reconnectRef.current?.();
     });
@@ -245,10 +238,6 @@ function TelehealthInner() {
     return pc;
   };
 
-  // ── Reconnection handler ──────────────────────────────────────────────────
-  // Offerer: closes old PC, emits a fresh offer and waits.
-  // Answerer: closes old PC and waits; the useEffect below auto-rejoins when
-  // the new offer arrives via availableOffer → Redux.
   const reconnect = useCallback(async () => {
     if (reconnectingRef.current) return;
     reconnectingRef.current = true;
@@ -264,7 +253,6 @@ function TelehealthInner() {
     if (isOffererParam) {
       try {
         await setupPeerConnection();
-        // Re-register remoteAnswer listener for the new negotiation round
         socketService.on(
           "remoteAnswer",
           (answer: RTCSessionDescriptionInit) => {
@@ -277,23 +265,16 @@ function TelehealthInner() {
         console.error("[reconnect] offerer re-init failed:", err);
         reconnectingRef.current = false;
       }
-      // reconnectingRef is cleared when connectionState → "connected"
     } else {
-      // Answerer just waits; the useEffect below fires when offer updates
       reconnectingRef.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOffererParam]);
 
-  // Keep the ref in sync so setupPeerConnection always calls the latest version
   useEffect(() => {
     reconnectRef.current = reconnect;
   }, [reconnect]);
 
-  // ── Answerer auto-rejoin ──────────────────────────────────────────────────
-  // When the answerer is already in the call and a new offer arrives (because
-  // the offerer reconnected), automatically re-establish the peer connection
-  // without requiring a manual button press.
   useEffect(() => {
     if (!hasJoined || !isReconnecting || isOffererParam || !offer) return;
 
@@ -302,7 +283,6 @@ function TelehealthInner() {
         await setupPeerConnection();
         const answer = await webRTCService.createAnswer(offer);
         socketService.emit("newAnswer", answer);
-        // isReconnecting cleared when connectionState → "connected"
       } catch (err) {
         console.error("[reconnect] answerer rejoin failed:", err);
       }
@@ -383,7 +363,16 @@ function TelehealthInner() {
     }
   };
 
-  const endCall = () => {
+  // ── End-call flow ─────────────────────────────────────────────────────────
+  // Step 1: user clicks "End call" → show confirmation modal (no teardown yet)
+  const requestEndCall = () => {
+    setShowEndCallModal(true);
+  };
+
+  // Step 2a: user confirms → tear down and navigate back
+  const confirmEndCall = () => {
+    isEndingRef.current = true;
+    setShowEndCallModal(false);
     if (document.pictureInPictureElement) {
       document.exitPictureInPicture().catch(() => {});
     }
@@ -392,19 +381,21 @@ function TelehealthInner() {
     window.history.back();
   };
 
+  // Step 2b: user cancels → just close the modal, call continues
+  const cancelEndCall = () => {
+    setShowEndCallModal(false);
+  };
+
   // ─── PRE-CALL LOBBY ───────────────────────────────────────────────────────
   if (!hasJoined) {
     return (
       <div className="relative min-h-screen bg-gray-900 overflow-hidden">
-        {/* Full-screen camera preview */}
         <video
           ref={initLocalVideoRef}
           className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
           autoPlay
           playsInline
         />
-
-        {/* Dark gradient at bottom for readability */}
         <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/70 to-transparent" />
 
         {!localMediaAvailable && (
@@ -413,7 +404,6 @@ function TelehealthInner() {
           </div>
         )}
 
-        {/* CTA pinned to bottom */}
         <div className="absolute inset-x-0 bottom-10 flex flex-col items-center gap-3">
           <p className="text-white text-base font-medium drop-shadow">
             {isOffererParam ? "Ready to start your call?" : "Waiting to join..."}
@@ -451,7 +441,6 @@ function TelehealthInner() {
       {/* Main video area */}
       <div className="relative flex-1 bg-gray-800 overflow-hidden">
 
-        {/* Remote video — always rendered so the ref is always available */}
         <video
           ref={remoteVideoRef}
           className="w-full h-full object-cover"
@@ -459,12 +448,10 @@ function TelehealthInner() {
           playsInline
         />
 
-        {/* Waiting / reconnecting overlay */}
         {!remoteConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 bg-gray-800">
             {isReconnecting ? (
               <>
-                {/* Spinner */}
                 <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm text-gray-300 font-medium">
                   Participant disconnected
@@ -580,7 +567,7 @@ function TelehealthInner() {
 
         <div className="flex flex-col items-center gap-1">
           <button
-            onClick={endCall}
+            onClick={requestEndCall}
             className="p-3 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors"
           >
             <PhoneOff size={20} />
@@ -588,6 +575,40 @@ function TelehealthInner() {
           <span className="text-gray-400 text-xs">End call</span>
         </div>
       </div>
+
+      {/* ── End-call confirmation modal ──────────────────────────────────── */}
+      {showEndCallModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-800 rounded-2xl shadow-2xl p-6 mx-6 max-w-sm w-full flex flex-col items-center gap-4 border border-gray-700">
+            {/* Icon */}
+            <div className="w-14 h-14 rounded-full bg-red-600/20 flex items-center justify-center">
+              <PhoneOff size={28} className="text-red-500" />
+            </div>
+
+            <div className="text-center">
+              <h2 className="text-white font-semibold text-lg">End this call?</h2>
+              <p className="text-gray-400 text-sm mt-1">
+                The other participant will be notified. You can rejoin from your appointments.
+              </p>
+            </div>
+
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={cancelEndCall}
+                className="flex-1 py-3 rounded-xl bg-gray-700 hover:bg-gray-600 text-white font-medium transition-colors"
+              >
+                Stay
+              </button>
+              <button
+                onClick={confirmEndCall}
+                className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors"
+              >
+                End call
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

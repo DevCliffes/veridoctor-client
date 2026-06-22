@@ -68,7 +68,12 @@ export default function Appointments() {
     window.dispatchEvent(new CustomEvent("vd:new-appointment"));
   };
 
-  const joinCall = (meetId: string) => router.push(`/calls/${meetId}`);
+  const joinCall = (meetId: string) => {
+  window.open(
+    `https://veridoctor-client-telehealth.vercel.app/${meetId}?userId=${userId}&isOfferer=true`,
+    "_blank"
+  );
+};
 
   // Join call is only active for today's non-terminal virtual appointments
   const isJoinEnabled = (appt: Appointment) => {

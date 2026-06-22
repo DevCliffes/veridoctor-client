@@ -45,6 +45,13 @@ function TelehealthInner() {
   const [isPiP, setIsPiP] = useState(false);
   const [pipSupported, setPipSupported] = useState(false);
 
+  // ── Reconnection state ────────────────────────────────────────────────────
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  // Guard against double-triggering reconnect
+  const reconnectingRef = useRef(false);
+  // Stable ref so setupPeerConnection can always call the latest reconnect
+  const reconnectRef = useRef<() => Promise<void>>();
+
   const TELEHEALTH_BACKEND_URL =
     process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
 
@@ -68,9 +75,7 @@ function TelehealthInner() {
 
   useEffect(() => {
     if (!hasJoined) return;
-
     window.history.pushState({ callActive: true }, "");
-
     const handlePopState = () => {
       window.history.pushState({ callActive: true }, "");
       const confirmed = window.confirm(
@@ -82,37 +87,27 @@ function TelehealthInner() {
         window.history.go(-2);
       }
     };
-
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, [hasJoined]);
 
   useEffect(() => {
     if (!hasJoined) return;
-
     let wakeLock: WakeLockSentinel | null = null;
-
     const requestWakeLock = async () => {
       try {
         if ("wakeLock" in navigator) {
-          wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request(
-            "screen"
-          );
+          wakeLock = await (
+            navigator as NavigatorWithWakeLock
+          ).wakeLock.request("screen");
         }
-      } catch {
-        // not available on this device — silently ignore
-      }
+      } catch {}
     };
-
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        requestWakeLock();
-      }
+      if (document.visibilityState === "visible") requestWakeLock();
     };
-
     requestWakeLock();
     document.addEventListener("visibilitychange", handleVisibilityChange);
-
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       wakeLock?.release().catch(() => {});
@@ -122,10 +117,8 @@ function TelehealthInner() {
   useEffect(() => {
     const video = remoteVideoRef.current;
     if (!video) return;
-
     const onEnter = () => setIsPiP(true);
     const onLeave = () => setIsPiP(false);
-
     video.addEventListener("enterpictureinpicture", onEnter);
     video.addEventListener("leavepictureinpicture", onLeave);
     return () => {
@@ -177,18 +170,18 @@ function TelehealthInner() {
 
   useEffect(() => {
     if (!isOffererParam) {
-      socketService.on("availableOffer", (incomingOffer: RTCSessionDescriptionInit) => {
-        console.log("[telehealth] availableOffer received");
-        dispatch(setOffer(incomingOffer));
-        webRTCService.setOffererType(false);
-      });
+      socketService.on(
+        "availableOffer",
+        (incomingOffer: RTCSessionDescriptionInit) => {
+          dispatch(setOffer(incomingOffer));
+          webRTCService.setOffererType(false);
+        }
+      );
     }
-
     socketService.connect(TELEHEALTH_BACKEND_URL, {
       userName: userId,
       roomName: meetId,
     });
-
     return () => {
       socketService.removeAllListeners();
       socketService.disconnect();
@@ -196,6 +189,10 @@ function TelehealthInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Setup peer connection ─────────────────────────────────────────────────
+  // Called on first join AND on every reconnect, so it must be safe to call
+  // multiple times. reconnectRef is used (not reconnect directly) to avoid a
+  // circular useCallback dependency.
   const setupPeerConnection = async () => {
     const pc = await webRTCService.createPeerConnection();
 
@@ -211,9 +208,7 @@ function TelehealthInner() {
 
     const stream = localStreamRef.current;
     if (stream) {
-      stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream);
-      });
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
     }
 
     pc.addEventListener("track", (event: RTCTrackEvent) => {
@@ -224,10 +219,15 @@ function TelehealthInner() {
     pc.addEventListener("connectionstatechange", () => {
       if (pc.connectionState === "connected") {
         toast.success("Call connected");
+        setIsReconnecting(false);
+        reconnectingRef.current = false;
       }
-      if (pc.connectionState === "disconnected") {
-        toast.error("Disconnected. Reconnecting...");
-        setRemoteConnected(false);
+      // WebRTC dropped — trigger reconnect flow
+      if (
+        pc.connectionState === "disconnected" ||
+        pc.connectionState === "failed"
+      ) {
+        reconnectRef.current?.();
       }
     });
 
@@ -237,22 +237,87 @@ function TelehealthInner() {
 
     socketService.emit("requestIceCandidates", { isOfferer: isOffererParam });
 
+    // Socket-level disconnect — other party closed their tab / network dropped
     socketService.on("peerLeft", () => {
-      toast.error("The other participant has left the call.");
-      setRemoteConnected(false);
+      reconnectRef.current?.();
     });
 
     return pc;
   };
 
+  // ── Reconnection handler ──────────────────────────────────────────────────
+  // Offerer: closes old PC, emits a fresh offer and waits.
+  // Answerer: closes old PC and waits; the useEffect below auto-rejoins when
+  // the new offer arrives via availableOffer → Redux.
+  const reconnect = useCallback(async () => {
+    if (reconnectingRef.current) return;
+    reconnectingRef.current = true;
+
+    setRemoteConnected(false);
+    setRemoteStream(null);
+    setIsReconnecting(true);
+
+    toast.error("Participant disconnected — waiting for them to rejoin...");
+
+    webRTCService.peerConnection?.close();
+
+    if (isOffererParam) {
+      try {
+        await setupPeerConnection();
+        // Re-register remoteAnswer listener for the new negotiation round
+        socketService.on(
+          "remoteAnswer",
+          (answer: RTCSessionDescriptionInit) => {
+            webRTCService.handleRemoteAnswer(answer).catch(console.error);
+          }
+        );
+        const newOffer = await webRTCService.createOffer();
+        socketService.emit("newOffer", newOffer);
+      } catch (err) {
+        console.error("[reconnect] offerer re-init failed:", err);
+        reconnectingRef.current = false;
+      }
+      // reconnectingRef is cleared when connectionState → "connected"
+    } else {
+      // Answerer just waits; the useEffect below fires when offer updates
+      reconnectingRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOffererParam]);
+
+  // Keep the ref in sync so setupPeerConnection always calls the latest version
+  useEffect(() => {
+    reconnectRef.current = reconnect;
+  }, [reconnect]);
+
+  // ── Answerer auto-rejoin ──────────────────────────────────────────────────
+  // When the answerer is already in the call and a new offer arrives (because
+  // the offerer reconnected), automatically re-establish the peer connection
+  // without requiring a manual button press.
+  useEffect(() => {
+    if (!hasJoined || !isReconnecting || isOffererParam || !offer) return;
+
+    const rejoinAsAnswerer = async () => {
+      try {
+        await setupPeerConnection();
+        const answer = await webRTCService.createAnswer(offer);
+        socketService.emit("newAnswer", answer);
+        // isReconnecting cleared when connectionState → "connected"
+      } catch (err) {
+        console.error("[reconnect] answerer rejoin failed:", err);
+      }
+    };
+
+    rejoinAsAnswerer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offer, hasJoined, isReconnecting, isOffererParam]);
+
   const joinMeeting = async (incomingOffer?: RTCSessionDescriptionInit) => {
     if (isOffererParam) {
       await setupPeerConnection();
-
       socketService.on("remoteAnswer", (answer: RTCSessionDescriptionInit) => {
         webRTCService.handleRemoteAnswer(answer).catch(console.error);
       });
-
       const newOffer = await webRTCService.createOffer();
       socketService.emit("newOffer", newOffer);
     } else {
@@ -264,7 +329,6 @@ function TelehealthInner() {
       const answer = await webRTCService.createAnswer(incomingOffer);
       socketService.emit("newAnswer", answer);
     }
-
     dispatch(setHasJoined(true));
   };
 
@@ -280,7 +344,9 @@ function TelehealthInner() {
   const toggleAudio = () => {
     if (webRTCService.localStream) {
       const audioTracks = webRTCService.localStream.getAudioTracks();
-      audioTracks.forEach((track) => { track.enabled = audioMuted; });
+      audioTracks.forEach((track) => {
+        track.enabled = audioMuted;
+      });
       setAudioMuted(!audioMuted);
       playNotificationAudio();
       toast.success(`Microphone ${audioMuted ? "on" : "off"}`);
@@ -290,7 +356,9 @@ function TelehealthInner() {
   const toggleVideo = () => {
     if (webRTCService.localStream) {
       const videoTracks = webRTCService.localStream.getVideoTracks();
-      videoTracks.forEach((track) => { track.enabled = videoOff; });
+      videoTracks.forEach((track) => {
+        track.enabled = videoOff;
+      });
       setVideoOff(!videoOff);
       playNotificationAudio();
       toast.success(`Camera ${videoOff ? "on" : "off"}`);
@@ -299,7 +367,6 @@ function TelehealthInner() {
 
   const togglePiP = async () => {
     const video = remoteVideoRef.current;
-    // Guard: PiP requires an active remote stream
     if (!video || !remoteConnected) {
       toast.error("No remote video to float yet.");
       return;
@@ -316,8 +383,6 @@ function TelehealthInner() {
     }
   };
 
-  // FIX: window.close() only works for tabs opened via window.open().
-  // Since we navigate here via window.location.href, use history.back() instead.
   const endCall = () => {
     if (document.pictureInPictureElement) {
       document.exitPictureInPicture().catch(() => {});
@@ -339,10 +404,9 @@ function TelehealthInner() {
           playsInline
         />
 
-        {/* Dark gradient overlay at bottom for readability */}
+        {/* Dark gradient at bottom for readability */}
         <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/70 to-transparent" />
 
-        {/* Loading indicator when camera not yet ready */}
         {!localMediaAvailable && (
           <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm bg-gray-900/80">
             Accessing camera...
@@ -387,7 +451,7 @@ function TelehealthInner() {
       {/* Main video area */}
       <div className="relative flex-1 bg-gray-800 overflow-hidden">
 
-        {/* Remote video */}
+        {/* Remote video — always rendered so the ref is always available */}
         <video
           ref={remoteVideoRef}
           className="w-full h-full object-cover"
@@ -395,17 +459,32 @@ function TelehealthInner() {
           playsInline
         />
 
-        {/* Waiting overlay */}
+        {/* Waiting / reconnecting overlay */}
         {!remoteConnected && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 bg-gray-800">
-            <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
-              ?
-            </div>
-            <p className="text-sm">Waiting for the other participant...</p>
+            {isReconnecting ? (
+              <>
+                {/* Spinner */}
+                <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-gray-300 font-medium">
+                  Participant disconnected
+                </p>
+                <p className="text-xs text-gray-500">
+                  Waiting for them to rejoin...
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center text-3xl font-bold text-gray-500">
+                  ?
+                </div>
+                <p className="text-sm">Waiting for the other participant...</p>
+              </>
+            )}
           </div>
         )}
 
-        {/* Local self-view — larger pip */}
+        {/* Local self-view PIP */}
         <div className="absolute bottom-4 right-4 rounded-xl overflow-hidden shadow-lg border border-gray-700 w-[220px] h-[160px] bg-gray-900">
           {videoOff ? (
             <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 text-xs">

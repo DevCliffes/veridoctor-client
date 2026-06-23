@@ -46,6 +46,9 @@ type Capture = {
   updated_at: string;
 };
 
+// Must match the key used in capture/page.tsx
+const SNAPSHOT_KEY = "__form_snapshot__";
+
 export default function CaptureViewPage() {
   const { id: appointmentId, captureId } = useParams<{ id: string; captureId: string }>();
   const router = useRouter();
@@ -91,10 +94,21 @@ export default function CaptureViewPage() {
     );
   }
 
+  // ✅ Read snapshot from values.__form_snapshot__ first (new captures),
+  // then fall back to top-level form_snapshot (if backend ever starts
+  // persisting it), then fall back to legacy mode.
+  const smuggled = capture.values?.[SNAPSHOT_KEY];
   const sections: Section[] =
-    capture.form_snapshot && capture.form_snapshot.length > 0
+    Array.isArray(smuggled) && smuggled.length > 0
+      ? (smuggled as Section[])
+      : Array.isArray(capture.form_snapshot) && capture.form_snapshot.length > 0
       ? capture.form_snapshot
       : [];
+
+  // Values without the internal snapshot key (don't render it as a field)
+  const displayValues = Object.fromEntries(
+    Object.entries(capture.values ?? {}).filter(([k]) => k !== SNAPSHOT_KEY)
+  );
 
   const isPrescriptionSection = (section: Section) =>
     section.isPrescription ||
@@ -123,9 +137,7 @@ export default function CaptureViewPage() {
 
       <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-5">
         {sections.length > 0 ? (
-          // ✅ New captures: render using snapshotted form structure.
-          // Field labels are preserved regardless of whether the original form
-          // still exists or has been edited.
+          // ✅ Happy path: snapshot found — render with proper field labels.
           sections.map((section) => (
             <div
               key={section.id}
@@ -175,11 +187,7 @@ export default function CaptureViewPage() {
             </div>
           ))
         ) : (
-          // ⚠️ Legacy fallback for captures that predate the form_snapshot field.
-          // Tries to render values intelligently:
-          //   - { label, value } shape → from the previous partial fix attempt
-          //   - plain primitive → raw key/value display
-          //   - object (e.g. prescription) → rendered via PrescriptionView
+          // ⚠️ Legacy fallback for captures predating this fix.
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-700">Captured Data</h2>
@@ -188,8 +196,8 @@ export default function CaptureViewPage() {
               </span>
             </div>
             <div className="flex flex-col gap-4">
-              {Object.entries(capture.values).map(([key, val]) => {
-                // Handle { label, value } shape from prior partial fix
+              {Object.entries(displayValues).map(([key, val]) => {
+                // Handle { label, value } shape from prior partial fix attempt
                 const isLabeledPair =
                   val !== null &&
                   typeof val === "object" &&

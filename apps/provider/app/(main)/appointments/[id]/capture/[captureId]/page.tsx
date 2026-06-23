@@ -91,11 +91,10 @@ export default function CaptureViewPage() {
     );
   }
 
-  // Use the snapshotted form structure if available.
-  // For old captures (before snapshot was introduced), fall back to raw key/value display.
-  const sections: Section[] = capture.form_snapshot && capture.form_snapshot.length > 0
-    ? capture.form_snapshot
-    : [];
+  const sections: Section[] =
+    capture.form_snapshot && capture.form_snapshot.length > 0
+      ? capture.form_snapshot
+      : [];
 
   const isPrescriptionSection = (section: Section) =>
     section.isPrescription ||
@@ -124,8 +123,9 @@ export default function CaptureViewPage() {
 
       <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-5">
         {sections.length > 0 ? (
-          // Render using the snapshotted form structure — labels are preserved
-          // regardless of whether the original form still exists.
+          // ✅ New captures: render using snapshotted form structure.
+          // Field labels are preserved regardless of whether the original form
+          // still exists or has been edited.
           sections.map((section) => (
             <div
               key={section.id}
@@ -145,7 +145,7 @@ export default function CaptureViewPage() {
                   section.fields.map((field) => {
                     const val = capture.values[field.id];
                     const isEmpty =
-                      val === undefined || val === "" || val === false;
+                      val === undefined || val === "" || val === false || val === null;
                     return (
                       <div key={field.id} className="flex flex-col gap-1">
                         <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -175,8 +175,11 @@ export default function CaptureViewPage() {
             </div>
           ))
         ) : (
-          // Fallback for old captures that predate the snapshot feature.
-          // Shows raw key/value pairs — not ideal but better than broken labels.
+          // ⚠️ Legacy fallback for captures that predate the form_snapshot field.
+          // Tries to render values intelligently:
+          //   - { label, value } shape → from the previous partial fix attempt
+          //   - plain primitive → raw key/value display
+          //   - object (e.g. prescription) → rendered via PrescriptionView
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-700">Captured Data</h2>
@@ -184,15 +187,68 @@ export default function CaptureViewPage() {
                 Legacy capture — field labels unavailable
               </span>
             </div>
-            <div className="flex flex-col gap-3">
-              {Object.entries(capture.values).map(([key, val]) => (
-                <div key={key} className="flex flex-col gap-0.5">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">
-                    {key}
-                  </p>
-                  <p className="text-sm text-gray-700">{String(val)}</p>
-                </div>
-              ))}
+            <div className="flex flex-col gap-4">
+              {Object.entries(capture.values).map(([key, val]) => {
+                // Handle { label, value } shape from prior partial fix
+                const isLabeledPair =
+                  val !== null &&
+                  typeof val === "object" &&
+                  "label" in (val as object) &&
+                  "value" in (val as object);
+
+                if (isLabeledPair) {
+                  const { label, value: innerVal } = val as { label: string; value: unknown };
+                  const isPrescObj =
+                    innerVal !== null &&
+                    typeof innerVal === "object" &&
+                    ("drugs" in (innerVal as object) || "diagnosis" in (innerVal as object));
+                  return (
+                    <div key={key} className="flex flex-col gap-1">
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        {label}
+                      </p>
+                      {isPrescObj ? (
+                        <PrescriptionView value={innerVal as PrescriptionValue} />
+                      ) : (
+                        <p className="text-sm text-gray-700">
+                          {innerVal === undefined || innerVal === "" || innerVal === null
+                            ? <span className="italic text-gray-300">Not filled</span>
+                            : String(innerVal)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Handle raw prescription object (keyed by section ID)
+                const isPrescObj =
+                  val !== null &&
+                  typeof val === "object" &&
+                  ("drugs" in (val as object) || "diagnosis" in (val as object));
+
+                if (isPrescObj) {
+                  return (
+                    <div key={key} className="flex flex-col gap-1">
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        Prescription
+                      </p>
+                      <PrescriptionView value={val as PrescriptionValue} />
+                    </div>
+                  );
+                }
+
+                // Plain primitive
+                return (
+                  <div key={key} className="flex flex-col gap-0.5">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">{key}</p>
+                    <p className="text-sm text-gray-700">
+                      {val === undefined || val === "" || val === null
+                        ? <span className="italic text-gray-300">Not filled</span>
+                        : String(val)}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

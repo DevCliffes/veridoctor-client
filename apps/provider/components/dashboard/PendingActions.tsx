@@ -9,15 +9,23 @@ interface PendingActionsProps {
 
 export function PendingActions({ identityId }: PendingActionsProps) {
   const router = useRouter();
-  const [pendingCount, setPendingCount] = useState(0);
+  const [upcomingCount, setUpcomingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!identityId) return;
+    // ✅ Switched from /dashboard/stats (pending_count = unconfirmed only)
+    // to the appointments list filtered to upcoming, so the badge reflects
+    // ALL upcoming appointments rather than just unconfirmed ones.
+    //
+    // Confirmed against apps/provider/app/(main)/appointments/page.tsx:
+    //   - query param is `filter` (values: today | upcoming | past)
+    //   - endpoint: GET /provider/{userId}/appointments?filter=upcoming
+    //   - response is a bare array: `res.data ?? []` (no { results, total } wrapper)
     axiosClient
-      .get(`/provider/${identityId}/dashboard/stats`)
+      .get(`/provider/${identityId}/appointments?filter=upcoming`)
       .then((res) => {
-        setPendingCount(res.data?.pending_count ?? 0);
+        setUpcomingCount((res.data ?? []).length);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -25,10 +33,12 @@ export function PendingActions({ identityId }: PendingActionsProps) {
 
   const items = [
     {
-      label: "Unconfirmed appointments",
-      count: pendingCount,
-      urgency: pendingCount > 0 ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-400",
-      href: "/appointments",
+      label: "Upcoming appointments",
+      count: upcomingCount,
+      urgency: upcomingCount > 0 ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-400",
+      // ✅ Matches the real tab-selection mechanism on the appointments
+      // page, which reads `filter` from the query string — NOT `tab`.
+      href: "/appointments?filter=upcoming",
     },
     {
       label: "Prescriptions to sign",

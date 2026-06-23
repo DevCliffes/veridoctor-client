@@ -138,6 +138,9 @@ const STATUS_STYLES: Record<string, string> = {
   scheduled: "bg-yellow-100 text-yellow-700",
 };
 
+// Must match the key used in capture/page.tsx
+const SNAPSHOT_KEY = "__form_snapshot__";
+
 function getInsuranceLabel(ins: Insurance): string {
   if (typeof ins === "string") return ins;
   return ins.provider;
@@ -170,10 +173,17 @@ function buildLabelMap(
   return map;
 }
 
+function isPrescriptionValue(val: unknown): val is { diagnosis?: string; drugs?: unknown[]; notes?: string } {
+  if (!val || typeof val !== "object") return false;
+  const obj = val as Record<string, unknown>;
+  return "drugs" in obj || "diagnosis" in obj;
+}
+
 function renderValue(val: unknown): string {
   if (val === null || val === undefined) return "—";
-  if (typeof val === "string") return val;
-  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "string") return val || "—";
+  if (typeof val === "boolean") return val ? "Yes" : "No";
+  if (typeof val === "number") return String(val);
   if (Array.isArray(val)) return val.map(renderValue).join(", ");
   if (typeof val === "object") {
     const obj = val as Record<string, unknown>;
@@ -183,6 +193,31 @@ function renderValue(val: unknown): string {
     return JSON.stringify(val);
   }
   return String(val);
+}
+
+function renderPrescription(val: { diagnosis?: string; drugs?: unknown[]; notes?: string }) {
+  const drugs = (val.drugs ?? []) as { drug_name?: string; frequency?: string; duration?: string; instructions?: string }[];
+  return (
+    <div className="flex flex-col gap-2 mt-1">
+      {val.diagnosis && (
+        <p className="text-xs text-gray-600"><span className="text-gray-400">Diagnosis: </span>{val.diagnosis}</p>
+      )}
+      {drugs.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {drugs.map((d, i) => (
+            <div key={i} className="bg-white border border-gray-100 rounded-lg px-3 py-2">
+              <p className="text-xs font-semibold text-gray-800">{d.drug_name || "—"}</p>
+              <p className="text-xs text-gray-500">{[d.frequency, d.duration].filter(Boolean).join(" · ")}</p>
+              {d.instructions && <p className="text-xs text-gray-400 italic">{d.instructions}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+      {val.notes && (
+        <p className="text-xs text-gray-600"><span className="text-gray-400">Notes: </span>{val.notes}</p>
+      )}
+    </div>
+  );
 }
 
 function buildTelehealthUrl(meetId: string, userId: string | null) {
@@ -534,13 +569,41 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
       {expanded && record.captures && record.captures.length > 0 && (
         <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 space-y-5">
           {record.captures.map((cap, i) => {
-            const labelMap = buildLabelMap(cap.form_snapshot ?? []);
+            // ✅ THE FIX: read snapshot from values.__form_snapshot__ first
+            // (new captures smuggle it there since the backend strips the
+            // top-level form_snapshot field). Fall back to top-level
+            // form_snapshot for any captures where the backend did persist it.
+            const smuggled = cap.values?.[SNAPSHOT_KEY];
+            const snapshot = (Array.isArray(smuggled) ? smuggled : null)
+              ?? cap.form_snapshot
+              ?? [];
+            const labelMap = buildLabelMap(snapshot);
+
+            // Strip the internal snapshot key so it doesn't appear as a field row
+            const displayValues = Object.fromEntries(
+              Object.entries(cap.values ?? {}).filter(([k]) => k !== SNAPSHOT_KEY)
+            );
+
             return (
               <div key={i}>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{cap.form_name || "Clinical Notes"}</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  {cap.form_name || "Clinical Notes"}
+                </p>
                 <div className="space-y-2">
-                  {Object.entries(cap.values).map(([key, val]) => {
+                  {Object.entries(displayValues).map(([key, val]) => {
+                    // Use snapshot label if available, otherwise humanise the key
                     const label = labelMap[key] ?? key.replace(/_/g, " ");
+
+                    // Render prescription objects properly instead of [object Object]
+                    if (isPrescriptionValue(val)) {
+                      return (
+                        <div key={key} className="flex flex-col gap-1 text-sm">
+                          <span className="text-gray-400 capitalize font-medium">{label}</span>
+                          {renderPrescription(val)}
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={key} className="flex gap-2 text-sm">
                         <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">{label}</span>

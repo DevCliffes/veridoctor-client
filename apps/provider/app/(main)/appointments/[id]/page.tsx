@@ -289,7 +289,7 @@ export default function AppointmentDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 mx-4 space-y-4 animate-pulse">
+      <div className="p-6 space-y-4 animate-pulse max-w-3xl mx-auto">
         <div className="h-8 bg-gray-200 rounded w-1/3" />
         <div className="h-40 bg-gray-200 rounded" />
       </div>
@@ -298,7 +298,7 @@ export default function AppointmentDetailPage() {
 
   if (!appointment) {
     return (
-      <div className="p-6 mx-4">
+      <div className="p-6 max-w-3xl mx-auto">
         <p className="text-gray-500">Appointment not found.</p>
         <button onClick={() => router.push("/appointments")} className="mt-4 text-blue-600 text-sm hover:underline">← Back to appointments</button>
       </div>
@@ -315,7 +315,12 @@ export default function AppointmentDetailPage() {
   const canJoinCall = appointment.appointment_type === "virtual" && appointment.meet_id && isToday;
 
   return (
-    <div className="p-4 mx-4 space-y-4 max-w-3xl">
+    // ✅ FIX: added mx-auto. This page sets its own max-w-3xl, which is
+    // narrower than the layout's max-w-6xl content area. Without mx-auto,
+    // a narrower fixed-width block defaults to the start (left) edge of
+    // its parent instead of centering within it — that's what was
+    // producing the empty space on the right.
+    <div className="p-4 space-y-4 max-w-3xl mx-auto">
       <button onClick={() => router.push("/appointments")} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
         ← Back to appointments
       </button>

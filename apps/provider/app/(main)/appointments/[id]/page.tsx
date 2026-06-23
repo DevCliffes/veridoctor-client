@@ -25,6 +25,16 @@ import {
   LucideShield,
 } from "@veridoctor/design/icons";
 
+type InsuranceEntry = {
+  id?: string;
+  provider: string;
+  policy_number?: string;
+  principal_member?: string;
+  scheme_name?: string;
+};
+
+type Insurance = string | InsuranceEntry;
+
 type Appointment = {
   id: string;
   patient_first_name: string;
@@ -91,7 +101,7 @@ type PatientSummary = {
     gender: string;
     date_of_birth: string | null;
     blood_type: string | null;
-    insurances?: string[];
+    insurances?: Insurance[];
   };
   consultation_active: boolean;
   stats: {
@@ -103,7 +113,7 @@ type PatientSummary = {
   always_visible: {
     allergies: string[];
     active_medications_count: number;
-    insurances?: string[];
+    insurances?: Insurance[];
   };
   record_categories: RecordCategory[];
   access_granted: { id: string; requested_category: string; status: string }[];
@@ -127,6 +137,11 @@ const STATUS_STYLES: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
   scheduled: "bg-yellow-100 text-yellow-700",
 };
+
+function getInsuranceLabel(ins: Insurance): string {
+  if (typeof ins === "string") return ins;
+  return ins.provider;
+}
 
 function timeAgo(isoDate: string) {
   const diff = Date.now() - new Date(isoDate).getTime();
@@ -186,7 +201,7 @@ export default function AppointmentDetailPage() {
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"details" | "records">("details");
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [patientInsurances, setPatientInsurances] = useState<string[]>([]);
+  const [patientInsurances, setPatientInsurances] = useState<Insurance[]>([]);
 
   useEffect(() => {
     if (!userId || !id) return;
@@ -198,7 +213,6 @@ export default function AppointmentDetailPage() {
         setAppointment(apptRes.data);
         setForms(formsRes.data ?? []);
         if (formsRes.data?.length > 0) setSelectedFormId(formsRes.data[0].id);
-        // Fetch patient insurances if patient identity is linked
         if (apptRes.data?.patient_identity) {
           axiosClient
             .get(`provider/${userId}/patients/${apptRes.data.patient_identity}`)
@@ -286,8 +300,10 @@ export default function AppointmentDetailPage() {
               {patientInsurances.length > 0 && (
                 <div className="flex items-center gap-1 mt-1 flex-wrap">
                   <LucideShield size={11} className="text-blue-500 shrink-0" />
-                  {patientInsurances.map((ins) => (
-                    <span key={ins} className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">{ins}</span>
+                  {patientInsurances.map((ins, i) => (
+                    <span key={i} className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">
+                      {getInsuranceLabel(ins)}
+                    </span>
                   ))}
                 </div>
               )}
@@ -542,6 +558,32 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
   );
 }
 
+function InsuranceCard({ ins }: { ins: Insurance }) {
+  if (typeof ins === "string") {
+    return (
+      <div className="bg-white rounded-lg border border-blue-100 px-3 py-2">
+        <p className="text-xs font-semibold text-gray-800">{ins}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-white rounded-lg border border-blue-100 px-3 py-2">
+      <p className="text-xs font-semibold text-gray-800">{ins.provider}</p>
+      <div className="mt-1 space-y-0.5">
+        {ins.policy_number && (
+          <p className="text-xs text-gray-500">Policy: <span className="font-medium text-gray-700">{ins.policy_number}</span></p>
+        )}
+        {ins.principal_member && (
+          <p className="text-xs text-gray-500">Principal: <span className="font-medium text-gray-700">{ins.principal_member}</span></p>
+        )}
+        {ins.scheme_name && (
+          <p className="text-xs text-gray-500">Scheme: <span className="font-medium text-gray-700">{ins.scheme_name}</span></p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; userId: string }) {
   const [summary, setSummary] = useState<PatientSummary | null>(null);
   const [ownRecords, setOwnRecords] = useState<OwnRecord[]>([]);
@@ -603,12 +645,12 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
   }
 
   const { patient, stats, always_visible, record_categories, access_granted } = summary;
-  const patientInsurances = always_visible.insurances ?? patient.insurances ?? [];
+  const patientInsurances: Insurance[] = always_visible.insurances ?? patient.insurances ?? [];
   const dobFormatted = patient.date_of_birth ? formatDOB(patient.date_of_birth) : null;
 
   return (
     <div className="space-y-3">
-      {/* ── DISCLAIMER FIRST — most visible position ─────────────────────────── */}
+      {/* Disclaimer */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
         <LucideShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800">
@@ -662,6 +704,7 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Always visible</p>
 
+        {/* Allergies */}
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
@@ -677,6 +720,7 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
           <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
         </div>
 
+        {/* Active medications */}
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-orange-50 border border-orange-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
@@ -694,17 +738,23 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
           <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
         </div>
 
-        {/* Patient insurance — shown if available */}
+        {/* Patient insurance */}
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
               <LucideShield size={15} />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-800">Patient Insurance</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {patientInsurances.length > 0 ? patientInsurances.join(" · ") : "No insurance on record"}
-              </p>
+              {patientInsurances.length === 0 ? (
+                <p className="text-xs text-gray-500 mt-0.5">No insurance on record</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {patientInsurances.map((ins, i) => (
+                    <InsuranceCard key={i} ins={ins} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>

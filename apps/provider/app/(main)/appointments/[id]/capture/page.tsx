@@ -69,6 +69,11 @@ const DEMOGRAPHICS_AUTOFILL: Record<string, (a: Appointment) => string> = {
 
 const AUTOSAVE_INTERVAL = 5000;
 
+// ── Reserved key used to smuggle the form snapshot inside the values JSONField.
+// The backend strips top-level form_snapshot, but values is an open JSONField
+// that accepts any shape — so we store the snapshot here instead.
+const SNAPSHOT_KEY = "__form_snapshot__";
+
 export default function CapturePage() {
   const { id: appointmentId } = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -250,16 +255,18 @@ export default function CapturePage() {
         flatValues[sectionId] = prescVal;
       }
 
+      // ✅ THE FIX: smuggle the form snapshot *inside* the values JSONField
+      // using a reserved key. The backend strips unknown top-level fields like
+      // form_snapshot, but values is an open JSONField that persists whatever
+      // we put in it. The view page reads __form_snapshot__ out of values
+      // before falling back to the top-level form_snapshot or legacy mode.
+      flatValues[SNAPSHOT_KEY] = form?.sections ?? [];
+
       await axiosClient.post(
         `provider/${userId}/appointments/${appointmentId}/captures`,
         {
           form_id: formId,
           form_name: form?.name ?? "",
-          // ✅ THE FIX: snapshot the full form structure at submission time.
-          // This is stored alongside the values so the view page can always
-          // reconstruct field labels — even if the original form is later
-          // edited or deleted.
-          form_snapshot: form?.sections ?? [],
           values: flatValues,
         }
       );

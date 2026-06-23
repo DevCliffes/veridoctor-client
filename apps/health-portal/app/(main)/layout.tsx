@@ -110,7 +110,10 @@ export default function MainAppLayout({
       authInfo={authInfo}
       setAuthInfo={(token) => setAuthInfo(token)}
     >
-      <div className="fixed bg-gray-50 top-0 left-0 h-svh w-full flex flex-col">
+      {/* ✅ overflow-hidden on the outer shell so only the inner content
+          area scrolls — prevents the whole page from being measured
+          against the wrong height and clipping the last bit of content. */}
+      <div className="fixed bg-gray-50 top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
         <TopNav
           center={<p>Health portal</p>}
           right={
@@ -120,14 +123,27 @@ export default function MainAppLayout({
             </div>
           }
         />
-        <div className="flex h-full">
+        {/* ✅ flex-1 min-h-0 — lets this row actually shrink to the
+            remaining height below TopNav instead of inheriting h-full
+            from a parent that already includes TopNav's height. */}
+        <div className="flex flex-1 min-h-0">
           <SideNav navItems={navItems} activePath={pathname} />
-          <div className="w-full overflow-y-scroll bg-gray-200 p-4 rounded-lg">
-            {profileReady ? children : (
-              <div className="flex items-center justify-center h-full">
-                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
+          {/* ✅ flex-1 min-h-0 overflow-y-auto — this is now the single
+              scroll container, correctly bounded between TopNav and the
+              bottom of the viewport. */}
+          <div className="flex-1 min-h-0 overflow-y-auto bg-gray-200 p-4 rounded-lg">
+            {/* ✅ max-w-5xl mx-auto — caps content width and centers it
+                instead of letting it stretch/stick to the left on wide
+                screens. pb-8 gives breathing room so the last element
+                (e.g. the footer disclaimer) isn't flush against the
+                scroll boundary. */}
+            <div className="max-w-5xl mx-auto pb-8">
+              {profileReady ? children : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -125,7 +125,9 @@ export default function MainAppLayout({
     >
       <GlobalNewAppointmentDialog userId={identityId} />
 
-      <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col">
+      {/* ✅ overflow-hidden on the shell — only the inner content area
+          scrolls, so nothing gets clipped against the wrong height */}
+      <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
         <TopNav
           center={<p>{displayName}</p>}
           right={
@@ -135,10 +137,21 @@ export default function MainAppLayout({
             </div>
           }
         />
-        <div className="flex h-full">
+        {/* ✅ flex-1 min-h-0 — fills remaining height below TopNav instead
+            of h-full re-measuring against the already-full-viewport parent */}
+        <div className="flex flex-1 min-h-0">
           <SideNav navItems={navItems} activePath={pathname} />
-          <div className="w-full overflow-y-scroll bg-neutral-100 p-1">
-            {children}
+          {/* ✅ flex-1 min-h-0 overflow-y-auto — single correctly-bounded
+              scroll container */}
+          <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-100 p-1">
+            {/* ✅ max-w-6xl mx-auto — caps width and centers content
+                instead of sticking left on wide screens. pb-8 keeps the
+                last element clear of the scroll boundary. Provider pages
+                tend to be denser (records, patient cards), so a slightly
+                wider cap than the health-portal app. */}
+            <div className="max-w-6xl mx-auto pb-8">
+              {children}
+            </div>
           </div>
         </div>
       </div>

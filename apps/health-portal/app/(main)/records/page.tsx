@@ -93,10 +93,7 @@ const TYPE_TABS = [
   { key: "prescription", label: "Prescriptions" },
 ];
 
-const SENSITIVITY_CONFIG: Record
-  Sensitivity,
-  { label: string; description: string; color: string; icon: React.ReactNode }
-> = {
+const SENSITIVITY_CONFIG: Record<Sensitivity, { label: string; description: string; color: string; icon: React.ReactNode }> = {
   always_visible: {
     label: "Visible to all doctors",
     description: "Any treating doctor can see these records without asking.",

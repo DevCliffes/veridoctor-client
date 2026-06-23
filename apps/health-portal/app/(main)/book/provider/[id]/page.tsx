@@ -37,8 +37,6 @@ interface ProviderProfile {
   services: Service[];
 }
 
-// Display-only formatting — capitalizes the first letter for presentation
-// without ever mutating the underlying stored value (e.g. provider.bio).
 function capitalizeFirst(text: string) {
   if (!text) return text;
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -96,19 +94,20 @@ export default function ProviderProfilePage() {
       </button>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex gap-4 items-start">
+        {/* Profile picture — large, centered above details */}
+        <div className="flex flex-col items-center mb-5">
           {provider.profile_picture_url ? (
             <img
               src={provider.profile_picture_url}
               alt={`${provider.first_name} ${provider.last_name}`}
-              className="w-20 h-20 rounded-full object-cover shrink-0"
+              className="w-32 h-32 rounded-full object-cover border-4 border-blue-100 shadow-md"
             />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-2xl font-bold shrink-0">
+            <div className="w-32 h-32 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-4xl font-bold border-4 border-blue-50 shadow-md">
               {initials.toUpperCase()}
             </div>
           )}
-          <div className="flex-1 min-w-0">
+          <div className="mt-3 text-center">
             <h1 className="text-xl font-bold text-gray-800">
               {provider.title} {provider.first_name} {provider.last_name}
             </h1>
@@ -116,7 +115,7 @@ export default function ProviderProfilePage() {
               {provider.speciality || "General Practitioner"}
             </p>
             {(provider.clinic_name || provider.county) && (
-              <p className="text-sm text-gray-500 mt-2 flex items-center gap-1.5">
+              <p className="text-sm text-gray-500 mt-1.5 flex items-center justify-center gap-1.5">
                 <LucideMapPin size={14} className="text-gray-400" />
                 {[provider.clinic_name, provider.county, provider.country]
                   .filter(Boolean)
@@ -128,7 +127,7 @@ export default function ProviderProfilePage() {
 
         <button
           onClick={() => router.push(`/book?provider=${provider.id}`)}
-          className="mt-5 w-full sm:w-auto bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
         >
           View available slots →
         </button>

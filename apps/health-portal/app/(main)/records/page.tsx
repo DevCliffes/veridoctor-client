@@ -14,6 +14,9 @@ import {
   LucideShieldCheck,
   LucideBell,
   LucidePill,
+  LucideEye,
+  LucideEyeOff,
+  LucideShield,
 } from "@veridoctor/design/icons";
 
 interface Drug {
@@ -49,6 +52,8 @@ interface Capture {
   captured_at: string;
 }
 
+type Sensitivity = "always_visible" | "ask_first" | "never";
+
 interface HealthRecord {
   id: string;
   fhir_resource_type: string;
@@ -66,6 +71,8 @@ interface HealthRecord {
   diagnosis?: string;
   notes?: string;
   drugs?: Drug[];
+  sensitivity?: Sensitivity | null;
+  summary_id?: string | null;
 }
 
 interface AccessRequest {
@@ -86,6 +93,30 @@ const TYPE_TABS = [
   { key: "prescription", label: "Prescriptions" },
 ];
 
+const SENSITIVITY_CONFIG: Record
+  Sensitivity,
+  { label: string; description: string; color: string; icon: React.ReactNode }
+> = {
+  always_visible: {
+    label: "Visible to all doctors",
+    description: "Any treating doctor can see these records without asking.",
+    color: "text-green-700 bg-green-50 border-green-200",
+    icon: <LucideEye size={13} />,
+  },
+  ask_first: {
+    label: "Ask me first",
+    description: "Doctors must request access and you approve or deny.",
+    color: "text-amber-700 bg-amber-50 border-amber-200",
+    icon: <LucideShield size={13} />,
+  },
+  never: {
+    label: "Private — never share",
+    description: "These records are never visible to other doctors.",
+    color: "text-red-700 bg-red-50 border-red-200",
+    icon: <LucideEyeOff size={13} />,
+  },
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-KE", {
     day: "numeric",
@@ -105,7 +136,6 @@ function buildLabelMap(snapshot: FormSection[]): Record<string, string> {
   return map;
 }
 
-// ── Detect if a value looks like a prescription object ───────────────────────
 function isPrescriptionValue(val: unknown): val is PrescriptionValue {
   if (!val || typeof val !== "object" || Array.isArray(val)) return false;
   const obj = val as Record<string, unknown>;
@@ -113,9 +143,7 @@ function isPrescriptionValue(val: unknown): val is PrescriptionValue {
 }
 
 function parsePrescription(val: unknown): PrescriptionValue | null {
-  // Already an object
   if (isPrescriptionValue(val)) return val as PrescriptionValue;
-  // JSON string
   if (typeof val === "string") {
     try {
       const parsed = JSON.parse(val);
@@ -127,7 +155,6 @@ function parsePrescription(val: unknown): PrescriptionValue | null {
   return null;
 }
 
-// ── Inline prescription renderer used inside CaptureBlock ────────────────────
 function InlinePrescription({ value }: { value: PrescriptionValue }) {
   return (
     <div className="mt-1 space-y-2">
@@ -140,26 +167,17 @@ function InlinePrescription({ value }: { value: PrescriptionValue }) {
       {value.drugs && value.drugs.length > 0 && (
         <div className="space-y-2">
           {value.drugs.map((drug, i) => (
-            <div
-              key={drug.id ?? i}
-              className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-start gap-3"
-            >
+            <div key={drug.id ?? i} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-start gap-3">
               <div className="w-7 h-7 rounded-lg bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
                 <LucidePill size={13} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-800">
-                  {drug.drug_name}
-                </p>
+                <p className="text-sm font-semibold text-gray-800">{drug.drug_name}</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {[drug.dosage, drug.frequency, drug.duration]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  {[drug.dosage, drug.frequency, drug.duration].filter(Boolean).join(" · ")}
                 </p>
                 {drug.instructions && (
-                  <p className="text-xs text-gray-400 mt-0.5 italic">
-                    {drug.instructions}
-                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 italic">{drug.instructions}</p>
                 )}
               </div>
             </div>
@@ -181,11 +199,8 @@ function renderValue(val: unknown): React.ReactNode {
   if (typeof val === "boolean") return val ? "Yes" : "No";
   if (typeof val === "number") return String(val);
   if (typeof val === "string") return val;
-
-  // Check if it's a prescription object/string before generic rendering
   const prescription = parsePrescription(val);
   if (prescription) return <InlinePrescription value={prescription} />;
-
   if (Array.isArray(val)) return val.map(renderValue).join(", ");
   if (typeof val === "object") {
     const obj = val as Record<string, unknown>;
@@ -195,6 +210,91 @@ function renderValue(val: unknown): React.ReactNode {
     return JSON.stringify(val);
   }
   return String(val);
+}
+
+function SensitivityToggle({
+  summaryId,
+  current,
+  onChange,
+}: {
+  summaryId: string;
+  current: Sensitivity;
+  onChange: (val: Sensitivity) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const config = SENSITIVITY_CONFIG[current];
+
+  const handleSelect = async (val: Sensitivity) => {
+    if (val === current) { setOpen(false); return; }
+    setSaving(true);
+    setOpen(false);
+    try {
+      await axiosClient.patch(`/records/sensitivity/${summaryId}`, { sensitivity: val });
+      onChange(val);
+    } catch {
+      // silent — revert is implicit since onChange wasn't called
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        disabled={saving}
+        className={
+          "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-colors " +
+          config.color +
+          (saving ? " opacity-60" : "")
+        }
+      >
+        {saving ? <LucideLoader2 size={11} className="animate-spin" /> : config.icon}
+        {config.label}
+        <LucideChevronDown size={11} />
+      </button>
+
+      {open && (
+        <>
+          {/* backdrop */}
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-8 z-20 bg-white rounded-xl border border-gray-200 shadow-lg w-64 overflow-hidden">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 pt-3 pb-1">
+              Who can see these records?
+            </p>
+            {(Object.keys(SENSITIVITY_CONFIG) as Sensitivity[]).map((key) => {
+              const cfg = SENSITIVITY_CONFIG[key];
+              return (
+                <button
+                  key={key}
+                  onClick={() => handleSelect(key)}
+                  className={
+                    "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-gray-50 transition-colors " +
+                    (key === current ? "bg-gray-50" : "")
+                  }
+                >
+                  <span className={
+                    "mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 border " +
+                    cfg.color
+                  }>
+                    {cfg.icon}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{cfg.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{cfg.description}</p>
+                  </div>
+                  {key === current && (
+                    <LucideShieldCheck size={14} className="text-blue-500 shrink-0 ml-auto mt-0.5" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function AccessRequestsPanel({ identityId }: { identityId: string }) {
@@ -218,14 +318,10 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
   const handleRespond = async (grantId: string, newStatus: "approved" | "denied") => {
     setResponding(grantId);
     try {
-      await axiosClient.patch(`/records/access-grants/${grantId}`, {
-        status: newStatus,
-      });
+      await axiosClient.patch(`/records/access-grants/${grantId}`, { status: newStatus });
       setRequests((prev) =>
         prev.map((r) =>
-          r.id === grantId
-            ? { ...r, status: newStatus, responded_at: new Date().toISOString() }
-            : r
+          r.id === grantId ? { ...r, status: newStatus, responded_at: new Date().toISOString() } : r
         )
       );
     } catch {
@@ -251,7 +347,6 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
           </span>
         )}
       </h2>
-
       {pending.length > 0 && (
         <div className="space-y-2">
           {pending.map((req) => (
@@ -290,15 +385,11 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
           ))}
         </div>
       )}
-
       {past.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs text-gray-400 uppercase tracking-wide">Previous requests</p>
           {past.map((req) => (
-            <div
-              key={req.id}
-              className="flex items-center justify-between text-xs text-gray-500 py-1.5 border-b border-gray-50 last:border-0"
-            >
+            <div key={req.id} className="flex items-center justify-between text-xs text-gray-500 py-1.5 border-b border-gray-50 last:border-0">
               <span>{req.provider_name} · {req.requested_category}</span>
               <span className={req.status === "approved" ? "text-green-600 font-medium" : "text-red-500 font-medium"}>
                 {req.status}
@@ -325,14 +416,8 @@ function CaptureBlock({ capture }: { capture: Capture }) {
           const isPrescription = parsePrescription(val) !== null;
           return (
             <div key={key} className={isPrescription ? "flex flex-col gap-1" : "flex gap-2 text-sm"}>
-              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize text-sm">
-                {label}
-              </span>
-              {isPrescription ? (
-                rendered
-              ) : (
-                <span className="text-gray-800 font-medium text-sm">{rendered}</span>
-              )}
+              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize text-sm">{label}</span>
+              {isPrescription ? rendered : <span className="text-gray-800 font-medium text-sm">{rendered}</span>}
             </div>
           );
         })}
@@ -341,8 +426,15 @@ function CaptureBlock({ capture }: { capture: Capture }) {
   );
 }
 
-function ConsultationCard({ record }: { record: HealthRecord }) {
+function ConsultationCard({
+  record,
+  onSensitivityChange,
+}: {
+  record: HealthRecord;
+  onSensitivityChange: (id: string, val: Sensitivity) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <button
@@ -358,19 +450,14 @@ function ConsultationCard({ record }: { record: HealthRecord }) {
               <p className="text-sm font-semibold text-gray-800">
                 {record.service_name ?? "Consultation"}
               </p>
-              <span
-                className={
-                  "text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 " +
-                  (record.appointment_type === "virtual"
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "bg-green-50 text-green-700")
+              <span className={
+                "text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 " +
+                (record.appointment_type === "virtual" ? "bg-indigo-50 text-indigo-700" : "bg-green-50 text-green-700")
+              }>
+                {record.appointment_type === "virtual"
+                  ? <><LucideVideo size={11} /> Virtual</>
+                  : <><LucideMapPin size={11} /> In-person</>
                 }
-              >
-                {record.appointment_type === "virtual" ? (
-                  <><LucideVideo size={11} /> Virtual</>
-                ) : (
-                  <><LucideMapPin size={11} /> In-person</>
-                )}
               </span>
               {record.has_clinical_notes && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
@@ -391,13 +478,28 @@ function ConsultationCard({ record }: { record: HealthRecord }) {
             <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
           </div>
         </div>
-        {record.has_clinical_notes &&
-          (expanded ? (
-            <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
-          ) : (
-            <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
-          ))}
+        {record.has_clinical_notes && (
+          expanded
+            ? <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
+            : <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
+        )}
       </button>
+
+      {/* Sensitivity toggle — always shown on consultation records that have a summary */}
+      {record.summary_id && record.sensitivity && (
+        <div
+          className="px-5 pb-3 flex items-center justify-between"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-xs text-gray-400">Record visibility to other doctors</p>
+          <SensitivityToggle
+            summaryId={record.summary_id}
+            current={record.sensitivity}
+            onChange={(val) => onSensitivityChange(record.id, val)}
+          />
+        </div>
+      )}
+
       {expanded && record.captures && record.captures.length > 0 && (
         <div className="border-t border-gray-100 px-5 py-4 space-y-5 bg-gray-50">
           {record.captures.map((cap, i) => (
@@ -446,27 +548,22 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
             <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
           </div>
         </div>
-        {expanded ? (
-          <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
-        ) : (
-          <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
-        )}
+        {expanded
+          ? <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
+          : <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
+        }
       </button>
       {expanded && (
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-3">
           {record.notes && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Doctor's Notes
-              </p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Doctor's Notes</p>
               <p className="text-sm text-gray-700">{record.notes}</p>
             </div>
           )}
           {record.drugs && record.drugs.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                Medications
-              </p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Medications</p>
               <div className="space-y-2">
                 {record.drugs.map((drug, i) => (
                   <div key={i} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-start gap-3">
@@ -515,6 +612,14 @@ export default function RecordsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [identityId, activeType]);
+
+  // Update sensitivity locally after a successful PATCH so the UI
+  // reflects the change without a full refetch.
+  const handleSensitivityChange = (recordId: string, val: Sensitivity) => {
+    setRecords((prev) =>
+      prev.map((r) => (r.id === recordId ? { ...r, sensitivity: val } : r))
+    );
+  };
 
   const consultationCount = records.filter((r) => r.record_type === "consultation").length;
   const prescriptionCount = records.filter((r) => r.record_type === "prescription").length;
@@ -580,7 +685,11 @@ export default function RecordsPage() {
         <div className="space-y-3">
           {records.map((record) =>
             record.record_type === "consultation" ? (
-              <ConsultationCard key={record.id} record={record} />
+              <ConsultationCard
+                key={record.id}
+                record={record}
+                onSensitivityChange={handleSensitivityChange}
+              />
             ) : (
               <PrescriptionCard key={record.id} record={record} />
             )

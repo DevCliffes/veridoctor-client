@@ -35,7 +35,6 @@ type Appointment = {
   patient_last_name: string;
   patient_email: string;
   patient_phone_number: string;
-  // patient_identity is the UUID of their Identity record (null if guest)
   patient_identity: string | null;
 };
 
@@ -62,7 +61,6 @@ const DURATION_OPTIONS = [
   "14 days", "1 month", "2 months", "3 months", "Ongoing", "Other",
 ];
 
-// Fields in the demographics section that map to appointment data
 const DEMOGRAPHICS_AUTOFILL: Record<string, (a: Appointment) => string> = {
   "Full Name": (a) => `${a.patient_first_name} ${a.patient_last_name}`.trim(),
   "Contact Number": (a) => a.patient_phone_number ?? "",
@@ -79,7 +77,6 @@ export default function CapturePage() {
   const userId = useSelector((state: RootState) => state.auth.identity);
 
   const [form, setForm] = useState<Form | null>(null);
-  // appointment holds the resolved data including phone (possibly fetched from identity)
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [appointmentReady, setAppointmentReady] = useState(false);
   const [values, setValues] = useState<FieldValues>({});
@@ -92,28 +89,20 @@ export default function CapturePage() {
   const draftKey = `vd_capture_${appointmentId}`;
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Step 1: Fetch appointment, then resolve phone number if missing ──────────
+  // ── Step 1: Fetch appointment ─────────────────────────────────────────────
   useEffect(() => {
     if (!userId || !appointmentId) return;
-
     axiosClient
       .get(`provider/${userId}/appointments/${appointmentId}`)
       .then(async (res) => {
         const appt: Appointment = res.data;
-
-        // If phone is already present, we're done
         if (appt.patient_phone_number) {
           setAppointment(appt);
           setAppointmentReady(true);
           return;
         }
-
-        // Phone missing — try to pull it from the patient's Identity profile
         if (appt.patient_identity) {
           try {
-            // This endpoint returns the patient's profile. Check your backend:
-            //   provider/<provider_id>/patients/<patient_identity_id>/
-            // The response should include a `phone_number` field.
             const profileRes = await axiosClient.get(
               `provider/${userId}/patients/${appt.patient_identity}`
             );
@@ -123,23 +112,19 @@ export default function CapturePage() {
               "";
             setAppointment({ ...appt, patient_phone_number: phone });
           } catch {
-            // Profile fetch failed — proceed without phone
             setAppointment(appt);
           }
         } else {
-          // Guest booking with no linked account; phone simply isn't available
           setAppointment(appt);
         }
-
         setAppointmentReady(true);
       })
       .catch(() => {
-        // Non-critical — proceed without autofill
         setAppointmentReady(true);
       });
   }, [userId, appointmentId]);
 
-  // ── Step 2: Load form + restore draft ────────────────────────────────────────
+  // ── Step 2: Load form + restore draft ────────────────────────────────────
   useEffect(() => {
     if (!userId || !formId) return;
     axiosClient
@@ -164,17 +149,13 @@ export default function CapturePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, formId]);
 
-  // ── Step 3: Autofill demographics once BOTH form AND appointment are ready ───
-  // KEY FIX: only fills slots that are empty — draft values are never overwritten,
-  // but a missing/empty phone will be filled from the resolved appointment.
+  // ── Step 3: Autofill demographics ────────────────────────────────────────
   useEffect(() => {
     if (!form || !appointment || !appointmentReady) return;
-
     const demographicsSection = form.sections.find(
       (s) => s.id === "demographics" || s.title.toLowerCase().includes("demographic")
     );
     if (!demographicsSection) return;
-
     const autofilled: FieldValues = {};
     for (const field of demographicsSection.fields) {
       const filler = DEMOGRAPHICS_AUTOFILL[field.label];
@@ -183,23 +164,17 @@ export default function CapturePage() {
         if (val) autofilled[field.id] = val;
       }
     }
-
     if (Object.keys(autofilled).length === 0) return;
-
     setValues((prev) => {
       const merged = { ...prev };
       for (const [key, val] of Object.entries(autofilled)) {
-        // Only fill if the current value is empty/missing
-        // This handles: undefined, null, "" (empty string from old draft)
-        if (!merged[key]) {
-          merged[key] = val;
-        }
+        if (!merged[key]) merged[key] = val;
       }
       return merged;
     });
   }, [form, appointment, appointmentReady]);
 
-  // ── Draft save ────────────────────────────────────────────────────────────────
+  // ── Draft save ────────────────────────────────────────────────────────────
   const saveDraft = useCallback(
     (currentValues: FieldValues, currentPrescriptions: Record<string, PrescriptionValue>) => {
       try {
@@ -267,14 +242,28 @@ export default function CapturePage() {
     if (!validate()) return;
     setSaving(true);
     try {
+      // Build flat values map keyed by field ID
+      const flatValues: Record<string, unknown> = { ...values };
+
+      // Merge prescription section values (keyed by section ID)
+      for (const [sectionId, prescVal] of Object.entries(prescriptionValues)) {
+        flatValues[sectionId] = prescVal;
+      }
+
       await axiosClient.post(
         `provider/${userId}/appointments/${appointmentId}/captures`,
         {
           form_id: formId,
           form_name: form?.name ?? "",
-          values: { ...values, ...prescriptionValues },
+          // ✅ THE FIX: snapshot the full form structure at submission time.
+          // This is stored alongside the values so the view page can always
+          // reconstruct field labels — even if the original form is later
+          // edited or deleted.
+          form_snapshot: form?.sections ?? [],
+          values: flatValues,
         }
       );
+
       localStorage.removeItem(draftKey);
       toast.success("Capture saved successfully!");
       router.push(`/appointments/${appointmentId}`);

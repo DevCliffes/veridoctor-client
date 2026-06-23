@@ -19,6 +19,11 @@ import {
   LucideShield,
 } from "@veridoctor/design/icons";
 
+// Shared key used across capture/page.tsx, the provider capture view, and the
+// appointment detail page to smuggle the form snapshot inside `values`
+// (the backend strips a top-level `form_snapshot` field).
+const SNAPSHOT_KEY = "__form_snapshot__";
+
 interface Drug {
   id?: string;
   drug_name: string;
@@ -400,14 +405,25 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
 }
 
 function CaptureBlock({ capture }: { capture: Capture }) {
-  const labelMap = buildLabelMap(capture.form_snapshot ?? []);
+  // ✅ Read snapshot from the smuggled key first (new captures), fall back
+  // to the legacy top-level form_snapshot field for old captures.
+  const smuggled = (capture.values as Record<string, unknown> | undefined)?.[SNAPSHOT_KEY];
+  const snapshot = (Array.isArray(smuggled) ? smuggled : null) ?? capture.form_snapshot ?? [];
+  const labelMap = buildLabelMap(snapshot);
+
+  // ✅ Strip the smuggled key out of the values we actually render so it
+  // never shows up as its own "Form Snapshot" row.
+  const displayValues = Object.fromEntries(
+    Object.entries(capture.values ?? {}).filter(([key]) => key !== SNAPSHOT_KEY)
+  );
+
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
         {capture.form_name || "Clinical Notes"}
       </p>
       <div className="space-y-3">
-        {Object.entries(capture.values).map(([key, val]) => {
+        {Object.entries(displayValues).map(([key, val]) => {
           const label = labelMap[key] ?? key.replace(/_/g, " ");
           const rendered = renderValue(val);
           const isPrescription = parsePrescription(val) !== null;

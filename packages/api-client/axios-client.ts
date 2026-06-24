@@ -1,6 +1,16 @@
 import axios from "axios";
-import Cookies from "js-cookie";
 import { ACCESS_TOKEN_KEY, AUTH_CODE_KEY, IDENTITY_KEY } from "./constants";
+
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+function setCookie(name: string, value: string): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=${encodeURIComponent(value)};path=/`;
+}
 
 const axiosClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -8,13 +18,12 @@ const axiosClient = axios.create({
   withCredentials: true,
 });
 
-// Exchange auth code for access token if we don't have one yet
 async function maybeAuthorise(): Promise<string | null> {
-  const token = Cookies.get(ACCESS_TOKEN_KEY);
+  const token = getCookie(ACCESS_TOKEN_KEY);
   if (token) return token;
 
-  const authCode = Cookies.get(AUTH_CODE_KEY);
-  const identity = Cookies.get(IDENTITY_KEY);
+  const authCode = getCookie(AUTH_CODE_KEY);
+  const identity = getCookie(IDENTITY_KEY);
   if (!authCode || !identity) return null;
 
   try {
@@ -24,14 +33,13 @@ async function maybeAuthorise(): Promise<string | null> {
       { params: { auth_code: authCode, identity } }
     );
     const { a_token } = res.data;
-    Cookies.set(ACCESS_TOKEN_KEY, a_token);
+    setCookie(ACCESS_TOKEN_KEY, a_token);
     return a_token;
   } catch {
     return null;
   }
 }
 
-// Attach access token to every request
 axiosClient.interceptors.request.use(async (config) => {
   const token = await maybeAuthorise();
   if (token) {

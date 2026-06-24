@@ -22,6 +22,9 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useRef, useState } from "react";
 
+// Health-portal base URL — all cross-app links point here.
+const HEALTH_PORTAL_URL = "https://veridoctor-client-ffs7ue4ah-dev-cliffes-projects.vercel.app";
+
 const features: { name: string; description: string; icon: ReactNode }[] = [
   {
     name: "Telehealth Tools",
@@ -79,7 +82,6 @@ function DoctorAvatar({ provider }: { provider: Provider }) {
 }
 
 function TopDoctorsSection() {
-  const router = useRouter();
   const trackRef = useRef<HTMLDivElement>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +89,6 @@ function TopDoctorsSection() {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
-    // cancelled flag prevents a slow in-flight request from setting state
-    // after the component has unmounted or a retry has been triggered.
     let cancelled = false;
 
     setLoading(true);
@@ -114,12 +114,19 @@ function TopDoctorsSection() {
     return () => {
       cancelled = true;
     };
-    // retryCount is the only real dependency — incrementing it re-runs the fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryCount]);
 
   const scrollBy = (amount: number) => {
     trackRef.current?.scrollBy({ left: amount, behavior: "smooth" });
+  };
+
+  // Clicking "View profile" sends the user to the health-portal login page.
+  // After a successful login the health-portal's root page.tsx reads the
+  // `redirect` param and forwards them straight to the doctor's profile.
+  const goToProvider = (id: string) => {
+    const redirect = encodeURIComponent(`/book/provider/${id}`);
+    window.location.href = `${HEALTH_PORTAL_URL}/auth/login?redirect=/book/provider/${id}`;
   };
 
   return (
@@ -180,7 +187,7 @@ function TopDoctorsSection() {
                   </p>
                 )}
                 <button
-                  onClick={() => router.push("/book/provider/" + p.id)}
+                  onClick={() => goToProvider(p.id)}
                   className="mt-2 w-full text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg py-2 transition-colors"
                 >
                   View profile
@@ -211,7 +218,12 @@ function TopDoctorsSection() {
       )}
 
       <div className="text-center mt-8">
-        <Button variant="outline" onClick={() => router.push("/book")}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            window.location.href = `${HEALTH_PORTAL_URL}/book`;
+          }}
+        >
           See all doctors <ArrowUpRight />
         </Button>
       </div>
@@ -249,14 +261,21 @@ export default function Home() {
             deliver it.
           </p>
           <div className="w-full grid md:grid-cols-2 md:max-w-lg md:m-auto lg:mx-0 gap-4 mt-10 md:mt-20">
-            <Button size={"lg"} onClick={() => router.push("/auth/signup")}>
+            <Button
+              size={"lg"}
+              onClick={() => {
+                window.location.href = `${HEALTH_PORTAL_URL}/auth/signup`;
+              }}
+            >
               Get started <ArrowUpRight />
             </Button>
             <Button
               className="border-primary text-primary"
               variant={"outline"}
               size={"lg"}
-              onClick={() => router.push("/auth/login")}
+              onClick={() => {
+                window.location.href = `${HEALTH_PORTAL_URL}/auth/login`;
+              }}
             >
               Login
             </Button>

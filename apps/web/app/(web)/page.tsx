@@ -20,7 +20,7 @@ import {
 } from "@veridoctor/design/icons";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 const features: { name: string; description: string; icon: ReactNode }[] = [
   {
@@ -46,14 +46,6 @@ const features: { name: string; description: string; icon: ReactNode }[] = [
   },
 ];
 
-// Matches the Provider shape returned by GET /provider/list
-// (see apps/health-portal/app/(main)/book/page.tsx for the source of truth).
-// Only fields that actually exist on the backend today are used here —
-// there is no rating or booking-count field yet, so the carousel does not
-// display or sort by either. If the backend later adds a `featured` flag
-// or a real ranking signal (e.g. completed_appointments_count), this
-// section should be updated to sort by that instead of the current
-// "first N as returned by the API" fallback.
 interface Provider {
   id: string;
   first_name: string;
@@ -91,25 +83,57 @@ function TopDoctorsSection() {
   const trackRef = useRef<HTMLDivElement>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    axiosClient
-      .get("/provider/list")
-      .then((res) => {
-        // No ranking signal exists on the backend yet (no rating or
-        // booking count). Showing the first 10 as returned by the API.
-        // Swap this for a real sort once that data exists.
-        setProviders((res.data ?? []).slice(0, 10));
+  const fetchProviders = useCallback(() => {
+    setLoading(true);
+    setError(null);
+
+    // Try with axiosClient first; if it throws immediately (e.g. missing
+    // base URL in the web app), fall back to a raw fetch so the section
+    // is never silently invisible.
+    const request = (() => {
+      try {
+        return axiosClient.get("/provider/list").then((res) => res.data);
+      } catch {
+        // axiosClient itself threw (misconfigured base URL, etc.) — fall
+        // back to the env var directly so the public homepage still works.
+        const base =
+          process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+        return fetch(`${base}/provider/list`).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        });
+      }
+    })();
+
+    request
+      .then((data: Provider[]) => {
+        const list = Array.isArray(data) ? data : [];
+        setProviders(list.slice(0, 10));
+        if (list.length === 0) {
+          // Surface this so a developer can tell the API returned an
+          // empty list rather than an error, which is a different problem.
+          console.info("[TopDoctors] /provider/list returned 0 providers");
+        }
       })
-      .catch(() => setProviders([]))
+      .catch((err: unknown) => {
+        const msg =
+          err instanceof Error ? err.message : "Unknown error";
+        console.error("[TopDoctors] Failed to load providers:", msg);
+        setError("Could not load doctors right now.");
+        setProviders([]);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchProviders();
+  }, [fetchProviders]);
 
   const scrollBy = (amount: number) => {
     trackRef.current?.scrollBy({ left: amount, behavior: "smooth" });
   };
-
-  if (!loading && providers.length === 0) return null;
 
   return (
     <div className="bg-white py-12 px-4 md:px-8">
@@ -120,9 +144,30 @@ function TopDoctorsSection() {
       </p>
 
       {loading ? (
-        <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        /* Loading skeleton — same height as the cards so the layout
+           does not jump when providers arrive. */
+        <div className="flex gap-4 overflow-hidden max-w-6xl mx-auto pb-2">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="shrink-0 w-[230px] h-[230px] bg-gray-100 rounded-xl animate-pulse"
+            />
+          ))}
         </div>
+      ) : error ? (
+        <div className="text-center py-10">
+          <p className="text-gray-400 text-sm mb-3">{error}</p>
+          <button
+            onClick={fetchProviders}
+            className="text-xs text-blue-600 underline hover:no-underline"
+          >
+            Try again
+          </button>
+        </div>
+      ) : providers.length === 0 ? (
+        <p className="text-center text-gray-400 text-sm py-10">
+          No doctors listed yet — check back soon.
+        </p>
       ) : (
         <div className="relative max-w-6xl mx-auto">
           <div
@@ -202,13 +247,6 @@ export default function Home() {
 
   return (
     <>
-      {/* Hero section.
-          FIX: removed `min-h-[80vh]` — it forced the hero to occupy 80% of
-          viewport height no matter how little content it had, which is what
-          produced the large empty gap beneath the buttons on tall/short
-          viewports and at certain zoom levels. Replaced with natural content
-          height plus generous, consistent vertical padding (py-16/py-20) so
-          the section's height always tracks its actual content. */}
       <div className="relative flex flex-col lg:flex-row pt-10 pb-16 lg:py-20 items-center justify-around lg:gap-10">
         <div className="md:mx-8 lg:mx-20 py-8 px-4 text-center lg:text-left">
           <div className="text-2xl md:text-4xl xl:text-5xl font-bold max-w-[90vw] flex flex-col gap-4">
@@ -240,9 +278,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* FIX: single source of truth for image size — the width/height
-            props now match the rendered className exactly (400x430), so the
-            image no longer fights itself across breakpoints. */}
         <div className="hidden lg:block shrink-0 w-[400px]">
           <Image
             src="/hero_img.png"
@@ -254,10 +289,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Features section.
-          FIX: fixed-size cards replaced with min-h + flexible padding, so
-          text can never clip or overflow its box at different zoom levels —
-          the box grows with its content instead of clipping it. */}
       <div className="bg-blue-500 pb-12 text-white pt-8 px-2 md:p-4">
         <p className="text-2xl font-bold mb-5 text-center">Key features</p>
         <div className="flex flex-wrap justify-center items-stretch gap-4 w-full text-left">
@@ -275,12 +306,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Top doctors carousel — new section, placed between Key features
-          and "Find, book, consult" per request. */}
+      {/* Top doctors carousel */}
       <TopDoctorsSection />
 
-      {/* FIX: cards switched from fixed w-[220px] h-[180px] to min-h with
-          flexible width/padding, same reasoning as Key features above. */}
       <div className="bg-gray-200 text-center py-12">
         <p className="text-2xl">It is this easy</p>
         <p className="font-bold text-2xl">Find, book, consult</p>
@@ -313,9 +341,6 @@ export default function Home() {
         <AccordionEl />
       </div>
 
-      {/* FIX: newsletter input box switched from fixed w-[300px] h-[48px]
-          to flexible width with a max-width cap, so the input never clips
-          its placeholder text at zoomed-in levels. */}
       <div className="text-center mt-16 mb-16 px-4">
         <p className="font-bold text-2xl">Don&apos;t miss out</p>
         <p className="">Subscribe to our newsletter</p>

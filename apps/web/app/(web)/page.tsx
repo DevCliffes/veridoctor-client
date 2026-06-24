@@ -20,7 +20,7 @@ import {
 } from "@veridoctor/design/icons";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 
 const features: { name: string; description: string; icon: ReactNode }[] = [
   {
@@ -84,52 +84,39 @@ function TopDoctorsSection() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const fetchProviders = useCallback(() => {
+  useEffect(() => {
+    // cancelled flag prevents a slow in-flight request from setting state
+    // after the component has unmounted or a retry has been triggered.
+    let cancelled = false;
+
     setLoading(true);
     setError(null);
 
-    // Try with axiosClient first; if it throws immediately (e.g. missing
-    // base URL in the web app), fall back to a raw fetch so the section
-    // is never silently invisible.
-    const request = (() => {
-      try {
-        return axiosClient.get("/provider/list").then((res) => res.data);
-      } catch {
-        // axiosClient itself threw (misconfigured base URL, etc.) — fall
-        // back to the env var directly so the public homepage still works.
-        const base =
-          process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
-        return fetch(`${base}/provider/list`).then((r) => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        });
-      }
-    })();
-
-    request
-      .then((data: Provider[]) => {
-        const list = Array.isArray(data) ? data : [];
+    axiosClient
+      .get("/provider/list")
+      .then((res) => {
+        if (cancelled) return;
+        const list: Provider[] = Array.isArray(res.data) ? res.data : [];
         setProviders(list.slice(0, 10));
-        if (list.length === 0) {
-          // Surface this so a developer can tell the API returned an
-          // empty list rather than an error, which is a different problem.
-          console.info("[TopDoctors] /provider/list returned 0 providers");
-        }
       })
       .catch((err: unknown) => {
-        const msg =
-          err instanceof Error ? err.message : "Unknown error";
-        console.error("[TopDoctors] Failed to load providers:", msg);
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[TopDoctors] fetch failed:", msg);
         setError("Could not load doctors right now.");
-        setProviders([]);
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  useEffect(() => {
-    fetchProviders();
-  }, [fetchProviders]);
+    return () => {
+      cancelled = true;
+    };
+    // retryCount is the only real dependency — incrementing it re-runs the fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryCount]);
 
   const scrollBy = (amount: number) => {
     trackRef.current?.scrollBy({ left: amount, behavior: "smooth" });
@@ -144,8 +131,6 @@ function TopDoctorsSection() {
       </p>
 
       {loading ? (
-        /* Loading skeleton — same height as the cards so the layout
-           does not jump when providers arrive. */
         <div className="flex gap-4 overflow-hidden max-w-6xl mx-auto pb-2">
           {[...Array(4)].map((_, i) => (
             <div
@@ -158,7 +143,7 @@ function TopDoctorsSection() {
         <div className="text-center py-10">
           <p className="text-gray-400 text-sm mb-3">{error}</p>
           <button
-            onClick={fetchProviders}
+            onClick={() => setRetryCount((c) => c + 1)}
             className="text-xs text-blue-600 underline hover:no-underline"
           >
             Try again

@@ -23,7 +23,7 @@ import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useRef, useState } from "react";
 
 // Health-portal base URL — all cross-app links point here.
-const HEALTH_PORTAL_URL = "https://veridoctor-client-health-portal.vercel.app";
+const HEALTH_PORTAL_URL = "https://veridoctor-client-web.vercel.app";
 
 const features: { name: string; description: string; icon: ReactNode }[] = [
   {

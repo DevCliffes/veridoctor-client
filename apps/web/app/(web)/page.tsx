@@ -221,7 +221,7 @@ function TopDoctorsSection() {
         <Button
           variant="outline"
           onClick={() => {
-            window.location.href = `${HEALTH_PORTAL_URL}/book`;
+            window.location.href = `${HEALTH_PORTAL_URL}/auth/login?redirect=/book`;
           }}
         >
           See all doctors <ArrowUpRight />

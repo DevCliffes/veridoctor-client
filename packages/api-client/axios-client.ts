@@ -9,7 +9,7 @@ const axiosClient = axios.create({
 });
 
 // Exchange auth code for access token if we don't have one yet
-async function maybeAuthorise() {
+async function maybeAuthorise(): Promise<string | null> {
   const token = Cookies.get(ACCESS_TOKEN_KEY);
   if (token) return token;
 
@@ -18,11 +18,12 @@ async function maybeAuthorise() {
   if (!authCode || !identity) return null;
 
   try {
-    const res = await axios.get(
+    const res = await axios.post(
       `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
+      null,
       { params: { auth_code: authCode, identity } }
     );
-    const { a_token, refresh_token } = res.data;
+    const { a_token } = res.data;
     Cookies.set(ACCESS_TOKEN_KEY, a_token);
     return a_token;
   } catch {

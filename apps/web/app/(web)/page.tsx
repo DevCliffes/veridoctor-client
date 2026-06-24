@@ -125,8 +125,7 @@ function TopDoctorsSection() {
   // After a successful login the health-portal's root page.tsx reads the
   // `redirect` param and forwards them straight to the doctor's profile.
   const goToProvider = (id: string) => {
-    const redirect = encodeURIComponent(`/book/provider/${id}`);
-    window.location.href = `${HEALTH_PORTAL_URL}/auth/login?redirect=/book/provider/${id}`;
+    window.location.href = `${HEALTH_PORTAL_URL}/auth/login`;
   };
 
   return (

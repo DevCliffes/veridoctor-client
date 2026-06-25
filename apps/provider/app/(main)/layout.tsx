@@ -40,7 +40,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { GlobalNewAppointmentDialog } from "../../components/GlobalNewAppointmentDialog";
 import NotificationBell from "../../components/NotificationBell";
 
-const WEB_APP_URL = "https://veridoctor-client-web.vercel.app";
+const WEB_APP_URL = "https://veridoctor.com";
 
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {

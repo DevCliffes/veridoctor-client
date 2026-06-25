@@ -1,20 +1,31 @@
 import Cookies from "js-cookie";
 
+function getRootDomain(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.location.hostname.includes("veridoctor.com")
+    ? ".veridoctor.com"
+    : undefined;
+}
+
 const CookieService = {
   /**
    * Set a cookie value
    * @param key
    * @param value - Objects/Arrays will be stringified by js-cookie
-   * @param options - e.g., { expires: 7, path: '' }
+   * @param options - e.g., { expires: 7, path: '/' }
    */
   set(
     key: string,
     value: string,
-    options: any = { expires: 7, sameSite: "strict", paths: "/" },
+    options: any = {
+      expires: 7,
+      sameSite: "lax",
+      path: "/",
+      domain: getRootDomain(),
+    },
   ) {
     Cookies.set(key, value, options);
   },
-
   /**
    * Get a cookie value
    * @param key
@@ -22,16 +33,14 @@ const CookieService = {
    */
   get(key: string) {
     const value = Cookies.get(key);
-
     return value;
   },
-
   /**
    * Remove a cookie
    * @param key
    */
   remove(key: string) {
-    Cookies.remove(key);
+    Cookies.remove(key, { path: "/", domain: getRootDomain() });
   },
 };
 

@@ -21,11 +21,9 @@ const axiosClient = axios.create({
 async function maybeAuthorise(): Promise<string | null> {
   const token = getCookie(ACCESS_TOKEN_KEY);
   if (token) return token;
-
   const authCode = getCookie(AUTH_CODE_KEY);
   const identity = getCookie(IDENTITY_KEY);
   if (!authCode || !identity) return null;
-
   try {
     const res = await axios.post(
       `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
@@ -52,7 +50,8 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
-      window.location.href = "/auth/login";
+      const webAppUrl = process.env.NEXT_PUBLIC_WEB_APP_URL ?? "/";
+      window.location.href = `${webAppUrl}/auth/login`;
     }
     return Promise.reject(error);
   }

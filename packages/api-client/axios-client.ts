@@ -18,24 +18,39 @@ const axiosClient = axios.create({
   withCredentials: true,
 });
 
+// Shared in-flight promise so concurrent requests don't each trigger their
+// own /identity/authorise call against a single-use auth_code. Without this,
+// multiple components mounting at once (e.g. NotificationBell + dashboard)
+// race to exchange the same code, and every call after the first one fails.
+let authorisePromise: Promise<string | null> | null = null;
+
 async function maybeAuthorise(): Promise<string | null> {
   const token = getCookie(ACCESS_TOKEN_KEY);
   if (token) return token;
+
+  if (authorisePromise) return authorisePromise;
+
   const authCode = getCookie(AUTH_CODE_KEY);
   const identity = getCookie(IDENTITY_KEY);
   if (!authCode || !identity) return null;
-  try {
-    const res = await axios.post(
+
+  authorisePromise = axios
+    .post(
       `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
       null,
       { params: { auth_code: authCode, identity } }
-    );
-    const { a_token } = res.data;
-    setCookie(ACCESS_TOKEN_KEY, a_token);
-    return a_token;
-  } catch {
-    return null;
-  }
+    )
+    .then((res) => {
+      const { a_token } = res.data;
+      setCookie(ACCESS_TOKEN_KEY, a_token);
+      return a_token as string;
+    })
+    .catch(() => null)
+    .finally(() => {
+      authorisePromise = null;
+    });
+
+  return authorisePromise;
 }
 
 axiosClient.interceptors.request.use(async (config) => {

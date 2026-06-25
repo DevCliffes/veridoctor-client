@@ -9,7 +9,12 @@ function getCookie(name: string): string | null {
 
 function setCookie(name: string, value: string): void {
   if (typeof document === "undefined") return;
-  document.cookie = `${name}=${encodeURIComponent(value)};path=/`;
+  // Share cookies across all *.veridoctor.com subdomains (www, app, provider,
+  // telehealth) instead of scoping to whichever subdomain happened to set it.
+  const domain = window.location.hostname.includes("veridoctor.com")
+    ? "; domain=.veridoctor.com"
+    : "";
+  document.cookie = `${name}=${encodeURIComponent(value)};path=/${domain};secure;samesite=lax`;
 }
 
 const axiosClient = axios.create({
@@ -19,9 +24,7 @@ const axiosClient = axios.create({
 });
 
 // Shared in-flight promise so concurrent requests don't each trigger their
-// own /identity/authorise call against a single-use auth_code. Without this,
-// multiple components mounting at once (e.g. NotificationBell + dashboard)
-// race to exchange the same code, and every call after the first one fails.
+// own /identity/authorise call against a single-use auth_code.
 let authorisePromise: Promise<string | null> | null = null;
 
 async function maybeAuthorise(): Promise<string | null> {

@@ -6,7 +6,7 @@ import { Button } from "@veridoctor/design/components";
 import { LucideEye, LucideEyeClosed } from "@veridoctor/design/icons";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useState, Suspense } from "react";
 import { toast } from "sonner";
 import { setIsLoggedIn, setUser } from "@veridoctor/store";
 
@@ -20,7 +20,7 @@ type LoginResponse = {
   auth_code: string;
 };
 
-export default function Login() {
+function LoginForm() {
   const [passwordType, setPasswordType] = useState<"password" | "text">("password");
   const [loginForm, setLoginForm] = useState<LoginForm>({
     email: { value: "", valid: true },
@@ -30,7 +30,6 @@ export default function Login() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Preserve the redirect param so after login the user lands where they were
   const redirectParam = searchParams.get("redirect") ?? "";
 
   const validateEmail = (email: string) => {
@@ -68,7 +67,6 @@ export default function Login() {
           dispatch(setIsLoggedIn());
           dispatch(setUser(res.data.user));
 
-          // Pass the original redirect destination through to the accounts page
           const redirectQuery = redirectParam
             ? `&redirect=${encodeURIComponent(redirectParam)}`
             : "";
@@ -141,5 +139,13 @@ export default function Login() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

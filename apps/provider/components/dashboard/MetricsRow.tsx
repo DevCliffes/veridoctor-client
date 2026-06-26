@@ -1,35 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
-import { axiosClient } from "@veridoctor/api-client";
-
-interface DashboardStats {
-  today_count: number;
-  upcoming_today: number;
-  pending_count: number;
-  this_week_appointments: number;
-  this_week_patients: number;
-  total_patients_month: number;
-  avg_duration_minutes: number;
-  weekly_data: { date: string; day: string; count: number }[];
-}
+import type { DashboardStats } from "../../app/(main)/dashboard/page";
 
 interface MetricsRowProps {
-  identityId: string;
+  stats: DashboardStats | null;
+  loading: boolean;
 }
 
-export function MetricsRow({ identityId }: MetricsRowProps) {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!identityId) return;
-    axiosClient
-      .get(`/provider/${identityId}/dashboard/stats`)
-      .then((res) => setStats(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [identityId]);
-
+export function MetricsRow({ stats, loading }: MetricsRowProps) {
   const cards = [
     {
       label: "Today's Appointments",

@@ -64,10 +64,8 @@ export default async function AccountsPage({
   const PATIENT_APP_URL = process.env.NEXT_PUBLIC_PATIENT_APP_URL ?? "";
   const FACILITY_APP_URL = process.env.NEXT_PUBLIC_FACILITY_APP_URL ?? "";
 
-  const accountDetails: Record
-    AccountType,
-    { appBaseUrl: string; icon: React.ReactNode; accountName: string }
-  > = {
+  type AccountDetail = { appBaseUrl: string; icon: React.ReactNode; accountName: string };
+  const accountDetails: { [K in AccountType]: AccountDetail } = {
     patient: {
       appBaseUrl: PATIENT_APP_URL,
       icon: <UserStar size="30" />,

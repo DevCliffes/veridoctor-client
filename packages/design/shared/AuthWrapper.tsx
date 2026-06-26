@@ -5,6 +5,17 @@ export type TokenPayload = {
   refresh_token: string;
 };
 
+function getSafeLoginUrl(): string {
+  const webAppUrl = process.env.NEXT_PUBLIC_WEB_APP_URL;
+  if (webAppUrl && webAppUrl.startsWith("https://")) {
+    return webAppUrl;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.host}`;
+  }
+  return "";
+}
+
 function AuthWrapper({
   authInfo,
   children,
@@ -20,18 +31,14 @@ function AuthWrapper({
 }) {
   const checkLoginStatus = (): boolean => {
     if (!authInfo.isLoggedIn) {
-      /** TODO: stabilize fetch to make use of it here */
       if (!authInfo.identity || !authInfo.auth_code) return false;
+
       fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise?auth_code=${authInfo.auth_code}&identity=${authInfo.identity}`,
-        {
-          method: "POST",
-        },
+        { method: "POST" }
       )
         .then((response) => {
-          if (!response.ok) {
-            throw new Error("Network response was not ok");
-          }
+          if (!response.ok) throw new Error("Network response was not ok");
           return response.json();
         })
         .then((result: TokenPayload) => {
@@ -45,15 +52,16 @@ function AuthWrapper({
     }
     return true;
   };
+
   const isAuthenticated = checkLoginStatus();
 
   if (!isAuthenticated) {
-    const authUrl = process.env.NEXT_PUBLIC_WEB_APP_URL;
-    if (typeof window !== "undefined" && authUrl) {
+    if (typeof window !== "undefined") {
+      const loginBase = getSafeLoginUrl();
+      const redirectPath = encodeURIComponent(window.location.pathname);
       setTimeout(() => {
-        window.location.href = `${authUrl}/auth/login?redirect=true`;
+        window.location.href = `${loginBase}/auth/login?redirect=${redirectPath}`;
       }, 300);
-      return;
     }
     return null;
   }

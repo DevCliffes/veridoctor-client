@@ -1,6 +1,4 @@
 "use client";
-import { useEffect, useState } from "react";
-import { axiosClient } from "@veridoctor/api-client";
 
 interface DayData {
   date: string;
@@ -9,28 +7,14 @@ interface DayData {
 }
 
 interface WeeklyChartProps {
-  identityId: string;
+  weeklyData: DayData[];
+  loading: boolean;
 }
 
-export function WeeklyChart({ identityId }: WeeklyChartProps) {
-  const [weeklyData, setWeeklyData] = useState<DayData[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!identityId) return;
-    axiosClient
-      .get(`/provider/${identityId}/dashboard/stats`)
-      .then((res) => {
-        if (res.data?.weekly_data) setWeeklyData(res.data.weekly_data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [identityId]);
-
+export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
   const today = new Date().toISOString().split("T")[0];
   const max = Math.max(...weeklyData.map((d) => d.count), 1);
 
-  // SVG line graph dimensions
   const W = 400;
   const H = 80;
   const PAD_X = 16;
@@ -71,7 +55,6 @@ export function WeeklyChart({ identityId }: WeeklyChartProps) {
             style={{ height: "100px" }}
             preserveAspectRatio="none"
           >
-            {/* Area fill */}
             <defs>
               <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#185FA5" stopOpacity="0.15" />
@@ -79,8 +62,6 @@ export function WeeklyChart({ identityId }: WeeklyChartProps) {
               </linearGradient>
             </defs>
             <path d={areaPath} fill="url(#areaGrad)" />
-
-            {/* Line */}
             <polyline
               points={polyline}
               fill="none"
@@ -89,8 +70,6 @@ export function WeeklyChart({ identityId }: WeeklyChartProps) {
               strokeLinejoin="round"
               strokeLinecap="round"
             />
-
-            {/* Dots */}
             {points.map((p) => {
               const isToday = p.date === today;
               return (
@@ -104,13 +83,7 @@ export function WeeklyChart({ identityId }: WeeklyChartProps) {
                     strokeWidth="2"
                   />
                   {p.count > 0 && (
-                    <text
-                      x={p.x}
-                      y={p.y - 8}
-                      textAnchor="middle"
-                      fontSize="9"
-                      fill="#6b7280"
-                    >
+                    <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="9" fill="#6b7280">
                       {p.count}
                     </text>
                   )}
@@ -118,17 +91,13 @@ export function WeeklyChart({ identityId }: WeeklyChartProps) {
               );
             })}
           </svg>
-
-          {/* X axis labels */}
           <div className="flex justify-between mt-1 px-1">
             {weeklyData.map((d) => {
               const isToday = d.date === today;
               return (
                 <span
                   key={d.date}
-                  className={`text-xs ${
-                    isToday ? "text-blue-600 font-bold" : "text-gray-400"
-                  }`}
+                  className={`text-xs ${isToday ? "text-blue-600 font-bold" : "text-gray-400"}`}
                 >
                   {d.day}
                 </span>

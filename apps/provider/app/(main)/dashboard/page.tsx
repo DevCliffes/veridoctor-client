@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
@@ -10,9 +10,6 @@ import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
 import { PendingActions } from "../../../components/dashboard/PendingActions";
 import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
 
-// `identity` from Redux is normally a raw ID string (rehydrated from
-// localStorage's "vd_identity"), but handle the object/JSON-string
-// shapes too just in case.
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
     if (!identity) return "";
@@ -21,9 +18,7 @@ function getIdentityId(identity: unknown): string {
       if (parsed && typeof parsed === "object" && typeof parsed.id === "string") {
         return parsed.id;
       }
-    } catch {
-      // not JSON — it's the raw identity ID itself
-    }
+    } catch {}
     return identity;
   }
   if (identity && typeof identity === "object" && "id" in identity) {
@@ -31,6 +26,15 @@ function getIdentityId(identity: unknown): string {
     if (typeof val === "string") return val;
   }
   return "";
+}
+
+export interface DashboardStats {
+  today_count: number;
+  pending_count: number;
+  this_week_appointments: number;
+  total_patients_month: number;
+  avg_duration_minutes: number;
+  weekly_data: { date: string; day: string; count: number }[];
 }
 
 interface ProviderProfile {
@@ -43,14 +47,37 @@ export default function Dashboard() {
   const router = useRouter();
   const { identity } = useAppSelector((store) => store.auth);
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
-  const identityId = getIdentityId(identity);
+  const identityId = useMemo(() => getIdentityId(identity), [identity]);
 
-  const now = new Date();
-  const hour = now.getHours();
-  const greeting =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const { greeting, dateLabel } = useMemo(() => {
+    const now = new Date();
+    const hour = now.getHours();
+    return {
+      greeting: hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening",
+      dateLabel: now.toLocaleDateString("en-KE", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+    };
+  }, []);
 
+  // Single fetch for all dashboard stats
+  useEffect(() => {
+    if (!identityId) return;
+    setStatsLoading(true);
+    axiosClient
+      .get(`/provider/${identityId}/dashboard/stats`)
+      .then((res) => setStats(res.data))
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+  }, [identityId]);
+
+  // Profile fetch is separate — lightweight and only needed for the greeting
   useEffect(() => {
     if (!identityId) return;
     axiosClient
@@ -70,29 +97,27 @@ export default function Dashboard() {
           <p className="text-xl font-bold">
             {greeting}{providerName ? `, ${providerName}` : ""} 👋
           </p>
-          <p className="text-gray-500 text-sm">
-            {now.toLocaleDateString("en-KE", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </p>
+          <p className="text-gray-500 text-sm">{dateLabel}</p>
         </div>
         <Button onClick={() => window.dispatchEvent(new CustomEvent("vd:new-appointment"))}>
           <LucidePlus /> New appointment
         </Button>
       </div>
 
-      <MetricsRow identityId={identityId} />
+      {/* All three stat-based components receive pre-fetched data — no extra API calls */}
+      <MetricsRow stats={stats} loading={statsLoading} />
 
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
+          {/* TodaySchedule still fetches its own list — it needs appointment details */}
           <TodaySchedule identityId={identityId} />
-          <WeeklyChart identityId={identityId} />
+          <WeeklyChart weeklyData={stats?.weekly_data ?? []} loading={statsLoading} />
         </div>
         <div className="space-y-4">
-          <PendingActions identityId={identityId} />
+          <PendingActions
+            upcomingCount={stats?.pending_count ?? 0}
+            loading={statsLoading}
+          />
           <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-4 space-y-2">
             <p className="font-bold text-sm text-gray-500 uppercase tracking-wide">
               Quick actions

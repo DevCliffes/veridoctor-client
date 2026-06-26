@@ -27,10 +27,16 @@ export default function Patients() {
   useEffect(() => {
     if (!userId) return;
     axiosClient
-      .get(`provider/${userId}/appointments`)
+      .get(`provider/${userId}/appointments?filter=all`)   // ← fetch all, not just upcoming
       .then((res) => {
-        // Deduplicate by email to get unique patients
         const all: Patient[] = res.data ?? [];
+
+        // Sort newest first so we keep the most recent appointment per patient
+        all.sort(
+          (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+        );
+
+        // Deduplicate by email — first occurrence is now the latest visit
         const seen = new Set();
         const unique = all.filter((p) => {
           const key = p.patient_email || `${p.patient_first_name}-${p.patient_last_name}`;
@@ -38,6 +44,7 @@ export default function Patients() {
           seen.add(key);
           return true;
         });
+
         setPatients(unique);
       })
       .catch(() => {})

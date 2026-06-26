@@ -1,43 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
-import { axiosClient } from "@veridoctor/api-client";
 import { useRouter } from "next/navigation";
 
 interface PendingActionsProps {
-  identityId: string;
+  upcomingCount: number;
+  loading: boolean;
 }
 
-export function PendingActions({ identityId }: PendingActionsProps) {
+export function PendingActions({ upcomingCount, loading }: PendingActionsProps) {
   const router = useRouter();
-  const [upcomingCount, setUpcomingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!identityId) return;
-    // ✅ Switched from /dashboard/stats (pending_count = unconfirmed only)
-    // to the appointments list filtered to upcoming, so the badge reflects
-    // ALL upcoming appointments rather than just unconfirmed ones.
-    //
-    // Confirmed against apps/provider/app/(main)/appointments/page.tsx:
-    //   - query param is `filter` (values: today | upcoming | past)
-    //   - endpoint: GET /provider/{userId}/appointments?filter=upcoming
-    //   - response is a bare array: `res.data ?? []` (no { results, total } wrapper)
-    axiosClient
-      .get(`/provider/${identityId}/appointments?filter=upcoming`)
-      .then((res) => {
-        setUpcomingCount((res.data ?? []).length);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [identityId]);
 
   const items = [
     {
       label: "Upcoming appointments",
       count: upcomingCount,
       urgency: upcomingCount > 0 ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-400",
-      // ✅ Matches the real tab-selection mechanism on the appointments
-      // page, which reads `filter` from the query string — NOT `tab`.
       href: "/appointments?filter=upcoming",
     },
     {

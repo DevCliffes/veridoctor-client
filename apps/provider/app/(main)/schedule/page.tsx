@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store";
 import { axiosClient } from "@veridoctor/api-client";
@@ -62,33 +62,53 @@ function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
+// Limit expansion to ±60 days from today to avoid generating hundreds of
+// events for long-running recurring schedules
+const EXPAND_DAYS_BEFORE = 7;
+const EXPAND_DAYS_AFTER = 60;
+
 function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
   const events: Appointment[] = [];
-  const start = new Date(s.start_date + "T00:00:00");
-  const end = new Date(s.end_date + "T00:00:00");
   const [sh, sm] = s.start_time.split(":").map(Number);
   const [eh, em] = s.end_time.split(":").map(Number);
 
-  const maxEnd =
-    s.recurrence !== "none"
-      ? new Date(
-          Math.max(
-            end.getTime(),
-            start.getTime() + 90 * 24 * 60 * 60 * 1000
-          )
-        )
-      : end;
+  const blockStart = new Date(s.start_date + "T00:00:00");
+  const blockEnd = new Date(s.end_date + "T00:00:00");
 
-  const cursor = new Date(start);
-  while (cursor <= maxEnd) {
-    const python_dow = cursor.getDay() === 0 ? 6 : cursor.getDay() - 1;
+  // Only expand within a visible window to keep event count small
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - EXPAND_DAYS_BEFORE);
+  windowStart.setHours(0, 0, 0, 0);
+
+  const windowEnd = new Date();
+  windowEnd.setDate(windowEnd.getDate() + EXPAND_DAYS_AFTER);
+  windowEnd.setHours(23, 59, 59, 999);
+
+  const rangeStart = new Date(Math.max(blockStart.getTime(), windowStart.getTime()));
+  const rangeEnd = new Date(
+    Math.min(
+      s.recurrence !== "none" ? windowEnd.getTime() : blockEnd.getTime(),
+      windowEnd.getTime()
+    )
+  );
+
+  if (rangeStart > rangeEnd) return events;
+
+  const cursor = new Date(rangeStart);
+  while (cursor <= rangeEnd) {
     const dow_abbr = DAY_ABBR[cursor.getDay()];
+    const python_dow = cursor.getDay() === 0 ? 6 : cursor.getDay() - 1;
     let include = false;
-    if (s.recurrence === "none") include = true;
-    else if (s.recurrence === "daily") include = true;
-    else if (s.recurrence === "weekdays") include = python_dow < 5;
-    else if (s.recurrence === "weekly" || s.recurrence === "custom")
+
+    if (s.recurrence === "none") {
+      include = cursor >= blockStart && cursor <= blockEnd;
+    } else if (s.recurrence === "daily") {
+      include = true;
+    } else if (s.recurrence === "weekdays") {
+      include = python_dow < 5;
+    } else if (s.recurrence === "weekly" || s.recurrence === "custom") {
       include = s.recurrence_days?.includes(dow_abbr) ?? false;
+    }
 
     if (include) {
       const evStart = new Date(cursor);
@@ -430,7 +450,7 @@ export default function Schedule() {
   const fetchBookedAppts = useCallback(() => {
     if (!userId) return;
     axiosClient
-      .get("provider/" + userId + "/appointments")
+      .get("provider/" + userId + "/appointments?filter=all")
       .then((res) => setBookedAppts(res.data ?? []))
       .catch(() => {});
   }, [userId]);
@@ -497,49 +517,66 @@ export default function Schedule() {
   };
 
   const handleEventClick = (appt: Appointment) => {
-  if (appt.meta?.type === "schedule") {
-    const block = schedules.find((s) => s.id === appt.meta?.scheduleId);
-    if (block) setEditingBlock(block);
-  } else if (appt.meta?.type === "booked" && appt.meta?.appointmentId) {
-    window.location.href = "/appointments/" + appt.meta.appointmentId;
-  }
-};
+    if (appt.meta?.type === "schedule") {
+      const block = schedules.find((s) => s.id === appt.meta?.scheduleId);
+      if (block) setEditingBlock(block);
+    } else if (appt.meta?.type === "booked" && appt.meta?.appointmentId) {
+      window.location.href = "/appointments/" + appt.meta.appointmentId;
+    }
+  };
 
-  const scheduleEvents = schedules.flatMap(expandToCalendarEvents);
+  // ── Memoized: only recompute when schedules data changes ─────────────────
+  const scheduleEvents = useMemo(
+    () => schedules.flatMap(expandToCalendarEvents),
+    [schedules]
+  );
 
-  const bookedEvents: Appointment[] = bookedAppts
-    .filter((a) => a.status !== "cancelled")
-    .map((a) => ({
-      id: "booked-" + a.id,
-      start: new Date(a.start_time),
-      end: new Date(a.end_time),
-      patientName:
-        a.patient_first_name +
-        " " +
-        a.patient_last_name +
-        (a.service_name ? " · " + a.service_name : "") +
-        " · " +
-        (a.appointment_type === "virtual" ? "Virtual" : "In-person"),
-      meta: {
-        type: "booked",
-        appointmentId: a.id,
-        email: a.patient_email,
-        phone: a.patient_phone_number,
-        appointment_type: a.appointment_type,
-        service_name: a.service_name,
-        status: a.status,
-        location_type: a.appointment_type,
-      },
+  // ── Memoized: only recompute when booked appointments change ─────────────
+  const bookedEvents = useMemo<Appointment[]>(
+    () =>
+      bookedAppts
+        .filter((a) => a.status !== "cancelled")
+        .map((a) => ({
+          id: "booked-" + a.id,
+          start: new Date(a.start_time),
+          end: new Date(a.end_time),
+          patientName:
+            a.patient_first_name +
+            " " +
+            a.patient_last_name +
+            (a.service_name ? " · " + a.service_name : "") +
+            " · " +
+            (a.appointment_type === "virtual" ? "Virtual" : "In-person"),
+          meta: {
+            type: "booked",
+            appointmentId: a.id,
+            email: a.patient_email,
+            phone: a.patient_phone_number,
+            appointment_type: a.appointment_type,
+            service_name: a.service_name,
+            status: a.status,
+            location_type: a.appointment_type,
+          },
+        })),
+    [bookedAppts]
+  );
+
+  // ── Memoized: O(n×m) overlap filter, only reruns when inputs change ──────
+  const allCalendarEvents = useMemo(() => {
+    // Build a Set of booked time ranges for fast lookup
+    const bookedRanges = bookedEvents.map((b) => ({
+      start: b.start.getTime(),
+      end: b.end.getTime(),
     }));
 
-  // Hide schedule slots that are already covered by a booked appointment
-  const filteredScheduleEvents = scheduleEvents.filter((slot) => {
-    return !bookedEvents.some(
-      (booked) => booked.start < slot.end && booked.end > slot.start
-    );
-  });
+    const filteredScheduleEvents = scheduleEvents.filter((slot) => {
+      const s = slot.start.getTime();
+      const e = slot.end.getTime();
+      return !bookedRanges.some((b) => b.start < e && b.end > s);
+    });
 
-  const allCalendarEvents = [...filteredScheduleEvents, ...bookedEvents];
+    return [...filteredScheduleEvents, ...bookedEvents];
+  }, [scheduleEvents, bookedEvents]);
 
   const locationOptions: { key: LocationType; label: string; icon: ReactNode }[] = [
     { key: "virtual", label: "Virtual", icon: <LucideVideo size={14} /> },

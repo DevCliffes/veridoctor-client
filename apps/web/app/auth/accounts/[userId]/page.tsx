@@ -19,26 +19,19 @@ type AccountsResponse = {
   accounts: [{ account_type: AccountType; id: string; name: string }];
 };
 
-// Builds the final destination URL after login.
-// If a redirect path was passed (e.g. /appointments), appends it to the app
-// base URL so the user lands exactly where they were before session expiry.
 function buildDestination(
   appBaseUrl: string,
   userId: string,
   authCode: string,
   redirectPath: string,
 ): string {
-  // Validate appBaseUrl — must be a real https URL, never just "/"
   const safeBase =
     appBaseUrl && appBaseUrl.startsWith("https://") ? appBaseUrl : null;
 
   if (!safeBase) {
-    // Fallback: stay on the web app at homepage — better than a loop
     return `/?identity=${userId}&auth_tkn=${authCode}`;
   }
 
-  // redirectPath is a path like "/appointments" or "/" — not a full URL
-  // Append it as the landing path within the target app
   const landing =
     redirectPath && redirectPath !== "/" && redirectPath !== "%2F"
       ? redirectPath
@@ -54,14 +47,17 @@ export default async function AccountsPage({
   params: Promise<{ userId: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  let accountsData: AccountsResponse | null = null;
   const pathParams = await params;
-  const { auth_tkn, redirect: redirectParam } = await searchParams;
+  const resolvedSearch = await searchParams;
 
-  const authCode = Array.isArray(auth_tkn) ? auth_tkn[0] : auth_tkn ?? "";
-  // Decode the redirect path in case it was encoded (e.g. %2Fappointments)
+  const auth_tkn = resolvedSearch["auth_tkn"];
+  const redirectParam = resolvedSearch["redirect"];
+
+  const authCode = Array.isArray(auth_tkn) ? auth_tkn[0] : (auth_tkn ?? "");
   const redirectPath = redirectParam
-    ? decodeURIComponent(Array.isArray(redirectParam) ? redirectParam[0] : redirectParam)
+    ? decodeURIComponent(
+        Array.isArray(redirectParam) ? redirectParam[0] : redirectParam,
+      )
     : "/";
 
   const PROVIDER_APP_URL = process.env.NEXT_PUBLIC_PROVIDER_APP_URL ?? "";
@@ -94,6 +90,8 @@ export default async function AccountsPage({
     },
   };
 
+  let accountsData: AccountsResponse | null = null;
+
   try {
     const res = await axiosServer.get(`identity/${pathParams.userId}/accounts`);
     accountsData = res.data;
@@ -101,7 +99,6 @@ export default async function AccountsPage({
     console.error(err);
   }
 
-  // Single account → redirect straight to the right app
   if (accountsData?.accounts.length === 1) {
     const account = accountsData.accounts[0];
     const destination = buildDestination(

@@ -9,12 +9,23 @@ function getCookie(name: string): string | null {
 
 function setCookie(name: string, value: string): void {
   if (typeof document === "undefined") return;
-  // Share cookies across all *.veridoctor.com subdomains (www, app, provider,
-  // telehealth) instead of scoping to whichever subdomain happened to set it.
   const domain = window.location.hostname.includes("veridoctor.com")
     ? "; domain=.veridoctor.com"
     : "";
   document.cookie = `${name}=${encodeURIComponent(value)};path=/${domain};secure;samesite=lax`;
+}
+
+function getSafeLoginUrl(): string {
+  const webAppUrl = process.env.NEXT_PUBLIC_WEB_APP_URL;
+  // Only trust the env var if it's a full https:// URL
+  if (webAppUrl && webAppUrl.startsWith("https://")) {
+    return webAppUrl;
+  }
+  // Fallback: use current window origin (safe on any subdomain)
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.host}`;
+  }
+  return "";
 }
 
 const axiosClient = axios.create({
@@ -23,16 +34,12 @@ const axiosClient = axios.create({
   withCredentials: true,
 });
 
-// Shared in-flight promise so concurrent requests don't each trigger their
-// own /identity/authorise call against a single-use auth_code.
 let authorisePromise: Promise<string | null> | null = null;
 
 async function maybeAuthorise(): Promise<string | null> {
   const token = getCookie(ACCESS_TOKEN_KEY);
   if (token) return token;
-
   if (authorisePromise) return authorisePromise;
-
   const authCode = getCookie(AUTH_CODE_KEY);
   const identity = getCookie(IDENTITY_KEY);
   if (!authCode || !identity) return null;
@@ -68,8 +75,11 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
-      const webAppUrl = process.env.NEXT_PUBLIC_WEB_APP_URL ?? "/";
-      window.location.href = `${webAppUrl}/auth/login`;
+      if (typeof window !== "undefined") {
+        const loginBase = getSafeLoginUrl();
+        const redirectPath = encodeURIComponent(window.location.pathname);
+        window.location.href = `${loginBase}/auth/login?redirect=${redirectPath}`;
+      }
     }
     return Promise.reject(error);
   }

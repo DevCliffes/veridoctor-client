@@ -168,7 +168,7 @@ export default function Prescriptions() {
       return;
     }
     axiosClient
-      .get("/prescriptions?patient_email=" + patientEmail)
+      .get("/provider/prescriptions?patient_email=" + patientEmail)
       .then((res) => setPrescriptions(res.data ?? []))
       .catch(() =>
         setToast({ message: "Failed to load prescriptions", type: "error" })

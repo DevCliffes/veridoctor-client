@@ -14,6 +14,7 @@ import {
 interface Drug {
   id: string;
   drug_name: string;
+  dosage?: string;
   frequency: string;
   duration: string;
   instructions?: string;
@@ -80,7 +81,7 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
           </div>
           <div>
             <p className="font-semibold text-gray-800 text-sm">
-              {prescription.diagnosis}
+              {prescription.diagnosis || "No diagnosis"}
             </p>
             {prescription.provider && (
               <p className="text-xs text-gray-500 mt-0.5">
@@ -111,32 +112,45 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
 
       {expanded && (
         <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50 space-y-3">
-          <div className="space-y-2">
-            {prescription.drugs.map((drug, i) => (
-              <div
-                key={drug.id ?? i}
-                className="flex items-start gap-3 bg-white rounded-lg p-3 border border-gray-100"
-              >
-                <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                  <LucidePill size={14} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">
-                    {drug.drug_name}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {drug.frequency} · {drug.duration}
-                  </p>
-                  {drug.instructions && (
-                    <p className="text-xs text-gray-400 mt-0.5 italic">
-                      {drug.instructions}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
 
+          {/* Medications */}
+          {prescription.drugs.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                Medications
+              </p>
+              {prescription.drugs.map((drug, i) => (
+                <div
+                  key={drug.id ?? i}
+                  className="flex items-start gap-3 bg-white rounded-lg p-3 border border-gray-100"
+                >
+                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <LucidePill size={14} />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold text-gray-800">
+                      {drug.drug_name}
+                    </p>
+                    {drug.dosage && (
+                      <p className="text-xs text-gray-500">Dosage: {drug.dosage}</p>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      {drug.frequency} · {drug.duration}
+                    </p>
+                    {drug.instructions && (
+                      <p className="text-xs text-gray-400 italic">
+                        {drug.instructions}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic">No medications recorded.</p>
+          )}
+
+          {/* Doctor's notes */}
           {prescription.notes && (
             <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3">
               <p className="text-xs font-medium text-yellow-700 mb-1">

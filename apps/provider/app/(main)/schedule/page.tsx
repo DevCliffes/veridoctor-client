@@ -54,16 +54,23 @@ type BookedAppointment = {
 };
 
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAY_FULL = [
-  "Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday",
-];
+const DAY_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
 function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-// Limit expansion to ±60 days from today to avoid generating hundreds of
-// events for long-running recurring schedules
+// Compute end time string given a start time string and duration in minutes
+function computeEndTime(startTime: string, durationMins: number): string {
+  const [h, m] = startTime.split(":").map(Number);
+  const total = h * 60 + m + durationMins;
+  return (
+    String(Math.floor(total / 60) % 24).padStart(2, "0") +
+    ":" +
+    String(total % 60).padStart(2, "0")
+  );
+}
+
 const EXPAND_DAYS_BEFORE = 7;
 const EXPAND_DAYS_AFTER = 60;
 
@@ -75,7 +82,6 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
   const blockStart = new Date(s.start_date + "T00:00:00");
   const blockEnd = new Date(s.end_date + "T00:00:00");
 
-  // Only expand within a visible window to keep event count small
   const windowStart = new Date();
   windowStart.setDate(windowStart.getDate() - EXPAND_DAYS_BEFORE);
   windowStart.setHours(0, 0, 0, 0);
@@ -130,6 +136,8 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
   return events;
 }
 
+// ── Edit Modal ────────────────────────────────────────────────────────────────
+
 function EditScheduleModal({
   block,
   services,
@@ -160,10 +168,25 @@ function EditScheduleModal({
   const [deleting, setDeleting] = useState(false);
 
   const weekdayLabel = DAY_FULL[new Date(startDate + "T00:00:00").getDay()];
+
   const toggleRepeatDay = (day: string) =>
     setRepeatDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
     );
+
+  // Auto-fill end time when service changes
+  const handleServiceChange = (id: string) => {
+    setServiceId(id);
+    const svc = services.find((s) => s.id === id);
+    if (svc) setEndTime(computeEndTime(startTime, svc.estimated_duration));
+  };
+
+  // Auto-fill end time when start time changes (if a service is selected)
+  const handleStartTimeChange = (val: string) => {
+    setStartTime(val);
+    const svc = services.find((s) => s.id === serviceId);
+    if (svc) setEndTime(computeEndTime(val, svc.estimated_duration));
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -179,8 +202,7 @@ function EditScheduleModal({
           end_time: endTime,
           recurrence: repeat,
           recurrence_interval: repeat === "custom" ? repeatInterval : 1,
-          recurrence_days:
-            repeat === "weekly" || repeat === "custom" ? repeatDays : [],
+          recurrence_days: repeat === "weekly" || repeat === "custom" ? repeatDays : [],
           recurrence_end_type: repeat === "none" ? null : endType,
           recurrence_end_date: endType === "on_date" ? endAfterDate : null,
           recurrence_count: endType === "after" ? endAfterCount : null,
@@ -198,9 +220,7 @@ function EditScheduleModal({
     if (!confirm("Delete this schedule block?")) return;
     setDeleting(true);
     try {
-      await axiosClient.delete(
-        "provider/" + userId + "/schedule/" + block.id
-      );
+      await axiosClient.delete("provider/" + userId + "/schedule/" + block.id);
       onDeleted();
     } catch {
       // silent
@@ -231,10 +251,7 @@ function EditScheduleModal({
             >
               <LucideTrash2 size={16} />
             </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600">
               <LucideX size={18} />
             </button>
           </div>
@@ -243,14 +260,12 @@ function EditScheduleModal({
         <div className="px-5 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
           <select
             value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
+            onChange={(e) => handleServiceChange(e.target.value)}
             className="w-full text-base font-medium border-b border-gray-200 pb-2 focus:outline-none focus:border-blue-400 bg-transparent"
           >
             <option value="">Select a service</option>
             {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
+              <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
 
@@ -270,7 +285,7 @@ function EditScheduleModal({
               <input
                 type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => handleStartTimeChange(e.target.value)}
                 className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50"
               />
               <span className="text-gray-400">–</span>
@@ -289,6 +304,17 @@ function EditScheduleModal({
               />
             </div>
           </div>
+
+          {/* End time hint */}
+          {serviceId && (
+            <p className="text-xs text-gray-400 -mt-2 pl-6">
+              End time auto-filled from service duration
+              {services.find(s => s.id === serviceId)
+                ? ` (${services.find(s => s.id === serviceId)!.estimated_duration} mins)`
+                : ""}
+              — you can adjust manually.
+            </p>
+          )}
 
           <div className="flex items-start gap-2">
             <LucideRepeat size={16} className="text-gray-400 mt-2 shrink-0" />
@@ -327,23 +353,13 @@ function EditScheduleModal({
 
               {repeat !== "none" && (
                 <div className="space-y-2 pl-1">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">
-                    Ends
-                  </p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">Ends</p>
                   <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="radio"
-                      checked={endType === "never"}
-                      onChange={() => setEndType("never")}
-                    />
+                    <input type="radio" checked={endType === "never"} onChange={() => setEndType("never")} />
                     Never
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="radio"
-                      checked={endType === "on_date"}
-                      onChange={() => setEndType("on_date")}
-                    />
+                    <input type="radio" checked={endType === "on_date"} onChange={() => setEndType("on_date")} />
                     On
                     <input
                       type="date"
@@ -355,11 +371,7 @@ function EditScheduleModal({
                     />
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="radio"
-                      checked={endType === "after"}
-                      onChange={() => setEndType("after")}
-                    />
+                    <input type="radio" checked={endType === "after"} onChange={() => setEndType("after")} />
                     After
                     <input
                       type="number"
@@ -419,6 +431,8 @@ function EditScheduleModal({
   );
 }
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function Schedule() {
   const userId = useSelector((state: RootState) => state.auth.identity);
   const [services, setServices] = useState<Service[]>([]);
@@ -430,7 +444,7 @@ export default function Schedule() {
   const [startDate, setStartDate] = useState(todayStr());
   const [endDate, setEndDate] = useState(todayStr());
   const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("10:00");
+  const [endTime, setEndTime] = useState("09:45");
   const [locationType, setLocationType] = useState<LocationType>("virtual");
   const [repeat, setRepeat] = useState<RepeatType>("none");
   const [repeatDays, setRepeatDays] = useState<string[]>([]);
@@ -465,18 +479,18 @@ export default function Schedule() {
     fetchBookedAppts();
   }, [userId, fetchSchedules, fetchBookedAppts]);
 
+  // Auto-fill end time when service is selected
   const handleServiceChange = (id: string) => {
     setSelectedServiceId(id);
     const svc = services.find((s) => s.id === id);
-    if (svc) {
-      const [h, m] = startTime.split(":").map(Number);
-      const total = h * 60 + m + svc.estimated_duration;
-      setEndTime(
-        String(Math.floor(total / 60) % 24).padStart(2, "0") +
-          ":" +
-          String(total % 60).padStart(2, "0")
-      );
-    }
+    if (svc) setEndTime(computeEndTime(startTime, svc.estimated_duration));
+  };
+
+  // Auto-fill end time when start time changes (if service already selected)
+  const handleStartTimeChange = (val: string) => {
+    setStartTime(val);
+    const svc = services.find((s) => s.id === selectedServiceId);
+    if (svc) setEndTime(computeEndTime(val, svc.estimated_duration));
   };
 
   const handleStartDateChange = (val: string) => {
@@ -504,8 +518,7 @@ export default function Schedule() {
         end_time: endTime,
         recurrence: repeat,
         recurrence_interval: repeat === "custom" ? repeatInterval : 1,
-        recurrence_days:
-          repeat === "weekly" || repeat === "custom" ? repeatDays : [],
+        recurrence_days: repeat === "weekly" || repeat === "custom" ? repeatDays : [],
         recurrence_end_type: repeat === "none" ? null : endType,
         recurrence_end_date: endType === "on_date" ? endAfterDate : null,
         recurrence_count: endType === "after" ? endAfterCount : null,
@@ -525,13 +538,11 @@ export default function Schedule() {
     }
   };
 
-  // ── Memoized: only recompute when schedules data changes ─────────────────
   const scheduleEvents = useMemo(
     () => schedules.flatMap(expandToCalendarEvents),
     [schedules]
   );
 
-  // ── Memoized: only recompute when booked appointments change ─────────────
   const bookedEvents = useMemo<Appointment[]>(
     () =>
       bookedAppts
@@ -561,20 +572,16 @@ export default function Schedule() {
     [bookedAppts]
   );
 
-  // ── Memoized: O(n×m) overlap filter, only reruns when inputs change ──────
   const allCalendarEvents = useMemo(() => {
-    // Build a Set of booked time ranges for fast lookup
     const bookedRanges = bookedEvents.map((b) => ({
       start: b.start.getTime(),
       end: b.end.getTime(),
     }));
-
     const filteredScheduleEvents = scheduleEvents.filter((slot) => {
       const s = slot.start.getTime();
       const e = slot.end.getTime();
       return !bookedRanges.some((b) => b.start < e && b.end > s);
     });
-
     return [...filteredScheduleEvents, ...bookedEvents];
   }, [scheduleEvents, bookedEvents]);
 
@@ -583,6 +590,8 @@ export default function Schedule() {
     { key: "physical", label: "In-person", icon: <LucideMapPin size={14} /> },
     { key: "both", label: "Both", icon: null },
   ];
+
+  const selectedService = services.find((s) => s.id === selectedServiceId);
 
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
@@ -621,9 +630,7 @@ export default function Schedule() {
                 >
                   <option value="">Add title — select a service</option>
                   {services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               )}
@@ -641,7 +648,7 @@ export default function Schedule() {
                 <input
                   type="time"
                   value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
                   className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
                 />
                 <span className="text-gray-400">–</span>
@@ -660,6 +667,13 @@ export default function Schedule() {
                 />
               </div>
             </div>
+
+            {/* Duration hint */}
+            {selectedService && (
+              <p className="text-xs text-blue-500 -mt-2 pl-6">
+                End time auto-filled from &quot;{selectedService.name}&quot; duration ({selectedService.estimated_duration} mins) — you can adjust manually.
+              </p>
+            )}
 
             <div className="flex items-start gap-2">
               <LucideRepeat size={18} className="text-gray-400 mt-2 shrink-0" />
@@ -696,23 +710,13 @@ export default function Schedule() {
                 )}
                 {repeat !== "none" && (
                   <div className="space-y-2 pl-1">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">
-                      Ends
-                    </p>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Ends</p>
                     <label className="flex items-center gap-2 text-sm text-gray-600">
-                      <input
-                        type="radio"
-                        checked={endType === "never"}
-                        onChange={() => setEndType("never")}
-                      />
+                      <input type="radio" checked={endType === "never"} onChange={() => setEndType("never")} />
                       Never
                     </label>
                     <label className="flex items-center gap-2 text-sm text-gray-600">
-                      <input
-                        type="radio"
-                        checked={endType === "on_date"}
-                        onChange={() => setEndType("on_date")}
-                      />
+                      <input type="radio" checked={endType === "on_date"} onChange={() => setEndType("on_date")} />
                       On
                       <input
                         type="date"
@@ -724,11 +728,7 @@ export default function Schedule() {
                       />
                     </label>
                     <label className="flex items-center gap-2 text-sm text-gray-600">
-                      <input
-                        type="radio"
-                        checked={endType === "after"}
-                        onChange={() => setEndType("after")}
-                      />
+                      <input type="radio" checked={endType === "after"} onChange={() => setEndType("after")} />
                       After
                       <input
                         type="number"
@@ -748,9 +748,7 @@ export default function Schedule() {
             <div className="flex items-start gap-2">
               <LucideMapPin size={18} className="text-gray-400 mt-2 shrink-0" />
               <div className="flex-1">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">
-                  Location
-                </p>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Location</p>
                 <div className="flex gap-2">
                   {locationOptions.map((opt) => (
                     <button
@@ -785,14 +783,8 @@ export default function Schedule() {
           block={editingBlock}
           services={services}
           onClose={() => setEditingBlock(null)}
-          onSaved={() => {
-            setEditingBlock(null);
-            fetchSchedules();
-          }}
-          onDeleted={() => {
-            setEditingBlock(null);
-            fetchSchedules();
-          }}
+          onSaved={() => { setEditingBlock(null); fetchSchedules(); }}
+          onDeleted={() => { setEditingBlock(null); fetchSchedules(); }}
         />
       )}
     </div>

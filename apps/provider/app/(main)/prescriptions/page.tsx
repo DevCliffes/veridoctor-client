@@ -4,7 +4,14 @@ import { axiosClient } from "@veridoctor/api-client";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store";
 import { useRouter } from "next/navigation";
-import { LucideFileText, LucidePlus, LucideChevronDown, LucideChevronUp } from "@veridoctor/design/icons";
+import {
+  LucideFileText,
+  LucidePlus,
+  LucideChevronDown,
+  LucideChevronUp,
+  LucideTrash2,
+} from "@veridoctor/design/icons";
+import { toast } from "sonner";
 
 type Drug = {
   id: string;
@@ -30,6 +37,7 @@ export default function Prescriptions() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -40,6 +48,22 @@ export default function Prescriptions() {
       .finally(() => setLoading(false));
   }, [userId]);
 
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent row expand/collapse
+    if (!confirm("Delete this prescription? This cannot be undone.")) return;
+    setDeletingId(id);
+    try {
+      await axiosClient.delete(`provider/${userId}/prescriptions/${id}`);
+      setPrescriptions((prev) => prev.filter((rx) => rx.id !== id));
+      if (expanded === id) setExpanded(null);
+      toast.success("Prescription deleted");
+    } catch {
+      toast.error("Failed to delete prescription");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="p-4 mx-4 space-y-4">
       {/* Header */}
@@ -47,7 +71,7 @@ export default function Prescriptions() {
         <div>
           <h1 className="text-xl font-bold text-gray-800">Prescriptions</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {prescriptions.length} prescriptions written
+            {prescriptions.length} prescription{prescriptions.length !== 1 ? "s" : ""} written
           </p>
         </div>
         <button
@@ -85,45 +109,70 @@ export default function Prescriptions() {
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
                   onClick={() => setExpanded(expanded === rx.id ? null : rx.id)}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
                       <LucideFileText size={16} />
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-800 text-sm">{rx.patient_name}</p>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800 text-sm truncate">
+                        {rx.patient_name || "Unknown patient"}
+                      </p>
                       <p className="text-xs text-gray-500">
-                        {rx.diagnosis || "No diagnosis"} · {rx.drugs?.length ?? 0} drug(s) · {new Date(rx.created_at).toLocaleDateString("en-KE")}
+                        {rx.diagnosis || "No diagnosis"} · {rx.drugs?.length ?? 0} drug(s) ·{" "}
+                        {new Date(rx.created_at).toLocaleDateString("en-KE")}
                       </p>
                     </div>
                   </div>
-                  {expanded === rx.id ? (
-                    <LucideChevronUp size={16} className="text-gray-400" />
-                  ) : (
-                    <LucideChevronDown size={16} className="text-gray-400" />
-                  )}
+
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <button
+                      onClick={(e) => handleDelete(rx.id, e)}
+                      disabled={deletingId === rx.id}
+                      className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-50 rounded-lg hover:bg-red-50"
+                      title="Delete prescription"
+                    >
+                      <LucideTrash2 size={14} />
+                    </button>
+                    {expanded === rx.id ? (
+                      <LucideChevronUp size={16} className="text-gray-400" />
+                    ) : (
+                      <LucideChevronDown size={16} className="text-gray-400" />
+                    )}
+                  </div>
                 </div>
 
                 {expanded === rx.id && (
-                  <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                  <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3 bg-gray-50">
+                    {rx.drugs?.length === 0 && !rx.notes && (
+                      <p className="text-xs text-gray-400 italic">
+                        No drug or notes data — this record can be safely deleted.
+                      </p>
+                    )}
                     {rx.notes && (
-                      <div className="bg-yellow-50 rounded-lg p-3">
-                        <p className="text-xs font-medium text-yellow-700 mb-1">Doctor&apos;s notes</p>
+                      <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-100">
+                        <p className="text-xs font-medium text-yellow-700 mb-1">
+                          Doctor&apos;s notes
+                        </p>
                         <p className="text-sm text-gray-700">{rx.notes}</p>
                       </div>
                     )}
-                    <div className="space-y-2">
-                      {rx.drugs?.map((drug) => (
-                        <div key={drug.id} className="bg-gray-50 rounded-lg p-3">
-                          <p className="font-medium text-sm text-gray-800">{drug.drug_name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {drug.frequency} · {drug.duration}
-                          </p>
-                          {drug.instructions && (
-                            <p className="text-xs text-gray-400 mt-0.5 italic">{drug.instructions}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    {rx.drugs?.length > 0 && (
+                      <div className="space-y-2">
+                        {rx.drugs.map((drug) => (
+                          <div key={drug.id} className="bg-white rounded-lg p-3 border border-gray-100">
+                            <p className="font-medium text-sm text-gray-800">{drug.drug_name}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {drug.frequency} · {drug.duration}
+                            </p>
+                            {drug.instructions && (
+                              <p className="text-xs text-gray-400 mt-0.5 italic">
+                                {drug.instructions}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

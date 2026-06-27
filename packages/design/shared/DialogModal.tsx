@@ -27,10 +27,30 @@ function DialogModal({
   children,
 }: DialogContent) {
   const [open, setOpen] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const hasSubmitted = React.useRef(false);
+
+  // Reset guard whenever modal opens fresh
+  React.useEffect(() => {
+    if (open) {
+      hasSubmitted.current = false;
+      setSaving(false);
+    }
+  }, [open]);
 
   const handleSave = async () => {
-    await onSave();
-    setOpen(false);
+    // Hard guard — block any second call even before state updates
+    if (hasSubmitted.current || saving) return;
+    hasSubmitted.current = true;
+    setSaving(true);
+    try {
+      await onSave();
+      setOpen(false);
+    } catch {
+      // If onSave throws, reset so provider can retry
+      hasSubmitted.current = false;
+      setSaving(false);
+    }
   };
 
   return (
@@ -48,7 +68,9 @@ function DialogModal({
           <DialogClose className="bg-secondary px-4 rounded-md text-secondary-foreground shadow-xs hover:bg-secondary/80 cursor-pointer">
             cancel
           </DialogClose>
-          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

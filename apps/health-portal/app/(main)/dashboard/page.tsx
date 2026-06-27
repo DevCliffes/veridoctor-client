@@ -21,7 +21,11 @@ interface Appointment {
   meet_id?: string;
   provider_first_name?: string;
   provider_last_name?: string;
+  doctor_first_name?: string;
+  doctor_last_name?: string;
   provider_id?: string;
+  provider_identity_id?: string;
+  service_name?: string | null;
 }
 
 function getIdentityId(identity: unknown): string {
@@ -60,6 +64,35 @@ function minutesUntil(iso: string) {
   return Math.round((new Date(iso).getTime() - Date.now()) / 60000);
 }
 
+// Convert raw minutes into "X days Y hrs Z mins" human-readable string
+function formatTimeUntil(mins: number): string {
+  if (mins <= 0) return "coming up now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"}`;
+  const days = Math.floor(mins / (60 * 24));
+  const hours = Math.floor((mins % (60 * 24)) / 60);
+  const remainingMins = mins % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+  if (hours > 0) parts.push(`${hours} hr${hours === 1 ? "" : "s"}`);
+  if (remainingMins > 0 && days === 0)
+    parts.push(`${remainingMins} min${remainingMins === 1 ? "" : "s"}`);
+  return parts.join(" ");
+}
+
+// Resolve doctor name from whichever fields the API returns
+function getDoctorName(appt: Appointment): string | null {
+  const first =
+    appt.doctor_first_name || appt.provider_first_name || "";
+  const last =
+    appt.doctor_last_name || appt.provider_last_name || "";
+  if (!first && !last) return null;
+  return `Dr. ${first} ${last}`.trim();
+}
+
+function getDoctorProfileId(appt: Appointment): string | null {
+  return appt.provider_identity_id || appt.provider_id || null;
+}
+
 const TELEHEALTH_URL =
   process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
   "https://veridoctor-client-telehealth.vercel.app";
@@ -71,9 +104,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState("there");
 
-  // identity is a cookie string ID — used only for the name greeting fetch
   const identityId = getIdentityId(identity);
-  // user.email is the reliable source for patient email (set at login)
   const patientEmail = user?.email ?? "";
 
   useEffect(() => {
@@ -111,12 +142,11 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold mt-0.5">
           {firstName.charAt(0).toUpperCase() + firstName.slice(1)}
         </h1>
-        {nextAppt ? (
+        {nextAppt && minsUntilNext !== null ? (
           <p className="text-blue-100 text-sm mt-2">
-            You have an appointment{" "}
-            {minsUntilNext !== null && minsUntilNext > 0
-              ? "in " + minsUntilNext + " minutes"
-              : "coming up"}
+            {minsUntilNext > 0
+              ? `You have an appointment in ${formatTimeUntil(minsUntilNext)}`
+              : "You have an appointment coming up now"}
           </p>
         ) : (
           <p className="text-blue-100 text-sm mt-2">
@@ -186,10 +216,8 @@ export default function Dashboard() {
                 mins > -30 &&
                 mins < 60;
 
-              const doctorName =
-                appt.provider_first_name || appt.provider_last_name
-                  ? `Dr. ${appt.provider_first_name ?? ""} ${appt.provider_last_name ?? ""}`.trim()
-                  : null;
+              const doctorName = getDoctorName(appt);
+              const profileId = getDoctorProfileId(appt);
 
               return (
                 <div
@@ -211,10 +239,10 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    {doctorName && appt.provider_id ? (
+                    {doctorName && profileId ? (
                       <button
                         onClick={() =>
-                          router.push(`/book/provider/${appt.provider_id}`)
+                          router.push(`/book/provider/${profileId}`)
                         }
                         className="text-sm font-medium text-blue-600 hover:underline text-left"
                       >
@@ -231,6 +259,12 @@ export default function Dashboard() {
                     <p className="text-xs text-gray-500">
                       {formatDate(appt.start_time)} ·{" "}
                       {formatTime(appt.start_time)}
+                      {appt.service_name && (
+                        <span className="text-gray-400">
+                          {" · "}
+                          {appt.service_name}
+                        </span>
+                      )}
                     </p>
                   </div>
                   {isJoinable && appt.meet_id && (

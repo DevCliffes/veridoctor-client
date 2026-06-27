@@ -32,14 +32,6 @@ interface Prescription {
   };
 }
 
-function getField(identity: unknown, field: string): string {
-  if (identity && typeof identity === "object" && field in identity) {
-    const val = (identity as Record<string, unknown>)[field];
-    if (typeof val === "string") return val;
-  }
-  return "";
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-KE", {
     year: "numeric",
@@ -160,7 +152,7 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
 }
 
 export default function Prescriptions() {
-  const { identity } = useAppSelector((store) => store.auth);
+  const { user } = useAppSelector((store) => store.auth);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{
@@ -168,10 +160,13 @@ export default function Prescriptions() {
     type: "success" | "error";
   } | null>(null);
 
-  const patientEmail = getField(identity, "email");
+  const patientEmail = user?.email ?? "";
 
   useEffect(() => {
-    if (!patientEmail) return;
+    if (!patientEmail) {
+      setLoading(false);
+      return;
+    }
     axiosClient
       .get("/prescriptions?patient_email=" + patientEmail)
       .then((res) => setPrescriptions(res.data ?? []))

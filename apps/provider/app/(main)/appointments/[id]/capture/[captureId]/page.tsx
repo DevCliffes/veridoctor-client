@@ -46,7 +46,6 @@ type Capture = {
   updated_at: string;
 };
 
-// Must match the key used in capture/page.tsx
 const SNAPSHOT_KEY = "__form_snapshot__";
 
 export default function CaptureViewPage() {
@@ -94,18 +93,17 @@ export default function CaptureViewPage() {
     );
   }
 
-  // ✅ Read snapshot from values.__form_snapshot__ first (new captures),
-  // then fall back to top-level form_snapshot (if backend ever starts
-  // persisting it), then fall back to legacy mode.
+  // form_snapshot is now stored correctly on the top-level by the backend.
+  // Fall back to values.__form_snapshot__ only for captures saved between
+  // the original workaround and this fix.
   const smuggled = capture.values?.[SNAPSHOT_KEY];
   const sections: Section[] =
-    Array.isArray(smuggled) && smuggled.length > 0
-      ? (smuggled as Section[])
-      : Array.isArray(capture.form_snapshot) && capture.form_snapshot.length > 0
+    Array.isArray(capture.form_snapshot) && capture.form_snapshot.length > 0
       ? capture.form_snapshot
+      : Array.isArray(smuggled) && smuggled.length > 0
+      ? (smuggled as Section[])
       : [];
 
-  // Values without the internal snapshot key (don't render it as a field)
   const displayValues = Object.fromEntries(
     Object.entries(capture.values ?? {}).filter(([k]) => k !== SNAPSHOT_KEY)
   );
@@ -137,7 +135,6 @@ export default function CaptureViewPage() {
 
       <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-5">
         {sections.length > 0 ? (
-          // ✅ Happy path: snapshot found — render with proper field labels.
           sections.map((section) => (
             <div
               key={section.id}
@@ -166,17 +163,11 @@ export default function CaptureViewPage() {
                             <span className="text-red-400 ml-1">*</span>
                           )}
                         </p>
-                        <p
-                          className={`text-sm ${
-                            isEmpty ? "text-gray-300 italic" : "text-gray-700"
-                          }`}
-                        >
+                        <p className={`text-sm ${isEmpty ? "text-gray-300 italic" : "text-gray-700"}`}>
                           {isEmpty
                             ? "Not filled"
                             : field.type === "checkbox"
-                            ? val
-                              ? "Yes"
-                              : "No"
+                            ? val ? "Yes" : "No"
                             : String(val)}
                         </p>
                       </div>
@@ -187,7 +178,7 @@ export default function CaptureViewPage() {
             </div>
           ))
         ) : (
-          // ⚠️ Legacy fallback for captures predating this fix.
+          // Legacy fallback for captures with no snapshot saved at all
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-700">Captured Data</h2>
@@ -197,7 +188,6 @@ export default function CaptureViewPage() {
             </div>
             <div className="flex flex-col gap-4">
               {Object.entries(displayValues).map(([key, val]) => {
-                // Handle { label, value } shape from prior partial fix attempt
                 const isLabeledPair =
                   val !== null &&
                   typeof val === "object" &&
@@ -228,7 +218,6 @@ export default function CaptureViewPage() {
                   );
                 }
 
-                // Handle raw prescription object (keyed by section ID)
                 const isPrescObj =
                   val !== null &&
                   typeof val === "object" &&
@@ -245,7 +234,6 @@ export default function CaptureViewPage() {
                   );
                 }
 
-                // Plain primitive
                 return (
                   <div key={key} className="flex flex-col gap-0.5">
                     <p className="text-xs text-gray-400 uppercase tracking-wide">{key}</p>
@@ -268,9 +256,7 @@ export default function CaptureViewPage() {
 function PrescriptionView({ value }: { value: PrescriptionValue | undefined }) {
   if (
     !value ||
-    (!value.diagnosis &&
-      !value.notes &&
-      (!value.drugs || value.drugs.length === 0))
+    (!value.diagnosis && !value.notes && (!value.drugs || value.drugs.length === 0))
   ) {
     return <p className="text-sm text-gray-300 italic">Not filled</p>;
   }
@@ -285,7 +271,6 @@ function PrescriptionView({ value }: { value: PrescriptionValue | undefined }) {
           <p className="text-sm text-gray-700">{value.diagnosis}</p>
         </div>
       )}
-
       {value.drugs && value.drugs.length > 0 && (
         <div>
           <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
@@ -313,7 +298,6 @@ function PrescriptionView({ value }: { value: PrescriptionValue | undefined }) {
           </div>
         </div>
       )}
-
       {value.notes && (
         <div>
           <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">

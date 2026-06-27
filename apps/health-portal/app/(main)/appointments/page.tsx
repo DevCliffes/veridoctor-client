@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
@@ -21,6 +21,7 @@ interface Appointment {
   doctor_first_name: string | null;
   doctor_last_name: string | null;
   provider_id: string | null;
+  provider_identity_id: string | null;
   start_time: string;
   end_time: string;
   appointment_type: "virtual" | "physical";
@@ -28,6 +29,7 @@ interface Appointment {
   meet_id?: string;
   message?: string;
   service?: string | null;
+  service_name?: string | null;
 }
 
 interface Slot {
@@ -110,17 +112,15 @@ function RescheduleModal({
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Fetch available slots whenever date changes
   useEffect(() => {
-    if (!date || !appt.provider_id) return;
+    if (!date || !appt.provider_identity_id) return;
     setSlots([]);
     setSelectedSlot(null);
     setLoadingSlots(true);
     axiosClient
-      .get(`/provider/${appt.provider_id}/available-slots?date=${date}`)
+      .get(`/provider/${appt.provider_identity_id}/available-slots?date=${date}`)
       .then((res) => {
         const all: Slot[] = res.data ?? [];
-        // Filter to match the original appointment type
         const filtered = all.filter((s) => {
           if (
             appt.appointment_type !== "virtual" &&
@@ -136,7 +136,7 @@ function RescheduleModal({
       })
       .catch(() => toast.error("Failed to load available slots"))
       .finally(() => setLoadingSlots(false));
-  }, [date, appt.provider_id, appt.appointment_type]);
+  }, [date, appt.provider_identity_id, appt.appointment_type]);
 
   const handleConfirm = async () => {
     if (!selectedSlot) {
@@ -167,7 +167,6 @@ function RescheduleModal({
           Reschedule Appointment
         </h3>
 
-        {/* Date picker */}
         <div>
           <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1">
             Select Date
@@ -181,7 +180,6 @@ function RescheduleModal({
           />
         </div>
 
-        {/* Slot grid */}
         <div>
           <label className="text-xs text-gray-500 uppercase tracking-wide block mb-2">
             Available Times
@@ -191,10 +189,7 @@ function RescheduleModal({
           ) : loadingSlots ? (
             <div className="grid grid-cols-3 gap-2">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div
-                  key={i}
-                  className="h-9 bg-gray-100 rounded-lg animate-pulse"
-                />
+                <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />
               ))}
             </div>
           ) : slots.length === 0 ? (
@@ -222,7 +217,6 @@ function RescheduleModal({
           )}
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 pt-1">
           <button
             onClick={onClose}
@@ -245,7 +239,7 @@ function RescheduleModal({
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export default function Appointments() {
+function AppointmentsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -317,6 +311,7 @@ export default function Appointments() {
 
   const tableColumns: DatatableColumnHeader[] = [
     { name: "Doctor", type: "string", key: "name" },
+    { name: "Service", type: "string", key: "service_name" },
     { name: "Date/Time", type: "string", key: "date" },
     { name: "Status", type: "string", key: "status" },
     { name: "Call", type: "string", key: "call" },
@@ -326,6 +321,7 @@ export default function Appointments() {
   const tableRows: {
     id: string;
     name: ReactNode;
+    service_name: ReactNode;
     date: string;
     status: ReactNode;
     call: ReactNode;
@@ -341,6 +337,11 @@ export default function Appointments() {
           ? "Dr. " + appt.doctor_first_name + " " + (appt.doctor_last_name ?? "")
           : "Your Provider"}
       </button>
+    ),
+    service_name: (
+      <span className="text-xs text-gray-600">
+        {appt.service_name ?? <span className="text-gray-300 italic">—</span>}
+      </span>
     ),
     date: formatDateTime(appt.start_time),
     status: <StatusBadge status={appt.status} />,
@@ -414,5 +415,13 @@ export default function Appointments() {
         filterTabs={filterTabs}
       />
     </div>
+  );
+}
+
+export default function Appointments() {
+  return (
+    <Suspense fallback={<div className="p-4">Loading...</div>}>
+      <AppointmentsContent />
+    </Suspense>
   );
 }

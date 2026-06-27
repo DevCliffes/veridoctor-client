@@ -50,7 +50,8 @@ export default function PatientPortal({
       .then((res) => {
         const appt: Appointment = res.data;
         setAppointment(appt);
-        return axiosClient.get(`provider/${userId}/appointments`);
+        // ← filter=all so past appointments are included in history
+        return axiosClient.get(`provider/${userId}/appointments?filter=all`);
       })
       .then((res) => {
         setAllAppointments(res.data ?? []);
@@ -64,12 +65,17 @@ export default function PatientPortal({
   }, [fetchData]);
 
   const patientAppointments = allAppointments
-    .filter(
-      (a) =>
-        appointment &&
+    .filter((a) => {
+      if (!appointment) return false;
+      // Match by email (most reliable) with name fallback
+      if (appointment.patient_email && a.patient_email) {
+        return a.patient_email.toLowerCase() === appointment.patient_email.toLowerCase();
+      }
+      return (
         a.patient_first_name === appointment.patient_first_name &&
         a.patient_last_name === appointment.patient_last_name
-    )
+      );
+    })
     .sort(
       (a, b) =>
         new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
@@ -93,7 +99,6 @@ export default function PatientPortal({
 
   return (
     <div className="p-6 mx-4 space-y-6">
-      {/* Back button */}
       <button
         onClick={() => router.back()}
         className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"
@@ -109,9 +114,11 @@ export default function PatientPortal({
             <LucideUser size={28} />
           </div>
           <div>
-            <h1 className="text-xl font-bold">{appointment.patient_name}</h1>
+            <h1 className="text-xl font-bold">
+              {appointment.patient_first_name} {appointment.patient_last_name}
+            </h1>
             <p className="text-sm text-gray-500 capitalize">
-              {appointment.appointment_type} appointment
+              {appointment.appointment_type} Appointment
             </p>
           </div>
         </div>
@@ -160,15 +167,9 @@ export default function PatientPortal({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
-                  <th className="py-3 px-2 font-semibold text-gray-700">
-                    Date/Time
-                  </th>
-                  <th className="py-3 px-2 font-semibold text-gray-700">
-                    Type
-                  </th>
-                  <th className="py-3 px-2 font-semibold text-gray-700">
-                    Status
-                  </th>
+                  <th className="py-3 px-2 font-semibold text-gray-700">Date/Time</th>
+                  <th className="py-3 px-2 font-semibold text-gray-700">Type</th>
+                  <th className="py-3 px-2 font-semibold text-gray-700">Status</th>
                   <th className="py-3 px-2 w-8" />
                 </tr>
               </thead>
@@ -191,26 +192,22 @@ export default function PatientPortal({
                       })}
                     </td>
                     <td className="py-3 px-2">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
-                          a.appointment_type === "virtual"
-                            ? "bg-indigo-50 text-indigo-600"
-                            : "bg-green-50 text-green-600"
-                        }`}
-                      >
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                        a.appointment_type === "virtual"
+                          ? "bg-indigo-50 text-indigo-600"
+                          : "bg-green-50 text-green-600"
+                      }`}>
                         {a.appointment_type}
                       </span>
                     </td>
                     <td className="py-3 px-2">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
-                          a.status === "confirmed"
-                            ? "bg-green-50 text-green-600"
-                            : a.status === "cancelled"
-                            ? "bg-red-50 text-red-600"
-                            : "bg-yellow-50 text-yellow-600"
-                        }`}
-                      >
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                        a.status === "confirmed"
+                          ? "bg-green-50 text-green-600"
+                          : a.status === "cancelled"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-yellow-50 text-yellow-600"
+                      }`}>
                         {a.status}
                       </span>
                     </td>

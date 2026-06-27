@@ -24,14 +24,6 @@ interface Appointment {
   provider_id?: string;
 }
 
-function getField(identity: unknown, field: string): string {
-  if (identity && typeof identity === "object" && field in identity) {
-    const val = (identity as Record<string, unknown>)[field];
-    if (typeof val === "string") return val;
-  }
-  return "";
-}
-
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
     if (!identity) return "";
@@ -74,16 +66,16 @@ const TELEHEALTH_URL =
 
 export default function Dashboard() {
   const router = useRouter();
-  const { identity } = useAppSelector((store) => store.auth);
+  const { identity, user } = useAppSelector((store) => store.auth);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState("there");
 
-  // ✅ Fixed: get email from identity regardless of shape
-  const patientEmail = getField(identity, "email");
+  // identity is a cookie string ID — used only for the name greeting fetch
   const identityId = getIdentityId(identity);
+  // user.email is the reliable source for patient email (set at login)
+  const patientEmail = user?.email ?? "";
 
-  // ✅ Fixed: fetch patient name from profile so greeting shows real name
   useEffect(() => {
     if (!identityId) return;
     axiosClient
@@ -95,13 +87,9 @@ export default function Dashboard() {
       .catch(() => {});
   }, [identityId]);
 
-  // ✅ Fixed: only fetch appointments once patientEmail is available
   useEffect(() => {
     if (!patientEmail) {
-      // If no email yet, don't spin forever — check identity resolved
-      if (identity !== null && identity !== undefined && identity !== "") {
-        setLoading(false);
-      }
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -110,7 +98,7 @@ export default function Dashboard() {
       .then((res) => setAppointments((res.data ?? []).slice(0, 3)))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [patientEmail, identity]);
+  }, [patientEmail]);
 
   const nextAppt = appointments[0];
   const minsUntilNext = nextAppt ? minutesUntil(nextAppt.start_time) : null;
@@ -223,7 +211,6 @@ export default function Dashboard() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    {/* ✅ Fixed: doctor name links to provider public profile */}
                     {doctorName && appt.provider_id ? (
                       <button
                         onClick={() =>

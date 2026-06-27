@@ -1,4 +1,3 @@
-// TODO: Add search
 import { createSlice } from "@reduxjs/toolkit";
 import { safeStorage } from "../../services/useLocalStorage.hook";
 import CookieService from "../../services/cookieStorage";
@@ -7,10 +6,62 @@ import {
   REFRESH_TOKEN_KEY,
   LOGGED_IN_KEY,
   AUTH_CODE_KEY,
-  IDENTITY_KEY
+  IDENTITY_KEY,
+  PATIENT_IDENTITY_KEY,
+  PATIENT_LOGGED_IN_KEY,
+  PATIENT_ACCESS_TOKEN_KEY,
+  PATIENT_AUTH_CODE_KEY,
+  PROVIDER_IDENTITY_KEY,
+  PROVIDER_LOGGED_IN_KEY,
+  PROVIDER_ACCESS_TOKEN_KEY,
+  PROVIDER_AUTH_CODE_KEY,
 } from "../../../../api-client/constants";
 
-// state types
+// Detect which app we're running in based on hostname.
+// Falls back to generic keys if hostname is unavailable (SSR).
+function getAppScope(): "patient" | "provider" | "generic" {
+  if (typeof window === "undefined") return "generic";
+  const host = window.location.hostname;
+  if (host.startsWith("app.")) return "patient";
+  if (host.startsWith("provider.")) return "provider";
+  return "generic";
+}
+
+function getScopedKeys() {
+  const scope = getAppScope();
+  if (scope === "patient") {
+    return {
+      identityKey: PATIENT_IDENTITY_KEY,
+      loggedInKey: PATIENT_LOGGED_IN_KEY,
+      accessTokenKey: PATIENT_ACCESS_TOKEN_KEY,
+      authCodeKey: PATIENT_AUTH_CODE_KEY,
+      refreshTokenKey: REFRESH_TOKEN_KEY,
+      userStorageKey: "vd_patient_user",
+    };
+  }
+  if (scope === "provider") {
+    return {
+      identityKey: PROVIDER_IDENTITY_KEY,
+      loggedInKey: PROVIDER_LOGGED_IN_KEY,
+      accessTokenKey: PROVIDER_ACCESS_TOKEN_KEY,
+      authCodeKey: PROVIDER_AUTH_CODE_KEY,
+      refreshTokenKey: REFRESH_TOKEN_KEY,
+      userStorageKey: "vd_provider_user",
+    };
+  }
+  // Generic fallback (web app / SSR)
+  return {
+    identityKey: IDENTITY_KEY,
+    loggedInKey: LOGGED_IN_KEY,
+    accessTokenKey: ACCESS_TOKEN_KEY,
+    authCodeKey: AUTH_CODE_KEY,
+    refreshTokenKey: REFRESH_TOKEN_KEY,
+    userStorageKey: "user",
+  };
+}
+
+const keys = getScopedKeys();
+
 export type authState = {
   isLoggedIn: boolean;
   access_token: string | null;
@@ -23,16 +74,15 @@ export type authState = {
     last_name: string;
     email: string;
   } | null;
-  // for safety add doctor and patient types
 };
 
 const initialAuthState: authState = {
-  isLoggedIn: CookieService.get(LOGGED_IN_KEY) === "true",
-  access_token: CookieService.get(ACCESS_TOKEN_KEY) || null,
-  refresh_token: CookieService.get(REFRESH_TOKEN_KEY) || null,
-  auth_code: CookieService.get(AUTH_CODE_KEY) || null,
-  user: safeStorage.get("user"),
-  identity: CookieService.get(IDENTITY_KEY) || null,
+  isLoggedIn: CookieService.get(keys.loggedInKey) === "true",
+  access_token: CookieService.get(keys.accessTokenKey) || null,
+  refresh_token: CookieService.get(keys.refreshTokenKey) || null,
+  auth_code: CookieService.get(keys.authCodeKey) || null,
+  user: safeStorage.get(keys.userStorageKey),
+  identity: CookieService.get(keys.identityKey) || null,
 };
 
 export const authSlice = createSlice({
@@ -41,44 +91,45 @@ export const authSlice = createSlice({
   reducers: {
     setIsLoggedIn: (state) => {
       state.isLoggedIn = true;
-      CookieService.set(LOGGED_IN_KEY, "true");
+      CookieService.set(keys.loggedInKey, "true");
     },
-    /**sets the access token */
     setAccessToken: (state, action) => {
       state.access_token = action.payload;
-      CookieService.set(ACCESS_TOKEN_KEY, action.payload);
+      CookieService.set(keys.accessTokenKey, action.payload);
     },
-    /**sets the refresh token */
     setRefreshToken: (state, action) => {
       state.refresh_token = action.payload;
-      CookieService.set(REFRESH_TOKEN_KEY, action.payload);
+      CookieService.set(keys.refreshTokenKey, action.payload);
     },
-    /** sets the temporary auth cod  */
     setAuthCode: (state, action) => {
       state.auth_code = action.payload;
-      CookieService.set(AUTH_CODE_KEY, action.payload);
+      CookieService.set(keys.authCodeKey, action.payload);
     },
     setUser: (state, action) => {
       state.user = action.payload;
-      safeStorage.set("user", action.payload);
+      safeStorage.set(keys.userStorageKey, action.payload);
     },
     setUserId: (state, action) => {
       state.identity = action.payload;
-      CookieService.set(IDENTITY_KEY, action.payload);
+      CookieService.set(keys.identityKey, action.payload);
     },
     revokeTokens: (state) => {
       state.access_token = null;
       state.refresh_token = null;
       state.auth_code = null;
-      CookieService.remove(ACCESS_TOKEN_KEY);
-      CookieService.remove(REFRESH_TOKEN_KEY);
-      CookieService.remove(AUTH_CODE_KEY);
-      CookieService.remove(LOGGED_IN_KEY);
+      state.isLoggedIn = false;
+      state.identity = null;
+      state.user = null;
+      CookieService.remove(keys.accessTokenKey);
+      CookieService.remove(keys.refreshTokenKey);
+      CookieService.remove(keys.authCodeKey);
+      CookieService.remove(keys.loggedInKey);
+      CookieService.remove(keys.identityKey);
+      safeStorage.remove(keys.userStorageKey);
     },
   },
 });
 
-// Actions
 export const {
   setIsLoggedIn,
   setUser,
@@ -89,5 +140,4 @@ export const {
   revokeTokens,
 } = authSlice.actions;
 
-// Reducers
 export const authReducer = authSlice.reducer;

@@ -40,14 +40,6 @@ function formatDate(iso: string) {
   });
 }
 
-function getField(identity: unknown, field: string): string {
-  if (identity && typeof identity === "object" && field in identity) {
-    const val = (identity as Record<string, unknown>)[field];
-    if (typeof val === "string") return val;
-  }
-  return "";
-}
-
 function Toast({
   message,
   type,
@@ -160,7 +152,7 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
 }
 
 export default function Prescriptions() {
-  const { identity } = useAppSelector((store) => store.auth);
+  const { user } = useAppSelector((store) => store.auth);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{
@@ -168,14 +160,11 @@ export default function Prescriptions() {
     type: "success" | "error";
   } | null>(null);
 
-  // Use the same pattern as the working dashboard page
-  const patientEmail = getField(identity, "email");
+  const patientEmail = user?.email ?? "";
 
   useEffect(() => {
     if (!patientEmail) {
-      if (identity !== null && identity !== undefined && identity !== "") {
-        setLoading(false);
-      }
+      setLoading(false);
       return;
     }
     axiosClient
@@ -185,7 +174,7 @@ export default function Prescriptions() {
         setToast({ message: "Failed to load prescriptions", type: "error" })
       )
       .finally(() => setLoading(false));
-  }, [patientEmail, identity]);
+  }, [patientEmail]);
 
   return (
     <div className="space-y-4">

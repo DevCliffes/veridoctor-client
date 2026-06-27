@@ -7,6 +7,7 @@ import { LucideEye, LucideEyeClosed } from "@veridoctor/design/icons";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, useState, Suspense } from "react";
+import { Loader2 } from "@veridoctor/design/icons";
 import { toast } from "sonner";
 import { setIsLoggedIn, setUser } from "@veridoctor/store";
 
@@ -14,14 +15,39 @@ type LoginForm = {
   email: { value: string; valid: boolean };
   password: string;
 };
+
 type LoginResponse = {
   user: { id: string; first_name: string; last_name: string };
   detail: string;
   auth_code: string;
 };
 
+function extractApiError(data: unknown): string {
+  if (!data || typeof data !== "object") return "An error occurred. Please try again.";
+  const obj = data as Record<string, unknown>;
+  if (typeof obj.detail === "string") return obj.detail;
+  const fieldOrder = ["email", "password", "non_field_errors"];
+  for (const field of fieldOrder) {
+    if (Array.isArray(obj[field]) && (obj[field] as unknown[]).length > 0) {
+      const label =
+        field === "non_field_errors" ? "" :
+        field.charAt(0).toUpperCase() + field.slice(1);
+      const msg = String((obj[field] as unknown[])[0]);
+      return label ? `${label}: ${msg}` : msg;
+    }
+  }
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (Array.isArray(val) && val.length > 0) return String(val[0]);
+    if (typeof val === "string") return val;
+  }
+  return "An error occurred. Please try again.";
+}
+
 function LoginForm() {
   const [passwordType, setPasswordType] = useState<"password" | "text">("password");
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState<LoginForm>({
     email: { value: "", valid: true },
     password: "",
@@ -29,7 +55,6 @@ function LoginForm() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const redirectParam = searchParams.get("redirect") ?? "";
 
   const validateEmail = (email: string) => {
@@ -39,6 +64,7 @@ function LoginForm() {
 
   const handleLoginFormChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
+    setApiError(null); // clear error on any change
     if (name === "email") {
       setLoginForm({ ...loginForm, email: { valid: validateEmail(value), value } });
     } else {
@@ -52,10 +78,20 @@ function LoginForm() {
       | React.MouseEvent<HTMLButtonElement, MouseEvent>,
   ) => {
     event.preventDefault();
-    if (loginForm.email.value === "" || loginForm.password === "") {
-      toast.error("Please fill in all required fields.");
+    if (loading) return;
+
+    setApiError(null);
+
+    if (!loginForm.email.value || !loginForm.password) {
+      setApiError("Please fill in your email and password.");
       return;
     }
+    if (!loginForm.email.valid) {
+      setApiError("Please enter a valid email address.");
+      return;
+    }
+
+    setLoading(true);
     axiosClient
       .post<LoginResponse>("identity/login", {
         email: loginForm.email.value,
@@ -66,7 +102,6 @@ function LoginForm() {
           toast.success("Login successful!");
           dispatch(setIsLoggedIn());
           dispatch(setUser(res.data.user));
-
           const redirectQuery = redirectParam
             ? `&redirect=${encodeURIComponent(redirectParam)}`
             : "";
@@ -79,16 +114,31 @@ function LoginForm() {
         if (err.response?.status === 403) {
           toast.info("Please verify your email to proceed.");
           router.push(`/auth/verify-email/${err.response.data.user.id}?prev=login`);
+        } else if (err.response?.status === 401 || err.response?.status === 400) {
+          setApiError(extractApiError(err.response?.data));
+        } else if (err.response?.status >= 500) {
+          setApiError("Something went wrong on our end. Please try again later.");
         } else {
-          toast.error("An error occurred. Please try again later");
+          setApiError(extractApiError(err.response?.data));
         }
-      });
+      })
+      .finally(() => setLoading(false));
   };
 
   return (
     <div className="flex flex-col items-center m-auto w-full">
       <p className="text-xl font-bold mb-5">Login to your account</p>
+
       <form className="flex flex-col gap-2 p-4 w-full max-w-[400px] lg:max-w-[600px]">
+
+        {/* ── API error banner ── */}
+        {apiError && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-1">
+            <span className="mt-0.5 shrink-0">⚠</span>
+            <span>{apiError}</span>
+          </div>
+        )}
+
         <div className="w-full">
           <label className="block">
             Email <span className="text-red-500">*</span>
@@ -96,13 +146,14 @@ function LoginForm() {
           <input
             name="email"
             placeholder="johndoe@email.com"
-            className="border border-gray-400 rounded focus:outline-none px-2 w-full h-10"
+            className={`border ${!loginForm.email.valid && loginForm.email.value ? "border-red-400" : "border-gray-400"} rounded focus:outline-none px-2 w-full h-10`}
             onChange={handleLoginFormChange}
           />
-          {!loginForm.email.valid && (
+          {!loginForm.email.valid && loginForm.email.value && (
             <p className="text-sm text-red-400 italic">Please enter a valid email</p>
           )}
         </div>
+
         <div>
           <label className="block">
             Password <span className="text-red-500">*</span>
@@ -115,27 +166,43 @@ function LoginForm() {
               onChange={handleLoginFormChange}
             />
             {passwordType === "password" ? (
-              <LucideEyeClosed onClick={() => setPasswordType("text")} className="text-gray-400 cursor-pointer" />
+              <LucideEyeClosed
+                onClick={() => setPasswordType("text")}
+                className="text-gray-400 cursor-pointer"
+              />
             ) : (
-              <LucideEye onClick={() => setPasswordType("password")} className="text-gray-400 cursor-pointer" />
+              <LucideEye
+                onClick={() => setPasswordType("password")}
+                className="text-gray-400 cursor-pointer"
+              />
             )}
           </div>
         </div>
-        <div className="flex flex-col items-center gap-2 mt-5">
-          <Button onClick={handleLogin} className="p-5 cursor-pointer w-full">
-            Login
+
+        <div className="flex justify-end">
+          <Link href="/auth/reset-password" className="text-sm text-blue-500 hover:underline">
+            Forgot password?
+          </Link>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 mt-3">
+          <Button
+            onClick={handleLogin}
+            disabled={loading}
+            className={`p-5 cursor-pointer w-full ${loading ? "bg-primary/50" : ""}`}
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {loading ? "Logging in..." : "Login"}
           </Button>
         </div>
       </form>
+
       <div className="text-center my-4">
         <p>
           Don&apos;t have an account?{" "}
           <Link href="/auth/signup" className="text-blue-500 font-bold">
             create one
           </Link>
-        </p>
-        <p className="text-blue-500 font-bold">
-          <Link href="/auth/reset-password">Forgot password?</Link>
         </p>
       </div>
     </div>
@@ -149,4 +216,3 @@ export default function Login() {
     </Suspense>
   );
 }
-

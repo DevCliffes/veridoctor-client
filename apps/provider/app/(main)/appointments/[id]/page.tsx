@@ -841,7 +841,7 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
           ? <p className="text-xs text-gray-400 py-2">No previous consultations on record for this patient.</p>
           : (
             <>
-              <div className="overflow-y-auto max-h-72 space-y-2 pr-1">
+              <div className="overflow-y-auto max-h-[1056px] min-h-[300px] space-y-2 pr-1">
                 {ownRecords.map((rec) => <OwnRecordCard key={rec.id} record={rec} />)}
               </div>
               {ownRecords.length > 4 && <p className="text-xs text-gray-400 text-center mt-2">Scroll to see all {ownRecords.length} records</p>}

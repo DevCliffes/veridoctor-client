@@ -1,465 +1,221 @@
 "use client";
+import { useEffect, useState } from "react";
+import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
-import { Button } from "@veridoctor/design/components";
-import { LucidePlus, LucideTrash2, LucidePrinter, LucideCheck } from "@veridoctor/design/icons";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
-import { useSelector } from "react-redux";
-import { toast } from "sonner";
-import { RootState } from "../../../store";
+import {
+  LucideFileText,
+  LucidePill,
+  LucideLoader2,
+  LucideCalendar,
+  LucideChevronDown,
+  LucideChevronUp,
+} from "@veridoctor/design/icons";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface DrugEntry {
+interface Drug {
   id: string;
-  name: string;
-  dosage: string;
+  drug_name: string;
   frequency: string;
   duration: string;
-  instructions: string;
+  instructions?: string;
 }
 
-interface Patient {
+interface Prescription {
   id: string;
-  name: string;
-  patient_identity: string | null;
-  patient_email: string;
-  patient_phone_number: string;
-  date_of_birth?: string;
+  diagnosis: string;
+  notes?: string;
+  created_at: string;
+  drugs: Drug[];
+  provider?: {
+    first_name: string;
+    last_name: string;
+    speciality?: string;
+  };
 }
 
-interface RawAppointment {
-  id: string;
-  patient_first_name: string;
-  patient_last_name: string;
-  patient_email: string;
-  patient_phone_number: string;
-  patient_identity: string | null;
-  start_time: string;
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-KE", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
-const FREQUENCIES = [
-  "Once daily",
-  "Twice daily (BD)",
-  "Three times daily (TDS)",
-  "Four times daily (QDS)",
-  "Every 8 hours",
-  "Every 6 hours",
-  "At night (nocte)",
-  "In the morning",
-  "As needed (PRN)",
-  "Once weekly",
-];
-
-const DURATIONS = [
-  "3 days",
-  "5 days",
-  "7 days",
-  "10 days",
-  "14 days",
-  "1 month",
-  "2 months",
-  "3 months",
-  "6 months",
-  "Ongoing",
-];
-
-const COMMON_DRUGS = [
-  "Amoxicillin 500mg",
-  "Metformin 500mg",
-  "Amlodipine 5mg",
-  "Atorvastatin 20mg",
-  "Omeprazole 20mg",
-  "Paracetamol 500mg",
-  "Ibuprofen 400mg",
-  "Metronidazole 400mg",
-  "Ciprofloxacin 500mg",
-  "Doxycycline 100mg",
-  "Lisinopril 10mg",
-  "Salbutamol Inhaler 100mcg",
-];
-
-const emptyDrug = (): DrugEntry => ({
-  id: crypto.randomUUID(),
-  name: "",
-  dosage: "",
-  frequency: "Once daily",
-  duration: "7 days",
-  instructions: "",
-});
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
-export default function PrescriptionForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const patientId = searchParams.get("patient_id");
-  const userId = useSelector((state: RootState) => state.auth.identity);
-
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [patientSearch, setPatientSearch] = useState("");
-  const [allPatients, setAllPatients] = useState<Patient[]>([]);
-  const [patientsLoaded, setPatientsLoaded] = useState(false);
-  const [drugs, setDrugs] = useState<DrugEntry[]>([emptyDrug()]);
-  const [diagnosis, setDiagnosis] = useState("");
-  const [notes, setNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [drugSuggestions, setDrugSuggestions] = useState<string[]>([]);
-  const [activeDrugIdx, setActiveDrugIdx] = useState<number | null>(null);
-
-  // Guard: prevent any second submission even if state update lags
-  const hasSubmitted = useRef(false);
-
+function Toast({
+  message,
+  type,
+  onClose,
+}: {
+  message: string;
+  type: "success" | "error";
+  onClose: () => void;
+}) {
   useEffect(() => {
-    if (!userId) return;
-    axiosClient
-      .get(`provider/${userId}/appointments?filter=all`)
-      .then((res) => {
-        const all: RawAppointment[] = res.data ?? [];
-        all.sort(
-          (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
-        );
-        const seen = new Set<string>();
-        const unique: Patient[] = [];
-        for (const a of all) {
-          const key = a.patient_email || `${a.patient_first_name}-${a.patient_last_name}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          unique.push({
-            id: a.patient_identity || a.id,
-            name: `${a.patient_first_name} ${a.patient_last_name}`.trim(),
-            patient_identity: a.patient_identity,
-            patient_email: a.patient_email,
-            patient_phone_number: a.patient_phone_number,
-          });
-        }
-        setAllPatients(unique);
-      })
-      .catch(() => {})
-      .finally(() => setPatientsLoaded(true));
-  }, [userId]);
+    const t = setTimeout(onClose, 3000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+  return (
+    <div
+      className={
+        "fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium " +
+        (type === "success" ? "bg-green-600" : "bg-red-600")
+      }
+    >
+      {message}
+    </div>
+  );
+}
 
-  useEffect(() => {
-    if (!patientId || !patientsLoaded) return;
-    const match = allPatients.find(
-      (p) => p.id === patientId || p.patient_identity === patientId
-    );
-    if (match) setPatient(match);
-  }, [patientId, patientsLoaded, allPatients]);
-
-  const patientResults =
-    !patient && patientSearch.trim()
-      ? allPatients.filter((p) =>
-          p.name.toLowerCase().includes(patientSearch.toLowerCase())
-        )
-      : [];
-
-  const handleDrugNameChange = (idx: number, value: string) => {
-    updateDrug(idx, "name", value);
-    setActiveDrugIdx(idx);
-    if (value.length >= 2) {
-      setDrugSuggestions(
-        COMMON_DRUGS.filter((d) =>
-          d.toLowerCase().includes(value.toLowerCase())
-        )
-      );
-    } else {
-      setDrugSuggestions([]);
-    }
-  };
-
-  const updateDrug = (idx: number, field: keyof DrugEntry, value: string) => {
-    setDrugs((prev) =>
-      prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d))
-    );
-  };
-
-  const addDrug = () => setDrugs((prev) => [...prev, emptyDrug()]);
-
-  const removeDrug = (idx: number) =>
-    setDrugs((prev) => prev.filter((_, i) => i !== idx));
-
-  const handleSubmit = async () => {
-    // Hard guard — prevent double submission even on rapid clicks
-    if (hasSubmitted.current || submitting) return;
-
-    if (!patient) {
-      toast.error("Please select a patient");
-      return;
-    }
-    if (drugs.some((d) => !d.name.trim())) {
-      toast.error("Please fill in all drug names");
-      return;
-    }
-
-    hasSubmitted.current = true;
-    setSubmitting(true);
-
-    try {
-      await axiosClient.post(`provider/${userId}/prescriptions`, {
-        patient_id: patient.id,
-        patient_name: patient.name,
-        patient_email: patient.patient_email,
-        diagnosis,
-        notes,
-        drugs: drugs.map(({ id, ...rest }) => rest),
-      });
-      toast.success("Prescription saved successfully");
-      // Redirect immediately — no intermediate "submitted" screen,
-      // no way to accidentally click Save again
-      router.push("/prescriptions");
-    } catch {
-      toast.error("Failed to save prescription. Please try again.");
-      // Reset guard on failure so provider can retry
-      hasSubmitted.current = false;
-      setSubmitting(false);
-    }
-  };
-
-  const handlePrint = () => window.print();
-
-  // ─── Main form ─────────────────────────────────────────────────────────────
+function PrescriptionCard({ prescription }: { prescription: Prescription }) {
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="p-4 mx-4 max-w-3xl space-y-5">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <p className="text-xl font-bold">Write prescription</p>
-          <p className="text-gray-500 text-sm">
-            Fill in patient details and medications below
-          </p>
+    <div className="border border-gray-100 rounded-xl overflow-hidden hover:border-blue-100 transition-colors">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+            <LucideFileText size={18} />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-800 text-sm">
+              {prescription.diagnosis}
+            </p>
+            {prescription.provider && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                Dr. {prescription.provider.first_name}{" "}
+                {prescription.provider.last_name}
+                {prescription.provider.speciality &&
+                  " · " + prescription.provider.speciality}
+              </p>
+            )}
+            <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
+              <LucideCalendar size={11} />
+              <span>{formatDate(prescription.created_at)}</span>
+            </div>
+          </div>
         </div>
-        <Button variant="roundedOutline" onClick={() => router.back()}>
-          Cancel
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+            {prescription.drugs.length}{" "}
+            {prescription.drugs.length === 1 ? "drug" : "drugs"}
+          </span>
+          {expanded ? (
+            <LucideChevronUp size={16} className="text-gray-400" />
+          ) : (
+            <LucideChevronDown size={16} className="text-gray-400" />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50 space-y-3">
+          <div className="space-y-2">
+            {prescription.drugs.map((drug, i) => (
+              <div
+                key={drug.id ?? i}
+                className="flex items-start gap-3 bg-white rounded-lg p-3 border border-gray-100"
+              >
+                <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <LucidePill size={14} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {drug.drug_name}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {drug.frequency} · {drug.duration}
+                  </p>
+                  {drug.instructions && (
+                    <p className="text-xs text-gray-400 mt-0.5 italic">
+                      {drug.instructions}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {prescription.notes && (
+            <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3">
+              <p className="text-xs font-medium text-yellow-700 mb-1">
+                Doctor&apos;s Notes
+              </p>
+              <p className="text-xs text-yellow-800">{prescription.notes}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Prescriptions() {
+  const { user } = useAppSelector((store) => store.auth);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const patientEmail = user?.email ?? "";
+
+  useEffect(() => {
+    if (!patientEmail) {
+      setLoading(false);
+      return;
+    }
+    axiosClient
+      .get("/provider/prescriptions?patient_email=" + patientEmail)
+      .then((res) => setPrescriptions(res.data ?? []))
+      .catch(() =>
+        setToast({ message: "Failed to load prescriptions", type: "error" })
+      )
+      .finally(() => setLoading(false));
+  }, [patientEmail]);
+
+  return (
+    <div className="space-y-4">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+        <h1 className="text-xl font-bold text-gray-800">My Prescriptions</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          View prescriptions issued by your doctors
+        </p>
       </div>
 
-      {/* Patient selection */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-3">
-        <p className="font-bold text-sm">Patient</p>
-
-        {patient ? (
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div>
-              <p className="font-medium text-sm">{patient.name}</p>
-              {patient.patient_email && (
-                <p className="text-xs text-gray-500">{patient.patient_email}</p>
-              )}
-            </div>
-            <button
-              className="text-xs text-red-500 hover:underline"
-              onClick={() => setPatient(null)}
-            >
-              Change
-            </button>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <LucideLoader2 size={24} className="animate-spin text-blue-500" />
+          </div>
+        ) : prescriptions.length === 0 ? (
+          <div className="text-center py-12">
+            <LucideFileText size={36} className="mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500 font-medium">No prescriptions yet</p>
+            <p className="text-gray-400 text-sm mt-1">
+              Prescriptions issued by your doctor will appear here.
+            </p>
           </div>
         ) : (
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={
-                patientsLoaded
-                  ? "Search patient by name..."
-                  : "Loading patients..."
-              }
-              value={patientSearch}
-              onChange={(e) => setPatientSearch(e.target.value)}
-              disabled={!patientsLoaded}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 disabled:bg-gray-50"
-            />
-            {patientResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {patientResults.map((p) => (
-                  <button
-                    key={p.id}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                    onClick={() => {
-                      setPatient(p);
-                      setPatientSearch("");
-                    }}
-                  >
-                    <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-medium">
-                      {p.name.charAt(0)}
-                    </div>
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            {patientsLoaded &&
-              patientSearch.trim() &&
-              patientResults.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">
-                  No patients match &quot;{patientSearch}&quot;.
-                </p>
-              )}
+          <div className="space-y-3">
+            {prescriptions.map((prescription) => (
+              <PrescriptionCard
+                key={prescription.id}
+                prescription={prescription}
+              />
+            ))}
           </div>
         )}
-      </div>
-
-      {/* Diagnosis */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-3">
-        <p className="font-bold text-sm">Diagnosis / Indication</p>
-        <input
-          type="text"
-          placeholder="e.g. Hypertension, Type 2 Diabetes, Upper respiratory tract infection..."
-          value={diagnosis}
-          onChange={(e) => setDiagnosis(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-        />
-      </div>
-
-      {/* Medications */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-4">
-        <div className="flex justify-between items-center">
-          <p className="font-bold text-sm">Medications</p>
-          <button
-            onClick={addDrug}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium"
-          >
-            <LucidePlus className="w-3 h-3" /> Add medication
-          </button>
-        </div>
-
-        {drugs.map((drug, idx) => (
-          <div
-            key={drug.id}
-            className="border border-gray-200 rounded-lg p-3 space-y-3 relative"
-          >
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-medium text-gray-400">
-                Medication {idx + 1}
-              </span>
-              {drugs.length > 1 && (
-                <button
-                  onClick={() => removeDrug(idx)}
-                  className="text-red-400 hover:text-red-600"
-                >
-                  <LucideTrash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            <div className="relative">
-              <label className="text-xs text-gray-500 mb-1 block">
-                Drug name & strength
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Amoxicillin 500mg"
-                value={drug.name}
-                onChange={(e) => handleDrugNameChange(idx, e.target.value)}
-                onBlur={() =>
-                  setTimeout(() => {
-                    setDrugSuggestions([]);
-                    setActiveDrugIdx(null);
-                  }, 150)
-                }
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-              />
-              {activeDrugIdx === idx && drugSuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
-                  {drugSuggestions.map((s) => (
-                    <button
-                      key={s}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50"
-                      onMouseDown={() => {
-                        updateDrug(idx, "name", s);
-                        setDrugSuggestions([]);
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Frequency
-                </label>
-                <select
-                  value={drug.frequency}
-                  onChange={(e) => updateDrug(idx, "frequency", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-                >
-                  {FREQUENCIES.map((f) => (
-                    <option key={f}>{f}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Duration
-                </label>
-                <select
-                  value={drug.duration}
-                  onChange={(e) => updateDrug(idx, "duration", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-                >
-                  {DURATIONS.map((d) => (
-                    <option key={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">
-                Special instructions (optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Take with food, avoid alcohol..."
-                value={drug.instructions}
-                onChange={(e) =>
-                  updateDrug(idx, "instructions", e.target.value)
-                }
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Notes */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-3">
-        <p className="font-bold text-sm">Additional notes</p>
-        <textarea
-          placeholder="Follow-up instructions, referrals, lifestyle advice..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 resize-none"
-        />
-      </div>
-
-      {/* Submit */}
-      <div className="flex gap-3 pb-8">
-        <Button
-          variant="roundedOutline"
-          onClick={handlePrint}
-          className="flex-shrink-0"
-        >
-          <LucidePrinter className="w-4 h-4" /> Preview & print
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="flex-1"
-        >
-          {submitting ? (
-            <span className="flex items-center gap-2 justify-center">
-              <LucideCheck className="w-4 h-4 animate-pulse" /> Saving...
-            </span>
-          ) : (
-            "Save prescription"
-          )}
-        </Button>
       </div>
     </div>
   );

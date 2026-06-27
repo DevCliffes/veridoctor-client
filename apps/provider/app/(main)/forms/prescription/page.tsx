@@ -22,8 +22,20 @@ interface DrugEntry {
 interface Patient {
   id: string;
   name: string;
+  patient_identity: string | null;
+  patient_email: string;
+  patient_phone_number: string;
   date_of_birth?: string;
-  phone?: string;
+}
+
+interface RawAppointment {
+  id: string;
+  patient_first_name: string;
+  patient_last_name: string;
+  patient_email: string;
+  patient_phone_number: string;
+  patient_identity: string | null;
+  start_time: string;
 }
 
 const FREQUENCIES = [
@@ -86,7 +98,8 @@ export default function PrescriptionForm() {
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [patientSearch, setPatientSearch] = useState("");
-  const [patientResults, setPatientResults] = useState<Patient[]>([]);
+  const [allPatients, setAllPatients] = useState<Patient[]>([]);
+  const [patientsLoaded, setPatientsLoaded] = useState(false);
   const [drugs, setDrugs] = useState<DrugEntry[]>([emptyDrug()]);
   const [diagnosis, setDiagnosis] = useState("");
   const [notes, setNotes] = useState("");
@@ -95,29 +108,55 @@ export default function PrescriptionForm() {
   const [drugSuggestions, setDrugSuggestions] = useState<string[]>([]);
   const [activeDrugIdx, setActiveDrugIdx] = useState<number | null>(null);
 
-  // Load patient if ID passed via query param
+  // Load the provider's full patient list once — same source and dedup
+  // logic as the Patient Records page (provider/<id>/appointments?filter=all,
+  // deduplicated by email, newest visit kept).
   useEffect(() => {
-    if (!patientId || !userId) return;
+    if (!userId) return;
     axiosClient
-      .get(`provider/${userId}/patients/${patientId}`)
-      .then((res) => setPatient(res.data))
-      .catch(() => {});
-  }, [patientId, userId]);
+      .get(`provider/${userId}/appointments?filter=all`)
+      .then((res) => {
+        const all: RawAppointment[] = res.data ?? [];
 
-  // Patient search
+        all.sort(
+          (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+        );
+
+        const seen = new Set<string>();
+        const unique: Patient[] = [];
+        for (const a of all) {
+          const key = a.patient_email || `${a.patient_first_name}-${a.patient_last_name}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          unique.push({
+            id: a.patient_identity || a.id,
+            name: `${a.patient_first_name} ${a.patient_last_name}`.trim(),
+            patient_identity: a.patient_identity,
+            patient_email: a.patient_email,
+            patient_phone_number: a.patient_phone_number,
+          });
+        }
+        setAllPatients(unique);
+      })
+      .catch(() => {})
+      .finally(() => setPatientsLoaded(true));
+  }, [userId]);
+
+  // If a patient_id was passed via query param, preselect once the list is loaded
   useEffect(() => {
-    if (!patientSearch.trim() || patient) {
-      setPatientResults([]);
-      return;
-    }
-    const timer = setTimeout(() => {
-      axiosClient
-        .get(`provider/${userId}/patients?search=${patientSearch}`)
-        .then((res) => setPatientResults(res.data ?? []))
-        .catch(() => setPatientResults([]));
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [patientSearch, patient, userId]);
+    if (!patientId || !patientsLoaded) return;
+    const match = allPatients.find(
+      (p) => p.id === patientId || p.patient_identity === patientId
+    );
+    if (match) setPatient(match);
+  }, [patientId, patientsLoaded, allPatients]);
+
+  const patientResults =
+    !patient && patientSearch.trim()
+      ? allPatients.filter((p) =>
+          p.name.toLowerCase().includes(patientSearch.toLowerCase())
+        )
+      : [];
 
   // Drug name autocomplete
   const handleDrugNameChange = (idx: number, value: string) => {
@@ -159,6 +198,8 @@ export default function PrescriptionForm() {
     try {
       await axiosClient.post(`provider/${userId}/prescriptions`, {
         patient_id: patient.id,
+        patient_name: patient.name,
+        patient_email: patient.patient_email,
         diagnosis,
         notes,
         drugs: drugs.map(({ id, ...rest }) => rest),
@@ -237,15 +278,8 @@ export default function PrescriptionForm() {
           <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div>
               <p className="font-medium text-sm">{patient.name}</p>
-              {patient.date_of_birth && (
-                <p className="text-xs text-gray-500">
-                  DOB:{" "}
-                  {new Date(patient.date_of_birth).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </p>
+              {patient.patient_email && (
+                <p className="text-xs text-gray-500">{patient.patient_email}</p>
               )}
             </div>
             <button
@@ -259,10 +293,15 @@ export default function PrescriptionForm() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search patient by name..."
+              placeholder={
+                patientsLoaded
+                  ? "Search patient by name..."
+                  : "Loading patients..."
+              }
               value={patientSearch}
               onChange={(e) => setPatientSearch(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              disabled={!patientsLoaded}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 disabled:bg-gray-50"
             />
             {patientResults.length > 0 && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -273,7 +312,6 @@ export default function PrescriptionForm() {
                     onClick={() => {
                       setPatient(p);
                       setPatientSearch("");
-                      setPatientResults([]);
                     }}
                   >
                     <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-medium">
@@ -284,6 +322,13 @@ export default function PrescriptionForm() {
                 ))}
               </div>
             )}
+            {patientsLoaded &&
+              patientSearch.trim() &&
+              patientResults.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">
+                  No patients match &quot;{patientSearch}&quot;.
+                </p>
+              )}
           </div>
         )}
       </div>

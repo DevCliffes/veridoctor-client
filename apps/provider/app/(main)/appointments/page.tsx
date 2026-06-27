@@ -38,6 +38,8 @@ type Appointment = {
   patient_email: string;
   patient_phone_number: string;
   appointment_type: "virtual" | "physical";
+  service: string | null;
+  service_name: string | null;
   start_time: string;
   end_time: string;
   status: string;
@@ -160,6 +162,7 @@ export default function Appointments() {
   const tableRows: {
     id: string;
     name: ReactNode;
+    service: ReactNode;
     date: string;
     status: ReactNode;
     call: ReactNode;
@@ -173,6 +176,13 @@ export default function Appointments() {
       >
         {appointment.patient_first_name} {appointment.patient_last_name}
       </button>
+    ),
+    service: (
+      <span className="text-xs text-gray-600">
+        {appointment.service_name ?? (
+          <span className="text-gray-300 italic">—</span>
+        )}
+      </span>
     ),
     date: new Date(appointment.start_time).toLocaleString("en-KE"),
     status: statusBadge(appointment.status),
@@ -215,6 +225,7 @@ export default function Appointments() {
 
   const tableColumns: DatatableColumnHeader[] = [
     { name: "Patient Name", type: "string", key: "name" },
+    { name: "Service", type: "string", key: "service" },
     { name: "Date/Time", type: "string", key: "date" },
     { name: "Status", type: "string", key: "status" },
     { name: "Call", type: "string", key: "call" },

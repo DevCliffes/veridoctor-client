@@ -12,9 +12,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
 
-const TELEHEALTH_URL =
-  process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
-  "https://veridoctor-client-telehealth.vercel.app";
+const TELEHEALTH_URL = "https://telehealth.veridoctor.com";
 
 interface Appointment {
   id: string;
@@ -91,8 +89,6 @@ function JoinButton({ meetId, patientEmail }: { meetId: string; patientEmail: st
   );
 }
 
-// ── Reschedule Modal ─────────────────────────────────────────────────────────
-
 function RescheduleModal({
   appt,
   onClose,
@@ -122,15 +118,8 @@ function RescheduleModal({
       .then((res) => {
         const all: Slot[] = res.data ?? [];
         const filtered = all.filter((s) => {
-          if (
-            appt.appointment_type !== "virtual" &&
-            appt.appointment_type !== "physical"
-          )
-            return true;
-          return (
-            s.location_type === "both" ||
-            s.location_type === appt.appointment_type
-          );
+          if (appt.appointment_type !== "virtual" && appt.appointment_type !== "physical") return true;
+          return s.location_type === "both" || s.location_type === appt.appointment_type;
         });
         setSlots(filtered);
       })
@@ -139,10 +128,7 @@ function RescheduleModal({
   }, [date, appt.provider_identity_id, appt.appointment_type]);
 
   const handleConfirm = async () => {
-    if (!selectedSlot) {
-      toast.error("Please select a time slot");
-      return;
-    }
+    if (!selectedSlot) { toast.error("Please select a time slot"); return; }
     setSaving(true);
     try {
       await axiosClient.patch(`/appointments/${appt.id}/`, {
@@ -163,14 +149,9 @@ function RescheduleModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm space-y-4 p-6">
-        <h3 className="font-semibold text-gray-800 text-base">
-          Reschedule Appointment
-        </h3>
-
+        <h3 className="font-semibold text-gray-800 text-base">Reschedule Appointment</h3>
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1">
-            Select Date
-          </label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Select Date</label>
           <input
             type="date"
             value={date}
@@ -179,23 +160,18 @@ function RescheduleModal({
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
           />
         </div>
-
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-2">
-            Available Times
-          </label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-2">Available Times</label>
           {!date ? (
             <p className="text-sm text-gray-400">Pick a date first</p>
           ) : loadingSlots ? (
             <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+              {[1,2,3,4,5,6].map((i) => (
                 <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />
               ))}
             </div>
           ) : slots.length === 0 ? (
-            <p className="text-sm text-gray-400">
-              No available slots for this date
-            </p>
+            <p className="text-sm text-gray-400">No available slots for this date</p>
           ) : (
             <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
               {slots.map((slot) => (
@@ -216,19 +192,9 @@ function RescheduleModal({
             </div>
           )}
         </div>
-
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={saving || !selectedSlot}
-            className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={handleConfirm} disabled={saving || !selectedSlot} className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
             {saving ? "Saving..." : "Confirm"}
           </button>
         </div>
@@ -236,8 +202,6 @@ function RescheduleModal({
     </div>
   );
 }
-
-// ── Main Page ────────────────────────────────────────────────────────────────
 
 function AppointmentsContent() {
   const router = useRouter();
@@ -260,10 +224,7 @@ function AppointmentsContent() {
   };
 
   const fetchAppointments = useCallback(() => {
-    if (!patientEmail) {
-      setLoading(false);
-      return;
-    }
+    if (!patientEmail) { setLoading(false); return; }
     setLoading(true);
     axiosClient
       .get("/appointments?patient_email=" + patientEmail + "&filter=" + filter)
@@ -272,9 +233,7 @@ function AppointmentsContent() {
       .finally(() => setLoading(false));
   }, [patientEmail, filter]);
 
-  useEffect(() => {
-    fetchAppointments();
-  }, [fetchAppointments]);
+  useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
   const isJoinable = (appt: Appointment) => {
     if (appt.appointment_type !== "virtual" || !appt.meet_id) return false;
@@ -288,9 +247,7 @@ function AppointmentsContent() {
     setCancellingId(id);
     try {
       await axiosClient.patch(`/appointments/${id}/`, { status: "cancelled" });
-      setAppointments((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a))
-      );
+      setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a)));
       toast.success("Appointment cancelled");
     } catch {
       toast.error("Failed to cancel appointment");
@@ -301,11 +258,7 @@ function AppointmentsContent() {
 
   const handleRescheduled = (id: string, newStart: string, newEnd: string) => {
     setAppointments((prev) =>
-      prev.map((a) =>
-        a.id === id
-          ? { ...a, start_time: newStart, end_time: newEnd, status: "scheduled" }
-          : a
-      )
+      prev.map((a) => a.id === id ? { ...a, start_time: newStart, end_time: newEnd, status: "scheduled" } : a)
     );
   };
 
@@ -329,59 +282,38 @@ function AppointmentsContent() {
   }[] = appointments.map((appt) => ({
     id: appt.id,
     name: (
-      <button
-        className="text-blue-600 hover:underline font-medium text-left"
-        onClick={() => router.push("/appointments/" + appt.id)}
-      >
-        {appt.doctor_first_name
-          ? "Dr. " + appt.doctor_first_name + " " + (appt.doctor_last_name ?? "")
-          : "Your Provider"}
+      <button className="text-blue-600 hover:underline font-medium text-left" onClick={() => router.push("/appointments/" + appt.id)}>
+        {appt.doctor_first_name ? "Dr. " + appt.doctor_first_name + " " + (appt.doctor_last_name ?? "") : "Your Provider"}
       </button>
     ),
     service_name: (
-      <span className="text-xs text-gray-600">
-        {appt.service_name ?? <span className="text-gray-300 italic">—</span>}
-      </span>
+      <span className="text-xs text-gray-600">{appt.service_name ?? <span className="text-gray-300 italic">—</span>}</span>
     ),
     date: formatDateTime(appt.start_time),
     status: <StatusBadge status={appt.status} />,
-    call:
-      ["completed", "cancelled", "no-show"].includes(appt.status) ? (
-        <span className="text-xs text-gray-400">—</span>
-      ) : appt.appointment_type === "virtual" ? (
-        isJoinable(appt) && appt.meet_id ? (
-          <JoinButton meetId={appt.meet_id} patientEmail={patientEmail} />
-        ) : (
-          <button
-            disabled
-            className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium opacity-40 cursor-not-allowed"
-          >
-            <LucideVideo size={13} /> Join call
-          </button>
-        )
+    call: ["completed", "cancelled", "no-show"].includes(appt.status) ? (
+      <span className="text-xs text-gray-400">—</span>
+    ) : appt.appointment_type === "virtual" ? (
+      isJoinable(appt) && appt.meet_id ? (
+        <JoinButton meetId={appt.meet_id} patientEmail={patientEmail} />
       ) : (
-        <span className="text-xs text-gray-500">In-person</span>
-      ),
-    actions:
-      ["cancelled", "completed"].includes(appt.status) ? (
-        <span className="text-xs text-gray-400">—</span>
-      ) : (
-        <div className="flex gap-1">
-          <button
-            onClick={() => setReschedulingAppt(appt)}
-            className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
-          >
-            Reschedule
-          </button>
-          <button
-            onClick={() => handleCancel(appt.id)}
-            disabled={cancellingId === appt.id}
-            className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
-            {cancellingId === appt.id ? "..." : "Cancel"}
-          </button>
-        </div>
-      ),
+        <button disabled className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium opacity-40 cursor-not-allowed">
+          <LucideVideo size={13} /> Join call
+        </button>
+      )
+    ) : (
+      <span className="text-xs text-gray-500">In-person</span>
+    ),
+    actions: ["cancelled", "completed"].includes(appt.status) ? (
+      <span className="text-xs text-gray-400">—</span>
+    ) : (
+      <div className="flex gap-1">
+        <button onClick={() => setReschedulingAppt(appt)} className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">Reschedule</button>
+        <button onClick={() => handleCancel(appt.id)} disabled={cancellingId === appt.id} className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+          {cancellingId === appt.id ? "..." : "Cancel"}
+        </button>
+      </div>
+    ),
   }));
 
   const filterTabs: DatatableFilterTabs = {
@@ -396,24 +328,13 @@ function AppointmentsContent() {
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
       {reschedulingAppt && (
-        <RescheduleModal
-          appt={reschedulingAppt}
-          onClose={() => setReschedulingAppt(null)}
-          onRescheduled={handleRescheduled}
-        />
+        <RescheduleModal appt={reschedulingAppt} onClose={() => setReschedulingAppt(null)} onRescheduled={handleRescheduled} />
       )}
-
       <div className="mb-4">
         <h1 className="text-xl font-bold">My Appointments</h1>
         <p className="text-gray-600 mt-1">View and manage your consultations.</p>
       </div>
-
-      <DataTable
-        rows={tableRows}
-        columns={tableColumns}
-        isLoading={loading}
-        filterTabs={filterTabs}
-      />
+      <DataTable rows={tableRows} columns={tableColumns} isLoading={loading} filterTabs={filterTabs} />
     </div>
   );
 }
@@ -425,4 +346,3 @@ export default function Appointments() {
     </Suspense>
   );
 }
-

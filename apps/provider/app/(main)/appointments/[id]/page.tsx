@@ -221,7 +221,7 @@ function renderPrescription(val: { diagnosis?: string; drugs?: unknown[]; notes?
 }
 
 function buildTelehealthUrl(meetId: string, userId: string | null) {
-  const base = process.env.NEXT_PUBLIC_TELEHEALTH_URL || "https://veridoctor-client-telehealth.vercel.app";
+  const base = "https://telehealth.veridoctor.com";
   const params = new URLSearchParams({ userId: userId ?? "provider", isOfferer: "true" });
   return `${base}/${meetId}?${params.toString()}`;
 }
@@ -237,7 +237,6 @@ export default function AppointmentDetailPage() {
   const [activeTab, setActiveTab] = useState<"details" | "records">("details");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [patientInsurances, setPatientInsurances] = useState<Insurance[]>([]);
-  // Track which form IDs have already been captured for this appointment
   const [submittedFormIds, setSubmittedFormIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -257,7 +256,6 @@ export default function AppointmentDetailPage() {
             .then((r) => setPatientInsurances(r.data?.insurances ?? []))
             .catch(() => {});
         }
-        // Build a set of form IDs that already have a capture
         const captured = new Set<string>(
           (capturesRes.data ?? [])
             .map((c: Capture) => c.form_id)
@@ -296,7 +294,6 @@ export default function AppointmentDetailPage() {
 
   const draftKey = `vd_capture_${id}`;
   const selectedFormAlreadySubmitted = submittedFormIds.has(selectedFormId);
-  // Only show the draft banner if the selected form has NOT already been submitted
   const hasDraft = typeof window !== "undefined"
     && !!localStorage.getItem(draftKey)
     && !selectedFormAlreadySubmitted;
@@ -334,7 +331,6 @@ export default function AppointmentDetailPage() {
         ← Back to appointments
       </button>
 
-      {/* Header card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
@@ -360,13 +356,11 @@ export default function AppointmentDetailPage() {
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            {/* Draft banner — only shown when form not yet submitted */}
             {hasDraft && (
               <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
                 📝 Draft saved — click to resume
               </span>
             )}
-            {/* Already submitted badge — shown instead of draft banner */}
             {selectedFormAlreadySubmitted && (
               <span className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded-full border border-green-200">
                 ✓ Form already submitted
@@ -412,7 +406,6 @@ export default function AppointmentDetailPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab("details")}
@@ -603,11 +596,8 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
         <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 space-y-5">
           {record.captures.map((cap, i) => {
             const smuggled = cap.values?.[SNAPSHOT_KEY];
-            const snapshot = (Array.isArray(smuggled) ? smuggled : null)
-              ?? cap.form_snapshot
-              ?? [];
+            const snapshot = (Array.isArray(smuggled) ? smuggled : null) ?? cap.form_snapshot ?? [];
             const labelMap = buildLabelMap(snapshot);
-
             const displayValues = Object.fromEntries(
               Object.entries(cap.values ?? {}).filter(([k]) => k !== SNAPSHOT_KEY)
             );
@@ -620,7 +610,6 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
                 <div className="space-y-2">
                   {Object.entries(displayValues).map(([key, val]) => {
                     const label = labelMap[key] ?? key.replace(/_/g, " ");
-
                     if (isPrescriptionValue(val)) {
                       return (
                         <div key={key} className="flex flex-col gap-1 text-sm">
@@ -629,7 +618,6 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
                         </div>
                       );
                     }
-
                     return (
                       <div key={key} className="flex gap-2 text-sm">
                         <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">{label}</span>
@@ -728,7 +716,7 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
         <LucideHistory size={28} className="text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-400">No patient identity linked to this appointment. Records are only available for patients with a Veridoctor account.</p>
+        <p className="text-sm text-gray-400">No patient identity linked to this appointment.</p>
       </div>
     );
   }
@@ -742,7 +730,7 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
         <LucideShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800">
-          You are viewing limited patient information. Full records from other providers require patient consent. Requests expire when this consultation ends.
+          You are viewing limited patient information. Full records from other providers require patient consent.
         </p>
       </div>
 
@@ -788,7 +776,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Always visible</p>
-
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
@@ -878,7 +865,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
                     <p className="text-xs text-gray-400">
                       {[cat.facility_name, cat.record_count > 0 ? `${cat.record_count} records` : null, cat.last_record_at ? timeAgo(cat.last_record_at) : null].filter(Boolean).join(" · ")}
                     </p>
-                    {cat.sensitivity === "ask_first" && <p className="text-xs text-gray-400 italic mt-0.5">Patient set this to <em>ask me first</em></p>}
                   </div>
                 </div>
                 {cat.access_status === "approved"

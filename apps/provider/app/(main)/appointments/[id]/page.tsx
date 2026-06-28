@@ -58,6 +58,7 @@ type Form = {
 
 type Capture = {
   id: string;
+  form_id?: string;
   form_name: string;
   created_at: string;
 };
@@ -138,7 +139,6 @@ const STATUS_STYLES: Record<string, string> = {
   scheduled: "bg-yellow-100 text-yellow-700",
 };
 
-// Must match the key used in capture/page.tsx
 const SNAPSHOT_KEY = "__form_snapshot__";
 
 function getInsuranceLabel(ins: Insurance): string {
@@ -237,14 +237,17 @@ export default function AppointmentDetailPage() {
   const [activeTab, setActiveTab] = useState<"details" | "records">("details");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [patientInsurances, setPatientInsurances] = useState<Insurance[]>([]);
+  // Track which form IDs have already been captured for this appointment
+  const [submittedFormIds, setSubmittedFormIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!userId || !id) return;
     Promise.all([
       axiosClient.get(`provider/${userId}/appointments/${id}`),
       axiosClient.get(`provider/${userId}/forms`),
+      axiosClient.get(`provider/${userId}/appointments/${id}/captures`),
     ])
-      .then(([apptRes, formsRes]) => {
+      .then(([apptRes, formsRes, capturesRes]) => {
         setAppointment(apptRes.data);
         setForms(formsRes.data ?? []);
         if (formsRes.data?.length > 0) setSelectedFormId(formsRes.data[0].id);
@@ -254,6 +257,13 @@ export default function AppointmentDetailPage() {
             .then((r) => setPatientInsurances(r.data?.insurances ?? []))
             .catch(() => {});
         }
+        // Build a set of form IDs that already have a capture
+        const captured = new Set<string>(
+          (capturesRes.data ?? [])
+            .map((c: Capture) => c.form_id)
+            .filter(Boolean) as string[]
+        );
+        setSubmittedFormIds(captured);
       })
       .catch(() => toast.error("Could not load appointment"))
       .finally(() => setLoading(false));
@@ -285,7 +295,11 @@ export default function AppointmentDetailPage() {
   };
 
   const draftKey = `vd_capture_${id}`;
-  const hasDraft = typeof window !== "undefined" && !!localStorage.getItem(draftKey);
+  const selectedFormAlreadySubmitted = submittedFormIds.has(selectedFormId);
+  // Only show the draft banner if the selected form has NOT already been submitted
+  const hasDraft = typeof window !== "undefined"
+    && !!localStorage.getItem(draftKey)
+    && !selectedFormAlreadySubmitted;
 
   if (loading) {
     return (
@@ -315,11 +329,6 @@ export default function AppointmentDetailPage() {
   const canJoinCall = appointment.appointment_type === "virtual" && appointment.meet_id && isToday;
 
   return (
-    // ✅ FIX: added mx-auto. This page sets its own max-w-3xl, which is
-    // narrower than the layout's max-w-6xl content area. Without mx-auto,
-    // a narrower fixed-width block defaults to the start (left) edge of
-    // its parent instead of centering within it — that's what was
-    // producing the empty space on the right.
     <div className="p-4 space-y-4 max-w-3xl mx-auto">
       <button onClick={() => router.push("/appointments")} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
         ← Back to appointments
@@ -351,8 +360,17 @@ export default function AppointmentDetailPage() {
           </div>
 
           <div className="flex flex-col items-end gap-2">
+            {/* Draft banner — only shown when form not yet submitted */}
             {hasDraft && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">📝 Draft saved — click to resume</span>
+              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-200">
+                📝 Draft saved — click to resume
+              </span>
+            )}
+            {/* Already submitted badge — shown instead of draft banner */}
+            {selectedFormAlreadySubmitted && (
+              <span className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded-full border border-green-200">
+                ✓ Form already submitted
+              </span>
             )}
             <div className="flex items-center gap-2 flex-wrap justify-end">
               <div className="relative">
@@ -363,22 +381,32 @@ export default function AppointmentDetailPage() {
                 >
                   {forms.length === 0
                     ? <option value="">No forms available</option>
-                    : forms.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)
+                    : forms.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}{submittedFormIds.has(f.id) ? " ✓" : ""}
+                        </option>
+                      ))
                   }
                 </select>
                 <LucideChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
               <button
                 onClick={handleStartCapture}
-                disabled={forms.length === 0}
+                disabled={forms.length === 0 || selectedFormAlreadySubmitted}
                 className="flex items-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 <LucideClipboardPen size={15} />
-                {hasDraft ? "Resume Capture" : "Start Capture"}
+                {selectedFormAlreadySubmitted
+                  ? "Already submitted"
+                  : hasDraft
+                  ? "Resume Capture"
+                  : "Start Capture"}
               </button>
             </div>
             {forms.length === 0 && (
-              <button onClick={() => router.push("/forms/new")} className="text-xs text-blue-600 hover:underline">Create a form first →</button>
+              <button onClick={() => router.push("/forms/new")} className="text-xs text-blue-600 hover:underline">
+                Create a form first →
+              </button>
             )}
           </div>
         </div>
@@ -574,17 +602,12 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
       {expanded && record.captures && record.captures.length > 0 && (
         <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 space-y-5">
           {record.captures.map((cap, i) => {
-            // ✅ THE FIX: read snapshot from values.__form_snapshot__ first
-            // (new captures smuggle it there since the backend strips the
-            // top-level form_snapshot field). Fall back to top-level
-            // form_snapshot for any captures where the backend did persist it.
             const smuggled = cap.values?.[SNAPSHOT_KEY];
             const snapshot = (Array.isArray(smuggled) ? smuggled : null)
               ?? cap.form_snapshot
               ?? [];
             const labelMap = buildLabelMap(snapshot);
 
-            // Strip the internal snapshot key so it doesn't appear as a field row
             const displayValues = Object.fromEntries(
               Object.entries(cap.values ?? {}).filter(([k]) => k !== SNAPSHOT_KEY)
             );
@@ -596,10 +619,8 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
                 </p>
                 <div className="space-y-2">
                   {Object.entries(displayValues).map(([key, val]) => {
-                    // Use snapshot label if available, otherwise humanise the key
                     const label = labelMap[key] ?? key.replace(/_/g, " ");
 
-                    // Render prescription objects properly instead of [object Object]
                     if (isPrescriptionValue(val)) {
                       return (
                         <div key={key} className="flex flex-col gap-1 text-sm">
@@ -718,7 +739,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
 
   return (
     <div className="space-y-3">
-      {/* Disclaimer */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
         <LucideShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800">
@@ -726,7 +746,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         </p>
       </div>
 
-      {/* Patient header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
@@ -753,7 +772,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-4 gap-2">
         {[
           { label: "Total records", value: stats.total_records },
@@ -768,11 +786,9 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         ))}
       </div>
 
-      {/* Always visible */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Always visible</p>
 
-        {/* Allergies */}
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
@@ -788,7 +804,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
           <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
         </div>
 
-        {/* Active medications */}
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-orange-50 border border-orange-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
@@ -806,7 +821,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
           <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
         </div>
 
-        {/* Patient insurance */}
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
@@ -829,7 +843,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         </div>
       </div>
 
-      {/* Own records */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Your records for this patient</p>
@@ -850,7 +863,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         }
       </div>
 
-      {/* Record categories */}
       {record_categories.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Record categories — consent required</p>
@@ -892,7 +904,6 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         </div>
       )}
 
-      {/* Access granted */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Access granted this consultation</p>
         {access_granted.length === 0

@@ -28,6 +28,16 @@ function SideNav({
     return activePath === path || activePath?.startsWith(path + "/");
   };
 
+  const handleTooltipShow = (name: string, y: number) => {
+    setTooltipName(name);
+    setTooltipY(y);
+    setShowTooltip(true);
+  };
+
+  const handleTooltipHide = () => {
+    setShowTooltip(false);
+  };
+
   return (
     <>
       <div className="hidden lg:flex">
@@ -58,17 +68,12 @@ function SideNav({
                 navItem={navItem}
                 isActive={isActive(navItem.linkTo)}
                 sidebarOpen={sidebarOpen}
-                onTooltipShow={(name, y) => {
-                  setTooltipName(name);
-                  setTooltipY(y);
-                  setShowTooltip(true);
-                }}
-                onTooltipHide={() => setShowTooltip(false)}
+                onTooltipShow={handleTooltipShow}
+                onTooltipHide={handleTooltipHide}
               />
             ))}
           </div>
 
-          {/* Tooltip — only when sidebar is collapsed */}
           {!sidebarOpen && showTooltip && tooltipName ? (
             <div
               className="fixed z-50 pointer-events-none"
@@ -127,9 +132,6 @@ function SideNav({
   );
 }
 
-// ── Extracted into its own component so all handlers are defined at
-// component level — no inline arrow functions on JSX props that trip
-// the Turbopack/SWC ecmascript parser in this monorepo config.
 function NavItem({
   navItem,
   isActive,
@@ -143,27 +145,22 @@ function NavItem({
   onTooltipShow: (name: string, y: number) => void;
   onTooltipHide: () => void;
 }) {
-  const ref = React.useRef<HTMLAnchorElement>(null);
-
-  const handleMouseEnter = () => {
-    if (!sidebarOpen && ref.current) {
-      const rect = ref.current.getBoundingClientRect();
+  function handleMouseEnter(e: React.MouseEvent<HTMLDivElement>) {
+    if (!sidebarOpen) {
+      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       onTooltipShow(navItem.name, rect.top + rect.height / 2);
     }
-  };
+  }
 
-  const handleMouseLeave = () => {
+  function handleMouseLeave() {
     onTooltipHide();
-  };
+  }
 
   return (
-    
-      ref={ref}
-      href={navItem.linkTo}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
+    <a href={navItem.linkTo}>
       <div
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         className={`flex gap-2 p-2 items-center hover:bg-primary/70 cursor-pointer ${
           isActive ? "bg-primary/70" : ""
         } ${sidebarOpen ? "justify-start" : "justify-center"}`}

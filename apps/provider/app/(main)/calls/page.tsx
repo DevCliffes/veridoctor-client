@@ -10,9 +10,7 @@ import {
 } from "@veridoctor/design/icons";
 
 // ✅ Update this to your actual Vercel telehealth URL once deployed
-const TELEHEALTH_URL =
-  process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
-  "https://veridoctor-client-telehealth.vercel.app";
+const TELEHEALTH_URL = "https://telehealth.veridoctor.com";
 
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {

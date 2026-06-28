@@ -96,20 +96,18 @@ export default function MainAppLayout({
     isLoggedIn: access_token ? true : false,
     auth_code: auth_code,
     identity: identity,
-    // ✅ Tell AuthWrapper to redirect to web app, not /auth/login
     loginUrl: WEB_APP_URL,
   };
 
+  // ── Calls and Settings removed from nav (hidden from UI, pages still exist)
   const navItems: navITem[] = [
     { linkTo: "/dashboard", name: "Dashboard", icon: <LayoutDashboard /> },
     { linkTo: "/appointments", icon: <LucideCalendarCheck />, name: "Appointments" },
     { linkTo: "/patients", icon: <LucideUsers />, name: "Patients" },
-    { linkTo: "/calls", icon: <Video />, name: "Calls" },
     { linkTo: "/schedule", icon: <LucideClipboardClock />, name: "Schedule" },
     { linkTo: "/services", icon: <LucideStethoscope />, name: "Services" },
     { linkTo: "/prescriptions", icon: <LucideFileText />, name: "Prescriptions" },
     { linkTo: "/forms", icon: <LucideClipboardPen />, name: "Form studio" },
-    { linkTo: "/settings", icon: <LucideCog />, name: "Settings" },
   ];
 
   const setAuthInfo = (token: TokenPayload) => {
@@ -125,8 +123,6 @@ export default function MainAppLayout({
     >
       <GlobalNewAppointmentDialog userId={identityId} />
 
-      {/* ✅ overflow-hidden on the shell — only the inner content area
-          scrolls, so nothing gets clipped against the wrong height */}
       <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
         <TopNav
           center={<p>{displayName}</p>}
@@ -137,18 +133,9 @@ export default function MainAppLayout({
             </div>
           }
         />
-        {/* ✅ flex-1 min-h-0 — fills remaining height below TopNav instead
-            of h-full re-measuring against the already-full-viewport parent */}
         <div className="flex flex-1 min-h-0">
           <SideNav navItems={navItems} activePath={pathname} />
-          {/* ✅ flex-1 min-h-0 overflow-y-auto — single correctly-bounded
-              scroll container */}
           <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-100 p-1">
-            {/* ✅ max-w-6xl mx-auto — caps width and centers content
-                instead of sticking left on wide screens. pb-8 keeps the
-                last element clear of the scroll boundary. Provider pages
-                tend to be denser (records, patient cards), so a slightly
-                wider cap than the health-portal app. */}
             <div className="max-w-6xl mx-auto pb-8">
               {children}
             </div>
@@ -169,7 +156,6 @@ function ProfileDropdown({
   const handleLogout = () => {
     dispatch(setAccessToken(""));
     dispatch(setRefreshToken(""));
-    // Small delay so Redux state clears before redirect
     setTimeout(() => {
       window.location.href = WEB_APP_URL;
     }, 100);

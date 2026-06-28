@@ -24,8 +24,8 @@ function SideNav({
   const openMobileDropdown = () => setDropdownOpen(true);
   const closeMobileDropdown = () => setDropdownOpen(false);
 
-  const isActive = (path: string) => {
-    return activePath === path || activePath?.startsWith(path + "/");
+  const isActive = (path: string): boolean => {
+    return activePath === path || !!activePath?.startsWith(path + "/");
   };
 
   const handleTooltipShow = (name: string, y: number) => {

@@ -71,8 +71,8 @@ export default function Appointments() {
   };
 
   const joinCall = (meetId: string) => {
-  window.location.href = `https://veridoctor-client-telehealth.vercel.app/${meetId}?userId=${userId}&isOfferer=true`;
-};
+    window.location.href = `https://telehealth.veridoctor.com/${meetId}?userId=${userId}&isOfferer=true`;
+  };
 
   // Join call is only active for today's non-terminal virtual appointments
   const isJoinEnabled = (appt: Appointment) => {
@@ -186,7 +186,6 @@ export default function Appointments() {
     ),
     date: new Date(appointment.start_time).toLocaleString("en-KE"),
     status: statusBadge(appointment.status),
-    // Completed/cancelled/no-show → dash. Virtual active → Join call. Physical → In-person.
     call: DONE_STATUSES.includes(appointment.status) ? (
       <span className="text-xs text-gray-400">—</span>
     ) : appointment.appointment_type === "virtual" ? (
@@ -201,7 +200,6 @@ export default function Appointments() {
     ) : (
       <span className="text-xs text-gray-500">In-person</span>
     ),
-    // Completed/cancelled/no-show → no actions
     actions: DONE_STATUSES.includes(appointment.status) ? (
       <span className="text-xs text-gray-400">—</span>
     ) : (
@@ -347,4 +345,3 @@ export default function Appointments() {
     </div>
   );
 }
-

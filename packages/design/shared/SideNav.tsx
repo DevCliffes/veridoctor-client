@@ -26,11 +26,23 @@ function SideNav({
     return activePath === path || activePath?.startsWith(path + "/");
   };
 
+  // ── Moved outside JSX to avoid parser issues with dot expressions ─────────
+  const handleMouseEnter = (name: string, e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!sidebarOpen) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltip({ name, y: rect.top + rect.height / 2 });
+    }
+  };
+
+  const handleMouseLeave = () => setTooltip(null);
+
   return (
     <>
       <div className="hidden lg:flex">
         <div
-          className={`overflow-visible relative bg-white flex-col border-r h-full transition-all ease-in-out duration-75 ${sidebarOpen ? "w-44" : "w-16"}`}
+          className={`overflow-visible relative bg-white flex-col border-r h-full transition-all ease-in-out duration-75 ${
+            sidebarOpen ? "w-44" : "w-16"
+          }`}
         >
           <div className="mt-10 flex justify-center">
             <p className="font-extrabold text-3xl">
@@ -52,16 +64,8 @@ function SideNav({
               
                 href={navItem.linkTo}
                 key={index}
-                onMouseEnter={(e) => {
-                  if (!sidebarOpen) {
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    setTooltip({
-                      name: navItem.name,
-                      y: rect.top + rect.height / 2,
-                    });
-                  }
-                }}
-                onMouseLeave={() => setTooltip(null)}
+                onMouseEnter={(e) => handleMouseEnter(navItem.name, e)}
+                onMouseLeave={handleMouseLeave}
               >
                 <div
                   className={`flex gap-2 p-2 items-center hover:bg-primary/70 cursor-pointer ${
@@ -75,17 +79,19 @@ function SideNav({
             ))}
           </div>
 
-          {/* Hover tooltip — only shown when sidebar is collapsed */}
+          {/* Tooltip — only when sidebar is collapsed */}
           {!sidebarOpen && tooltip && (
             <div
               className="fixed z-50 pointer-events-none"
               style={{ top: tooltip.y, left: 68, transform: "translateY(-50%)" }}
             >
-              <div className="bg-gray-800 text-white text-xs px-2.5 py-1.5 rounded-md shadow-lg whitespace-nowrap flex items-center gap-1.5">
-                {/* Arrow pointing left */}
+              <div className="relative bg-gray-800 text-white text-xs px-2.5 py-1.5 rounded-md shadow-lg whitespace-nowrap">
                 <span
-                  className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-0 h-0"
+                  className="absolute top-1/2 -translate-y-1/2"
                   style={{
+                    left: -6,
+                    width: 0,
+                    height: 0,
                     borderTop: "5px solid transparent",
                     borderBottom: "5px solid transparent",
                     borderRight: "6px solid #1f2937",

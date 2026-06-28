@@ -5,7 +5,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../../store";
 import { axiosClient } from "@veridoctor/api-client";
 import { toast } from "sonner";
-import { LucideCheckCircle, LucideSave, LucideLoader2 } from "@veridoctor/design/icons";
+import { LucideCheckCircle, LucideLoader2 } from "@veridoctor/design/icons";
 
 type Field = {
   id: string;
@@ -68,10 +68,6 @@ const DEMOGRAPHICS_AUTOFILL: Record<string, (a: Appointment) => string> = {
 };
 
 const AUTOSAVE_INTERVAL = 5000;
-
-// ── Reserved key used to smuggle the form snapshot inside the values JSONField.
-// The backend strips top-level form_snapshot, but values is an open JSONField
-// that accepts any shape — so we store the snapshot here instead.
 const SNAPSHOT_KEY = "__form_snapshot__";
 
 export default function CapturePage() {
@@ -91,6 +87,9 @@ export default function CapturePage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [activeSection, setActiveSection] = useState<string>("");
+  // ── Guard: true once we've confirmed this form was already submitted ──────
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+
   const draftKey = `vd_capture_${appointmentId}`;
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -129,9 +128,20 @@ export default function CapturePage() {
       });
   }, [userId, appointmentId]);
 
-  // ── Step 2: Load form + restore draft ────────────────────────────────────
+  // ── Step 2: Load form + restore draft + check for existing capture ────────
   useEffect(() => {
     if (!userId || !formId) return;
+
+    // Check if this form has already been captured for this appointment
+    axiosClient
+      .get(`provider/${userId}/appointments/${appointmentId}/captures`)
+      .then((res) => {
+        const captures: { form_id?: string }[] = res.data ?? [];
+        const duplicate = captures.some((c) => c.form_id === formId);
+        if (duplicate) setAlreadySubmitted(true);
+      })
+      .catch(() => {/* non-fatal */});
+
     axiosClient
       .get(`provider/${userId}/forms/${formId}`)
       .then((res) => {
@@ -244,23 +254,37 @@ export default function CapturePage() {
   };
 
   const handleSubmit = async () => {
+    // ── Duplicate guard ───────────────────────────────────────────────────
+    if (alreadySubmitted) {
+      toast.error("This form has already been saved for this appointment.");
+      return;
+    }
+
     if (!validate()) return;
     setSaving(true);
-    try {
-      // Build flat values map keyed by field ID
-      const flatValues: Record<string, unknown> = { ...values };
 
-      // Merge prescription section values (keyed by section ID)
+    try {
+      // Re-check on the server right before submitting (race-condition safety)
+      const existingRes = await axiosClient.get(
+        `provider/${userId}/appointments/${appointmentId}/captures`
+      );
+      const existing: { form_id?: string }[] = existingRes.data ?? [];
+      if (existing.some((c) => c.form_id === formId)) {
+        setAlreadySubmitted(true);
+        toast.error("This form has already been saved for this appointment.");
+        setSaving(false);
+        return;
+      }
+
+      const submittedAt = new Date().toISOString();
+
+      const flatValues: Record<string, unknown> = { ...values };
       for (const [sectionId, prescVal] of Object.entries(prescriptionValues)) {
         flatValues[sectionId] = prescVal;
       }
-
-      // ✅ THE FIX: smuggle the form snapshot *inside* the values JSONField
-      // using a reserved key. The backend strips unknown top-level fields like
-      // form_snapshot, but values is an open JSONField that persists whatever
-      // we put in it. The view page reads __form_snapshot__ out of values
-      // before falling back to the top-level form_snapshot or legacy mode.
       flatValues[SNAPSHOT_KEY] = form?.sections ?? [];
+      // ── Capture submission timestamp ──────────────────────────────────
+      flatValues["__submitted_at__"] = submittedAt;
 
       await axiosClient.post(
         `provider/${userId}/appointments/${appointmentId}/captures`,
@@ -305,9 +329,20 @@ export default function CapturePage() {
     .reduce((acc, s) => acc + s.fields.length, 0);
   const progressPct = totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
+  // ── Format saved timestamp as "28 Jun 2026 at 06:50" ─────────────────────
+  const formatSavedAt = (d: Date) =>
+    d.toLocaleString("en-KE", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).replace(",", " at");
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Sticky header */}
+      {/* Sticky header — NO submit button here, only status indicator */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => router.back()} className="text-gray-500 hover:text-gray-700 shrink-0">←</button>
@@ -316,26 +351,25 @@ export default function CapturePage() {
             <p className="text-xs text-gray-400">{completedFields}/{totalFields} fields filled</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+
+        {/* Draft save status only — no submit button */}
+        <div className="flex items-center gap-2 shrink-0 text-xs">
           {saveStatus === "saving" && (
-            <span className="text-xs text-gray-400 flex items-center gap-1">
+            <span className="text-gray-400 flex items-center gap-1">
               <LucideLoader2 size={12} className="animate-spin" /> Saving…
             </span>
           )}
           {saveStatus === "saved" && lastSaved && (
-            <span className="text-xs text-green-600 flex items-center gap-1">
-              <LucideCheckCircle size={12} /> Draft saved {lastSaved.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
+            <span className="text-green-600 flex items-center gap-1">
+              <LucideCheckCircle size={12} /> Draft saved {formatSavedAt(lastSaved)}
             </span>
           )}
-          {saveStatus === "error" && <span className="text-xs text-red-500">⚠ Save failed</span>}
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="flex items-center gap-1.5 bg-blue-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-60 font-medium"
-          >
-            {saving ? <LucideLoader2 size={14} className="animate-spin" /> : <LucideSave size={14} />}
-            {saving ? "Saving…" : "Submit"}
-          </button>
+          {saveStatus === "error" && (
+            <span className="text-red-500">⚠ Save failed</span>
+          )}
+          {alreadySubmitted && (
+            <span className="text-amber-600 font-medium">⚠ Already submitted</span>
+          )}
         </div>
       </div>
 
@@ -416,13 +450,23 @@ export default function CapturePage() {
             </div>
           ))}
 
+          {/* Single submit button — bottom of form only */}
           <button
             onClick={handleSubmit}
-            disabled={saving}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2"
+            disabled={saving || alreadySubmitted}
+            className={`w-full py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
+              alreadySubmitted
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+            }`}
           >
-            {saving ? <LucideLoader2 size={16} className="animate-spin" /> : <LucideCheckCircle size={16} />}
-            {saving ? "Saving…" : "Submit Capture"}
+            {saving ? (
+              <><LucideLoader2 size={16} className="animate-spin" /> Saving…</>
+            ) : alreadySubmitted ? (
+              <><LucideCheckCircle size={16} /> Already submitted</>
+            ) : (
+              <><LucideCheckCircle size={16} /> Submit Capture</>
+            )}
           </button>
         </div>
       </div>

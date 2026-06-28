@@ -64,7 +64,6 @@ function minutesUntil(iso: string) {
   return Math.round((new Date(iso).getTime() - Date.now()) / 60000);
 }
 
-// Convert raw minutes into "X days Y hrs Z mins" human-readable string
 function formatTimeUntil(mins: number): string {
   if (mins <= 0) return "coming up now";
   if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"}`;
@@ -79,12 +78,9 @@ function formatTimeUntil(mins: number): string {
   return parts.join(" ");
 }
 
-// Resolve doctor name from whichever fields the API returns
 function getDoctorName(appt: Appointment): string | null {
-  const first =
-    appt.doctor_first_name || appt.provider_first_name || "";
-  const last =
-    appt.doctor_last_name || appt.provider_last_name || "";
+  const first = appt.doctor_first_name || appt.provider_first_name || "";
+  const last = appt.doctor_last_name || appt.provider_last_name || "";
   if (!first && !last) return null;
   return `Dr. ${first} ${last}`.trim();
 }
@@ -93,9 +89,7 @@ function getDoctorProfileId(appt: Appointment): string | null {
   return appt.provider_identity_id || appt.provider_id || null;
 }
 
-const TELEHEALTH_URL =
-  process.env.NEXT_PUBLIC_TELEHEALTH_URL ||
-  "https://veridoctor-client-telehealth.vercel.app";
+const TELEHEALTH_URL = "https://telehealth.veridoctor.com";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -119,10 +113,7 @@ export default function Dashboard() {
   }, [identityId]);
 
   useEffect(() => {
-    if (!patientEmail) {
-      setLoading(false);
-      return;
-    }
+    if (!patientEmail) { setLoading(false); return; }
     setLoading(true);
     axiosClient
       .get("/appointments?patient_email=" + patientEmail + "&filter=upcoming")
@@ -136,7 +127,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {/* Welcome banner */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
         <p className="text-blue-100 text-sm">Good day,</p>
         <h1 className="text-2xl font-bold mt-0.5">
@@ -149,29 +139,19 @@ export default function Dashboard() {
               : "You have an appointment coming up now"}
           </p>
         ) : (
-          <p className="text-blue-100 text-sm mt-2">
-            No upcoming appointments scheduled.
-          </p>
+          <p className="text-blue-100 text-sm mt-2">No upcoming appointments scheduled.</p>
         )}
       </div>
 
-      {/* Quick actions */}
       <div className="grid grid-cols-2 gap-3">
-        <Link
-          href="/book"
-          className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2 hover:border-blue-200 transition-colors"
-        >
+        <Link href="/book" className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2 hover:border-blue-200 transition-colors">
           <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
             <LucideCalendarCheck size={18} />
           </div>
           <p className="font-semibold text-gray-800 text-sm">Find a Doctor</p>
           <p className="text-xs text-gray-400">Book an appointment</p>
         </Link>
-
-        <Link
-          href="/appointments"
-          className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2 hover:border-blue-200 transition-colors"
-        >
+        <Link href="/appointments" className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2 hover:border-blue-200 transition-colors">
           <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
             <LucideCalendarCheck size={18} />
           </div>
@@ -180,14 +160,10 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Upcoming appointments */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-700">Upcoming</h2>
-          <Link
-            href="/appointments"
-            className="text-xs text-blue-600 flex items-center gap-0.5 hover:underline"
-          >
+          <Link href="/appointments" className="text-xs text-blue-600 flex items-center gap-0.5 hover:underline">
             See all <LucideChevronRight size={12} />
           </Link>
         </div>
@@ -199,12 +175,7 @@ export default function Dashboard() {
         ) : appointments.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-400 text-sm">No upcoming appointments.</p>
-            <Link
-              href="/book"
-              className="text-blue-600 text-sm font-medium mt-1 inline-block hover:underline"
-            >
-              Book one now
-            </Link>
+            <Link href="/book" className="text-blue-600 text-sm font-medium mt-1 inline-block hover:underline">Book one now</Link>
           </div>
         ) : (
           <div className="space-y-2">
@@ -220,51 +191,23 @@ export default function Dashboard() {
               const profileId = getDoctorProfileId(appt);
 
               return (
-                <div
-                  key={appt.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50"
-                >
-                  <div
-                    className={
-                      "w-9 h-9 rounded-full flex items-center justify-center shrink-0 " +
-                      (appt.appointment_type === "virtual"
-                        ? "bg-indigo-100 text-indigo-600"
-                        : "bg-green-100 text-green-600")
-                    }
-                  >
-                    {appt.appointment_type === "virtual" ? (
-                      <LucideVideo size={16} />
-                    ) : (
-                      <LucideMapPin size={16} />
-                    )}
+                <div key={appt.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50">
+                  <div className={"w-9 h-9 rounded-full flex items-center justify-center shrink-0 " + (appt.appointment_type === "virtual" ? "bg-indigo-100 text-indigo-600" : "bg-green-100 text-green-600")}>
+                    {appt.appointment_type === "virtual" ? <LucideVideo size={16} /> : <LucideMapPin size={16} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     {doctorName && profileId ? (
-                      <button
-                        onClick={() =>
-                          router.push(`/book/provider/${profileId}`)
-                        }
-                        className="text-sm font-medium text-blue-600 hover:underline text-left"
-                      >
+                      <button onClick={() => router.push(`/book/provider/${profileId}`)} className="text-sm font-medium text-blue-600 hover:underline text-left">
                         {doctorName}
                       </button>
                     ) : (
                       <p className="text-sm font-medium text-gray-800">
-                        {doctorName ??
-                          (appt.appointment_type === "virtual"
-                            ? "Virtual Consultation"
-                            : "In-person Consultation")}
+                        {doctorName ?? (appt.appointment_type === "virtual" ? "Virtual Consultation" : "In-person Consultation")}
                       </p>
                     )}
                     <p className="text-xs text-gray-500">
-                      {formatDate(appt.start_time)} ·{" "}
-                      {formatTime(appt.start_time)}
-                      {appt.service_name && (
-                        <span className="text-gray-400">
-                          {" · "}
-                          {appt.service_name}
-                        </span>
-                      )}
+                      {formatDate(appt.start_time)} · {formatTime(appt.start_time)}
+                      {appt.service_name && <span className="text-gray-400"> · {appt.service_name}</span>}
                     </p>
                   </div>
                   {isJoinable && appt.meet_id && (

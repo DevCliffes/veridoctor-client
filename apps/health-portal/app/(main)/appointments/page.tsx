@@ -53,6 +53,10 @@ function minutesUntil(iso: string) {
   return Math.round((new Date(iso).getTime() - Date.now()) / 60000);
 }
 
+function isPastAppointment(appt: Appointment): boolean {
+  return new Date(appt.end_time) < new Date();
+}
+
 const STATUS_STYLES: Record<string, string> = {
   confirmed: "bg-green-100 text-green-700",
   scheduled: "bg-yellow-100 text-yellow-700",
@@ -247,6 +251,7 @@ function AppointmentsContent() {
     setCancellingId(id);
     try {
       await axiosClient.patch(`/appointments/${id}/`, { status: "cancelled" });
+      // Optimistic update — no refresh needed
       setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a)));
       toast.success("Appointment cancelled");
     } catch {
@@ -257,6 +262,7 @@ function AppointmentsContent() {
   };
 
   const handleRescheduled = (id: string, newStart: string, newEnd: string) => {
+    // Optimistic update — no refresh needed
     setAppointments((prev) =>
       prev.map((a) => a.id === id ? { ...a, start_time: newStart, end_time: newEnd, status: "scheduled" } : a)
     );
@@ -279,42 +285,88 @@ function AppointmentsContent() {
     status: ReactNode;
     call: ReactNode;
     actions: ReactNode;
-  }[] = appointments.map((appt) => ({
-    id: appt.id,
-    name: (
-      <button className="text-blue-600 hover:underline font-medium text-left" onClick={() => router.push("/appointments/" + appt.id)}>
-        {appt.doctor_first_name ? "Dr. " + appt.doctor_first_name + " " + (appt.doctor_last_name ?? "") : "Your Provider"}
-      </button>
-    ),
-    service_name: (
-      <span className="text-xs text-gray-600">{appt.service_name ?? <span className="text-gray-300 italic">—</span>}</span>
-    ),
-    date: formatDateTime(appt.start_time),
-    status: <StatusBadge status={appt.status} />,
-    call: ["completed", "cancelled", "no-show"].includes(appt.status) ? (
-      <span className="text-xs text-gray-400">—</span>
-    ) : appt.appointment_type === "virtual" ? (
-      isJoinable(appt) && appt.meet_id ? (
-        <JoinButton meetId={appt.meet_id} patientEmail={patientEmail} />
+  }[] = appointments.map((appt) => {
+    const past = isPastAppointment(appt);
+    const terminated = ["cancelled", "completed", "no-show"].includes(appt.status);
+    const actionsDisabled = past || terminated;
+
+    return {
+      id: appt.id,
+      // Doctor name now links to the provider's profile page
+      name: (
+        <button
+          className="text-blue-600 hover:underline font-medium text-left"
+          onClick={() =>
+            appt.provider_identity_id
+              ? router.push("/doctors/" + appt.provider_identity_id)
+              : undefined
+          }
+        >
+          {appt.doctor_first_name
+            ? "Dr. " + appt.doctor_first_name + " " + (appt.doctor_last_name ?? "")
+            : "Your Provider"}
+        </button>
+      ),
+      service_name: (
+        <span className="text-xs text-gray-600">
+          {appt.service_name ?? <span className="text-gray-300 italic">—</span>}
+        </span>
+      ),
+      date: formatDateTime(appt.start_time),
+      status: <StatusBadge status={appt.status} />,
+      call: terminated ? (
+        <span className="text-xs text-gray-400">—</span>
+      ) : appt.appointment_type === "virtual" ? (
+        isJoinable(appt) && appt.meet_id ? (
+          <JoinButton meetId={appt.meet_id} patientEmail={patientEmail} />
+        ) : (
+          <button
+            disabled
+            className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium opacity-40 cursor-not-allowed"
+          >
+            <LucideVideo size={13} /> Join call
+          </button>
+        )
       ) : (
-        <button disabled className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium opacity-40 cursor-not-allowed">
-          <LucideVideo size={13} /> Join call
-        </button>
-      )
-    ) : (
-      <span className="text-xs text-gray-500">In-person</span>
-    ),
-    actions: ["cancelled", "completed"].includes(appt.status) ? (
-      <span className="text-xs text-gray-400">—</span>
-    ) : (
-      <div className="flex gap-1">
-        <button onClick={() => setReschedulingAppt(appt)} className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">Reschedule</button>
-        <button onClick={() => handleCancel(appt.id)} disabled={cancellingId === appt.id} className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
-          {cancellingId === appt.id ? "..." : "Cancel"}
-        </button>
-      </div>
-    ),
-  }));
+        <span className="text-xs text-gray-500">In-person</span>
+      ),
+      // Actions: greyed out for past or terminated appointments — no interaction possible
+      actions: actionsDisabled ? (
+        <div className="flex gap-1">
+          <button
+            disabled
+            title={past ? "Cannot modify past appointments" : undefined}
+            className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-300 cursor-not-allowed select-none"
+          >
+            Reschedule
+          </button>
+          <button
+            disabled
+            title={past ? "Cannot modify past appointments" : undefined}
+            className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-300 cursor-not-allowed select-none"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-1">
+          <button
+            onClick={() => setReschedulingAppt(appt)}
+            className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+          >
+            Reschedule
+          </button>
+          <button
+            onClick={() => handleCancel(appt.id)}
+            disabled={cancellingId === appt.id}
+            className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            {cancellingId === appt.id ? "..." : "Cancel"}
+          </button>
+        </div>
+      ),
+    };
+  });
 
   const filterTabs: DatatableFilterTabs = {
     tabs: [
@@ -328,7 +380,11 @@ function AppointmentsContent() {
   return (
     <div className="p-4 bg-white rounded-lg mx-4">
       {reschedulingAppt && (
-        <RescheduleModal appt={reschedulingAppt} onClose={() => setReschedulingAppt(null)} onRescheduled={handleRescheduled} />
+        <RescheduleModal
+          appt={reschedulingAppt}
+          onClose={() => setReschedulingAppt(null)}
+          onRescheduled={handleRescheduled}
+        />
       )}
       <div className="mb-4">
         <h1 className="text-xl font-bold">My Appointments</h1>

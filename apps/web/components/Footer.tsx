@@ -113,7 +113,7 @@ export default function Footer() {
         </div>
         {/* TODO: create a utility to get full year */}
         <p className="text-center text-sm italic">
-          &copy;2025 Veri Doctor Limited. All Rights Reserved.
+          &copy;2026 Veri Doctor Limited. All Rights Reserved.
         </p>
       </div>
     </div>

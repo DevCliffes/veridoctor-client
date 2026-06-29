@@ -26,6 +26,7 @@ interface ProviderProfile {
   last_name: string;
   title: string;
   speciality: string;
+  subspecialties: string[];
   clinic_name: string;
   address: string;
   county: string;
@@ -52,7 +53,13 @@ export default function ProviderProfilePage() {
     if (!id) return;
     axiosClient
       .get(`/provider/${id}/public-profile`)
-      .then((res) => setProvider(res.data))
+      .then((res) =>
+        setProvider({
+          ...res.data,
+          // Ensure subspecialties is always an array even if API omits it
+          subspecialties: res.data.subspecialties ?? [],
+        })
+      )
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
@@ -114,8 +121,20 @@ export default function ProviderProfilePage() {
             <p className="text-sm text-blue-600 font-medium mt-0.5">
               {provider.speciality || "General Practitioner"}
             </p>
+            {provider.subspecialties.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                {provider.subspecialties.map((sub) => (
+                  <span
+                    key={sub}
+                    className="text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 font-medium"
+                  >
+                    {sub}
+                  </span>
+                ))}
+              </div>
+            )}
             {(provider.clinic_name || provider.county) && (
-              <p className="text-sm text-gray-500 mt-1.5 flex items-center justify-center gap-1.5">
+              <p className="text-sm text-gray-500 mt-2 flex items-center justify-center gap-1.5">
                 <LucideMapPin size={14} className="text-gray-400" />
                 {[provider.clinic_name, provider.county, provider.country]
                   .filter(Boolean)

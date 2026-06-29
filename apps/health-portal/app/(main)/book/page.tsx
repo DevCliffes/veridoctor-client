@@ -30,6 +30,7 @@ interface Provider {
   first_name: string;
   last_name: string;
   speciality: string;
+  subspecialties?: string[];
   clinic_name: string;
   county: string;
   bio: string;
@@ -273,6 +274,11 @@ function ProviderCard({
             <p className="text-sm text-blue-600 font-medium mt-1">
               {provider.speciality || "General Practitioner"}
             </p>
+            {provider.subspecialties && provider.subspecialties.length > 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                {provider.subspecialties.join(" · ")}
+              </p>
+            )}
           </div>
         </div>
 
@@ -674,6 +680,7 @@ export default function BookPage() {
       p.last_name.toLowerCase().includes(q) ||
       (p.speciality ?? "").toLowerCase().includes(q) ||
       (p.clinic_name ?? "").toLowerCase().includes(q) ||
+      (p.subspecialties ?? []).some((sub) => sub.toLowerCase().includes(q)) ||
       p.services.some((s) => s.name.toLowerCase().includes(q)) ||
       (p.insurances_accepted ?? []).some((ins) =>
         ins.toLowerCase().includes(q)
@@ -804,4 +811,3 @@ export default function BookPage() {
     </div>
   );
 }
-

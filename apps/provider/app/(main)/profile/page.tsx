@@ -362,6 +362,7 @@ export default function ProfilePage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [insuranceInput, setInsuranceInput] = useState("");
   const [languageInput, setLanguageInput] = useState("");
+  const [subspecialtyInput, setSubspecialtyInput] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -408,21 +409,19 @@ export default function ProfilePage() {
   const removeLanguage = (lang: string) =>
     setProfile((prev) => ({ ...prev, languages: prev.languages.filter((l) => l !== lang) }));
 
-  // Subspecialty helpers
-  const addSubspecialty = () =>
-    setProfile((prev) => ({ ...prev, subspecialties: [...prev.subspecialties, ""] }));
+  // Subspecialty helpers — pill/chip pattern matching insurances:
+  // a single text input + Add button, saved entries shown as removable pills.
+  const addSubspecialty = () => {
+    const val = subspecialtyInput.trim();
+    if (!val || profile.subspecialties.includes(val)) return;
+    setProfile((prev) => ({ ...prev, subspecialties: [...prev.subspecialties, val] }));
+    setSubspecialtyInput("");
+  };
 
-  const updateSubspecialty = (idx: number, value: string) =>
-    setProfile((prev) => {
-      const updated = [...prev.subspecialties];
-      updated[idx] = value;
-      return { ...prev, subspecialties: updated };
-    });
-
-  const removeSubspecialty = (idx: number) =>
+  const removeSubspecialty = (sub: string) =>
     setProfile((prev) => ({
       ...prev,
-      subspecialties: prev.subspecialties.filter((_, i) => i !== idx),
+      subspecialties: prev.subspecialties.filter((s) => s !== sub),
     }));
 
   const addExtraCredential = () => {
@@ -475,7 +474,7 @@ export default function ProfilePage() {
         last_name: profile.last_name,
         title: profile.title,
         speciality: profile.speciality,
-        subspecialties: profile.subspecialties.filter((s) => s.trim() !== ""),
+        subspecialties: profile.subspecialties,
         phone_number: profile.phone_number,
         bio: profile.bio,
         licence_number: profile.licence_number,
@@ -551,7 +550,7 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {/* Personal Information */}
+      {/* Personal Information — Subspecialties now lives here, right after Speciality */}
       <Section title="Personal Information" icon={<LucideUser size={18} />}>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Title">
@@ -565,6 +564,44 @@ export default function ProfilePage() {
               {SPECIALITIES.map((s) => <option key={s}>{s}</option>)}
             </select>
           </Field>
+        </div>
+
+        {/* Subspecialties — pill/chip pattern, matching Insurances styling */}
+        <div className="mt-4">
+          <Field label="Subspecialties">
+            <div className="flex gap-2">
+              <input
+                value={subspecialtyInput}
+                onChange={(e) => setSubspecialtyInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSubspecialty())}
+                placeholder="Add other insurance..."
+                className={inputClass + " flex-1"}
+              />
+              <button
+                type="button"
+                onClick={addSubspecialty}
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 shrink-0"
+              >
+                Add
+              </button>
+            </div>
+          </Field>
+          {profile.subspecialties.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {profile.subspecialties.map((sub) => (
+                <span key={sub} className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-100 px-3 py-1 rounded-full font-medium">
+                  {sub}
+                  <button onClick={() => removeSubspecialty(sub)} className="ml-1 text-green-400 hover:text-red-500">&times;</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-gray-400 mt-2">
+            Add specific areas of focus within your speciality (e.g. Pediatric Cardiology, Sports Medicine) — these appear on your public profile so patients can find you more easily.
+          </p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-4">
           <Field label="First Name">
             <input value={profile.first_name} onChange={(e) => set("first_name", e.target.value)} className={inputClass} placeholder="First name" />
           </Field>
@@ -595,41 +632,6 @@ export default function ProfilePage() {
             onUploaded={(url) => setProfile((prev) => ({ ...prev, national_id_image: url }))}
           />
         </div>
-      </Section>
-
-      {/* Subspecialties — sits directly under Personal Information for easy discovery */}
-      <Section title="Subspecialties" icon={<LucideBriefcase size={18} />}>
-        <p className="text-xs text-gray-400 mb-4">
-          Add specific areas of focus within your speciality — these appear on your public profile so patients can find you more easily (e.g. Pediatric Cardiology, Sports Medicine, Reproductive Health).
-        </p>
-        <div className="space-y-2">
-          {profile.subspecialties.map((sub, idx) => (
-            <div key={idx} className="flex gap-2 items-center">
-              <input
-                value={sub}
-                onChange={(e) => updateSubspecialty(idx, e.target.value)}
-                placeholder={`e.g. ${["Pediatric Dermatology", "Interventional Cardiology", "Sports Medicine"][idx % 3]}`}
-                className={inputClass + " flex-1"}
-              />
-              <button
-                type="button"
-                onClick={() => removeSubspecialty(idx)}
-                className="p-2 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
-                title="Remove subspecialty"
-              >
-                <LucideTrash2 size={15} />
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={addSubspecialty}
-          className="mt-3 flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-        >
-          <LucidePlus size={15} />
-          Add subspecialty
-        </button>
       </Section>
 
       {/* Practice & Location */}

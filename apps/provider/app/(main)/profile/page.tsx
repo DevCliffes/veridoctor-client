@@ -32,6 +32,7 @@ interface ProviderProfile {
   email: string;
   title: string;
   speciality: string;
+  subspecialties: string[];
   phone_number: string;
   licence_number: string;
   licence_type: string;
@@ -340,7 +341,8 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<ProviderProfile>({
     first_name: "", last_name: "", email: "", title: "Dr.",
-    speciality: "", phone_number: "", licence_number: "", licence_type: "",
+    speciality: "", subspecialties: [], phone_number: "",
+    licence_number: "", licence_type: "",
     clinic_name: "", address: "", county: "", country: "Kenya",
     bio: "", insurances_accepted: [], languages: ["English"],
     profile_picture_url: "",
@@ -366,7 +368,14 @@ export default function ProfilePage() {
     if (!identityId) { setLoading(false); return; }
     axiosClient
       .get("/provider/" + identityId + "/profile")
-      .then((res) => setProfile((prev) => ({ ...prev, ...res.data })))
+      .then((res) =>
+        setProfile((prev) => ({
+          ...prev,
+          ...res.data,
+          // Ensure subspecialties is always an array even if API returns null
+          subspecialties: res.data.subspecialties ?? [],
+        }))
+      )
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [identityId]);
@@ -398,6 +407,23 @@ export default function ProfilePage() {
 
   const removeLanguage = (lang: string) =>
     setProfile((prev) => ({ ...prev, languages: prev.languages.filter((l) => l !== lang) }));
+
+  // Subspecialty helpers
+  const addSubspecialty = () =>
+    setProfile((prev) => ({ ...prev, subspecialties: [...prev.subspecialties, ""] }));
+
+  const updateSubspecialty = (idx: number, value: string) =>
+    setProfile((prev) => {
+      const updated = [...prev.subspecialties];
+      updated[idx] = value;
+      return { ...prev, subspecialties: updated };
+    });
+
+  const removeSubspecialty = (idx: number) =>
+    setProfile((prev) => ({
+      ...prev,
+      subspecialties: prev.subspecialties.filter((_, i) => i !== idx),
+    }));
 
   const addExtraCredential = () => {
     const newCred: ExtraCredential = { id: "cred_" + Date.now(), name: "", number: "", image_url: "" };
@@ -449,6 +475,7 @@ export default function ProfilePage() {
         last_name: profile.last_name,
         title: profile.title,
         speciality: profile.speciality,
+        subspecialties: profile.subspecialties.filter((s) => s.trim() !== ""),
         phone_number: profile.phone_number,
         bio: profile.bio,
         licence_number: profile.licence_number,
@@ -488,7 +515,7 @@ export default function ProfilePage() {
     <div className="space-y-4 max-w-3xl mx-auto pb-10">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Header */}
+      {/* Header — single Save Changes button lives here only */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white flex items-center gap-5">
         <div className="relative">
           <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold border-2 border-white/40 overflow-hidden">
@@ -568,6 +595,41 @@ export default function ProfilePage() {
             onUploaded={(url) => setProfile((prev) => ({ ...prev, national_id_image: url }))}
           />
         </div>
+      </Section>
+
+      {/* Subspecialties — sits directly under Personal Information for easy discovery */}
+      <Section title="Subspecialties" icon={<LucideBriefcase size={18} />}>
+        <p className="text-xs text-gray-400 mb-4">
+          Add specific areas of focus within your speciality — these appear on your public profile so patients can find you more easily (e.g. Pediatric Cardiology, Sports Medicine, Reproductive Health).
+        </p>
+        <div className="space-y-2">
+          {profile.subspecialties.map((sub, idx) => (
+            <div key={idx} className="flex gap-2 items-center">
+              <input
+                value={sub}
+                onChange={(e) => updateSubspecialty(idx, e.target.value)}
+                placeholder={`e.g. ${["Pediatric Dermatology", "Interventional Cardiology", "Sports Medicine"][idx % 3]}`}
+                className={inputClass + " flex-1"}
+              />
+              <button
+                type="button"
+                onClick={() => removeSubspecialty(idx)}
+                className="p-2 text-gray-400 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                title="Remove subspecialty"
+              >
+                <LucideTrash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={addSubspecialty}
+          className="mt-3 flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <LucidePlus size={15} />
+          Add subspecialty
+        </button>
       </Section>
 
       {/* Practice & Location */}
@@ -738,14 +800,7 @@ export default function ProfilePage() {
         )}
       </Section>
 
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full py-3 bg-blue-600 text-white rounded-2xl font-semibold text-sm hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2"
-      >
-        {saving ? <LucideLoader2 size={16} className="animate-spin" /> : <LucideCheck size={16} />}
-        {saving ? "Saving..." : "Save Profile"}
-      </button>
+      {/* No second Save button here — use the one in the header above */}
     </div>
   );
 }

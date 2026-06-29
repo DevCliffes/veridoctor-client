@@ -574,7 +574,7 @@ export default function ProfilePage() {
                 value={subspecialtyInput}
                 onChange={(e) => setSubspecialtyInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSubspecialty())}
-                placeholder="Add other insurance..."
+                placeholder="e.g. Pediatric Cardiology, Sports Medicine..."
                 className={inputClass + " flex-1"}
               />
               <button

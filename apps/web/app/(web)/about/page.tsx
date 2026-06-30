@@ -1,4 +1,14 @@
+import type { Metadata } from "next";
 import Image from "next/image";
+
+export const metadata: Metadata = {
+  title: "About Us",
+  description:
+    "Learn about VeriDoctor's mission to make quality healthcare accessible, efficient, and impactful for patients and providers across Kenya.",
+  alternates: {
+    canonical: "https://veridoctor.com/about",
+  },
+};
 
 export default function About() {
   return (
@@ -93,4 +103,3 @@ export default function About() {
     </div>
   );
 }
-

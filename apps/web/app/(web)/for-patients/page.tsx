@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Button } from "@veridoctor/design/components";
 import {
   LucideBarChart2,
@@ -6,6 +7,15 @@ import {
 } from "@veridoctor/design/icons";
 import Link from "next/link";
 import { ReactNode } from "react";
+
+export const metadata: Metadata = {
+  title: "For Patients",
+  description:
+    "Book verified doctors in Kenya for virtual or in-person consultations. Manage appointments and health records securely with VeriDoctor.",
+  alternates: {
+    canonical: "https://veridoctor.com/for-patients",
+  },
+};
 
 const benefits: { name: string; icon: ReactNode; description: string }[] = [
   {
@@ -24,7 +34,6 @@ const benefits: { name: string; icon: ReactNode; description: string }[] = [
     description: "All your medical history in one safe place.",
   },
 ];
-
 const reasons: { description: string }[] = [
   {
     description: "Access quality healthcare, anytime, anywhere.",

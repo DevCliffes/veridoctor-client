@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
@@ -124,10 +125,11 @@ function ProviderImageHeader({ provider }: { provider: Provider }) {
   if (provider.profile_picture_url) {
     return (
       <div className="w-full aspect-[4/3] overflow-hidden relative">
-        <img
+        <Image
           src={provider.profile_picture_url}
           alt={`Dr. ${provider.first_name} ${provider.last_name}`}
-          className="w-full h-full object-cover object-top"
+          fill
+          className="object-cover object-top"
         />
         {/* subtle gradient so text overlays readable */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
@@ -150,9 +152,11 @@ function ProviderAvatar({ provider }: { provider: Provider }) {
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
   if (provider.profile_picture_url) {
     return (
-      <img
+      <Image
         src={provider.profile_picture_url}
         alt={`Dr. ${provider.first_name} ${provider.last_name}`}
+        width={48}
+        height={48}
         className="w-12 h-12 rounded-full object-cover shrink-0 border border-gray-100"
       />
     );
@@ -182,7 +186,6 @@ function SlotColumn({
 }) {
   const [offset, setOffset] = useState(0);
 
-  // Reset offset when slots change (day navigation)
   useEffect(() => setOffset(0), [slots]);
 
   const visible = slots.slice(offset, offset + SLOTS_PER_PAGE);
@@ -191,7 +194,6 @@ function SlotColumn({
 
   return (
     <div className="flex flex-col gap-1">
-      {/* Day header */}
       <div className="border border-gray-100 rounded-lg p-2 text-center bg-gray-50">
         <p className="text-xs font-semibold text-gray-700 leading-tight">
           {dateLabel(day)}
@@ -210,7 +212,6 @@ function SlotColumn({
         )}
       </div>
 
-      {/* Up arrow */}
       {!loading && slots.length > 0 && (
         <button
           onClick={() => setOffset(Math.max(0, offset - 1))}
@@ -221,7 +222,6 @@ function SlotColumn({
         </button>
       )}
 
-      {/* Slot buttons – fixed at 5 rows */}
       {!loading && slots.length > 0 && (
         <div className="flex flex-col gap-1" style={{ minHeight: `${SLOTS_PER_PAGE * 38}px` }}>
           {visible.map((slot) => (
@@ -236,7 +236,6 @@ function SlotColumn({
         </div>
       )}
 
-      {/* Down arrow */}
       {!loading && slots.length > 0 && (
         <button
           onClick={() => setOffset(Math.min(slots.length - SLOTS_PER_PAGE, offset + 1))}
@@ -247,7 +246,6 @@ function SlotColumn({
         </button>
       )}
 
-      {/* No slots placeholder so columns stay same height */}
       {!loading && slots.length === 0 && (
         <div
           className="flex items-center justify-center text-[10px] text-gray-300"
@@ -365,12 +363,8 @@ function ProviderCard({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[340px_minmax(0,1fr)]">
       {/* ── LEFT PANEL (340 px) ── */}
       <div className="md:border-r border-gray-100 flex flex-col">
-        {/* Full-width image / avatar header */}
         <ProviderImageHeader provider={provider} />
-
-        {/* Info below image */}
         <div className="p-5 flex flex-col gap-3 flex-1">
-          {/* Name + specialty */}
           <div>
             <h3 className="font-bold text-gray-900 text-lg leading-tight">
               Dr. {provider.first_name} {provider.last_name}
@@ -385,7 +379,6 @@ function ProviderCard({
             )}
           </div>
 
-          {/* Location */}
           {(provider.clinic_name || provider.county) && (
             <p className="text-xs text-gray-500 flex items-start gap-1.5">
               <LucideMapPin size={13} className="shrink-0 mt-0.5" />
@@ -393,7 +386,6 @@ function ProviderCard({
             </p>
           )}
 
-          {/* Price */}
           {selectedService && (
             <div className="bg-blue-50 rounded-xl px-4 py-3">
               <p className="text-xs text-blue-500 font-medium">
@@ -409,7 +401,6 @@ function ProviderCard({
             </div>
           )}
 
-          {/* Languages & insurance */}
           {(languageSummary || insuranceSummary) && (
             <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
               {languageSummary && (
@@ -427,7 +418,6 @@ function ProviderCard({
             </div>
           )}
 
-          {/* View full profile */}
           <button
             onClick={() => router.push("/book/provider/" + provider.id)}
             className="mt-auto flex items-center justify-center gap-1.5 text-[13px] text-blue-600 hover:text-blue-700 font-medium bg-gray-50 hover:bg-gray-100 rounded-lg py-2.5 transition-colors"
@@ -439,7 +429,6 @@ function ProviderCard({
 
       {/* ── RIGHT PANEL ── */}
       <div className="p-5 flex flex-col gap-4">
-        {/* Service selector */}
         {provider.services.length > 0 && (
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
@@ -464,7 +453,6 @@ function ProviderCard({
           </div>
         )}
 
-        {/* Appointment type */}
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
             Appointment type
@@ -495,7 +483,6 @@ function ProviderCard({
           </div>
         </div>
 
-        {/* Availability */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-gray-400 uppercase tracking-wide">
@@ -547,7 +534,7 @@ function ProviderCard({
 }
 
 // ─────────────────────────────────────────────
-// Booking modal (unchanged from previous)
+// Booking modal
 // ─────────────────────────────────────────────
 function BookingModal({
   booking,

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Button } from "@veridoctor/design/components";
 import {
   LucideCalendar,
@@ -7,12 +8,15 @@ import {
 } from "@veridoctor/design/icons";
 import Link from "next/link";
 import { ReactNode } from "react";
-// import { RiCalendarScheduleLine } from "react-icons/ri";
-// import { Button } from "@radix-ui/themes";
-// import { useNavigate } from "react-router-dom";
-// import { MdOutlineVideocam } from "react-icons/md";
-// import { TbReportAnalytics } from "react-icons/tb";
-// import { FaRegEye } from "react-icons/fa";
+
+export const metadata: Metadata = {
+  title: "For Healthcare Providers",
+  description:
+    "Join VeriDoctor to reach more patients with telehealth tools, streamlined scheduling, and secure digital health records — built for Kenyan healthcare providers.",
+  alternates: {
+    canonical: "https://veridoctor.com/for-healthcare-providers",
+  },
+};
 
 const benefits: { name: string; icon: ReactNode; description: string }[] = [
   {

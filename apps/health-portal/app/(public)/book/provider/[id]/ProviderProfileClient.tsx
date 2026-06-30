@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   LucideArrowLeft,
   LucideMapPin,
@@ -83,9 +84,11 @@ export default function ProviderProfileClient({
         {/* Profile picture — large, centered above details */}
         <div className="flex flex-col items-center mb-5">
           {provider.profile_picture_url ? (
-            <img
+            <Image
               src={provider.profile_picture_url}
               alt={`${provider.first_name} ${provider.last_name}`}
+              width={128}
+              height={128}
               className="w-32 h-32 rounded-full object-cover border-4 border-blue-100 shadow-md"
             />
           ) : (

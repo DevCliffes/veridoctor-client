@@ -17,6 +17,7 @@ import {
   LucidePlus,
   LucideTrash2,
   LucideBuilding,
+  LucideEye,
 } from "@veridoctor/design/icons";
 
 interface ExtraCredential {
@@ -138,18 +139,86 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = "border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-gray-50 w-full";
 const selectClass = inputClass;
 
+// ─────────────────────────────────────────────────────────────────
+// Patient card preview — mirrors ProviderImageHeader in book/page.tsx
+// exactly: same 4/3 aspect ratio, same object-cover, same fallback
+// ─────────────────────────────────────────────────────────────────
+function PatientCardPreview({ profile }: { profile: ProviderProfile }) {
+  const initials = (profile.first_name[0] ?? "") + (profile.last_name[0] ?? "");
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Label */}
+      <div className="flex items-center gap-2 px-4 pt-4 pb-2">
+        <LucideEye size={14} className="text-blue-500" />
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          Patient view preview
+        </p>
+      </div>
+
+      <div className="px-4 pb-4">
+        {/* Exact replica of left panel from book page */}
+        <div
+          className="rounded-xl border border-gray-100 overflow-hidden"
+          style={{ maxWidth: 340 }}
+        >
+          {/* Image header — 4:3 exactly as in book page */}
+          <div className="w-full overflow-hidden relative" style={{ aspectRatio: "4/3" }}>
+            {profile.profile_picture_url ? (
+              <>
+                <img
+                  src={profile.profile_picture_url}
+                  alt="Preview"
+                  className="w-full h-full object-cover object-top"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+              </>
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-2xl font-bold shadow-lg">
+                  {initials.toUpperCase() || <LucideUser size={22} />}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Info below */}
+          <div className="p-4">
+            <p className="font-bold text-gray-900 text-sm">
+              Dr. {profile.first_name || "First"} {profile.last_name || "Last"}
+            </p>
+            <p className="text-xs text-blue-600 font-medium mt-0.5">
+              {profile.speciality || "General Practitioner"}
+            </p>
+            {profile.subspecialties.length > 0 && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                {profile.subspecialties.join(" · ")}
+              </p>
+            )}
+            {(profile.clinic_name || profile.county) && (
+              <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1">
+                <LucideMapPin size={11} className="shrink-0" />
+                {[profile.clinic_name, profile.county].filter(Boolean).join(", ")}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Crop tip — only shown when there's a real photo */}
+        {profile.profile_picture_url && (
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
+            <span className="font-semibold">Tip:</span> The card crops your photo to a 4:3 box from the top. Make sure your face is fully visible in the preview above. If it's cut off, upload a photo where your face is centred or in the upper-middle portion of the frame.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DocumentImageUpload({
-  label,
-  fieldName,
-  currentUrl,
-  identityId,
-  onUploaded,
+  label, fieldName, currentUrl, identityId, onUploaded,
 }: {
-  label: string;
-  fieldName: string;
-  currentUrl: string;
-  identityId: string;
-  onUploaded: (url: string) => void;
+  label: string; fieldName: string; currentUrl: string; identityId: string; onUploaded: (url: string) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -202,14 +271,8 @@ function DocumentImageUpload({
   );
 }
 
-function LogoUpload({
-  currentUrl,
-  identityId,
-  onUploaded,
-}: {
-  currentUrl: string;
-  identityId: string;
-  onUploaded: (url: string) => void;
+function LogoUpload({ currentUrl, identityId, onUploaded }: {
+  currentUrl: string; identityId: string; onUploaded: (url: string) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -257,16 +320,9 @@ function LogoUpload({
   );
 }
 
-function ExtraCredentialCard({
-  credential,
-  identityId,
-  onChange,
-  onRemove,
-}: {
-  credential: ExtraCredential;
-  identityId: string;
-  onChange: (updated: ExtraCredential) => void;
-  onRemove: () => void;
+function ExtraCredentialCard({ credential, identityId, onChange, onRemove }: {
+  credential: ExtraCredential; identityId: string;
+  onChange: (updated: ExtraCredential) => void; onRemove: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -300,21 +356,11 @@ function ExtraCredentialCard({
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-gray-400 uppercase tracking-wide">Credential Name</label>
-          <input
-            value={credential.name}
-            onChange={(e) => onChange({ ...credential, name: e.target.value })}
-            placeholder="e.g. KMPDB Registration"
-            className={inputClass}
-          />
+          <input value={credential.name} onChange={(e) => onChange({ ...credential, name: e.target.value })} placeholder="e.g. KMPDB Registration" className={inputClass} />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-gray-400 uppercase tracking-wide">Number / Reference</label>
-          <input
-            value={credential.number}
-            onChange={(e) => onChange({ ...credential, number: e.target.value })}
-            placeholder="e.g. KMPDB/12345"
-            className={inputClass}
-          />
+          <input value={credential.number} onChange={(e) => onChange({ ...credential, number: e.target.value })} placeholder="e.g. KMPDB/12345" className={inputClass} />
         </div>
       </div>
       <div
@@ -373,7 +419,6 @@ export default function ProfilePage() {
         setProfile((prev) => ({
           ...prev,
           ...res.data,
-          // Ensure subspecialties is always an array even if API returns null
           subspecialties: res.data.subspecialties ?? [],
         }))
       )
@@ -409,8 +454,6 @@ export default function ProfilePage() {
   const removeLanguage = (lang: string) =>
     setProfile((prev) => ({ ...prev, languages: prev.languages.filter((l) => l !== lang) }));
 
-  // Subspecialty helpers — pill/chip pattern matching insurances:
-  // a single text input + Add button, saved entries shown as removable pills.
   const addSubspecialty = () => {
     const val = subspecialtyInput.trim();
     if (!val || profile.subspecialties.includes(val)) return;
@@ -444,20 +487,28 @@ export default function ProfilePage() {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setToast({ message: "Please select an image file.", type: "error" }); return; }
     if (file.size > MAX_PHOTO_BYTES) { setToast({ message: "Image too large. Max 5MB.", type: "error" }); return; }
+    // Show local preview immediately — this is what PatientCardPreview renders
     const localPreviewUrl = URL.createObjectURL(file);
     setProfile((prev) => ({ ...prev, profile_picture_url: localPreviewUrl }));
     setUploadingPhoto(true);
     try {
       const formData = new FormData();
       formData.append("photo", file);
-      const res = await axiosClient.post("/provider/" + identityId + "/photo", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      const res = await axiosClient.post(
+        "/provider/" + identityId + "/photo",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
       const uploadedUrl = res.data?.profile_picture_url;
       if (uploadedUrl) {
         setProfile((prev) => ({ ...prev, profile_picture_url: uploadedUrl }));
         setToast({ message: "Profile photo updated!", type: "success" });
       }
     } catch {
-      setProfile((prev) => ({ ...prev, profile_picture_url: prev.profile_picture_url === localPreviewUrl ? "" : prev.profile_picture_url }));
+      setProfile((prev) => ({
+        ...prev,
+        profile_picture_url: prev.profile_picture_url === localPreviewUrl ? "" : prev.profile_picture_url,
+      }));
       setToast({ message: "Failed to upload photo.", type: "error" });
     } finally {
       URL.revokeObjectURL(localPreviewUrl);
@@ -514,7 +565,7 @@ export default function ProfilePage() {
     <div className="space-y-4 max-w-3xl mx-auto pb-10">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Header — single Save Changes button lives here only */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white flex items-center gap-5">
         <div className="relative">
           <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold border-2 border-white/40 overflow-hidden">
@@ -550,7 +601,10 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {/* Personal Information — Subspecialties now lives here, right after Speciality */}
+      {/* ── Patient card preview — shows immediately after photo is uploaded ── */}
+      <PatientCardPreview profile={profile} />
+
+      {/* Personal Information */}
       <Section title="Personal Information" icon={<LucideUser size={18} />}>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Title">
@@ -566,7 +620,6 @@ export default function ProfilePage() {
           </Field>
         </div>
 
-        {/* Subspecialties — pill/chip pattern, matching Insurances styling */}
         <div className="mt-4">
           <Field label="Subspecialties">
             <div className="flex gap-2">
@@ -597,7 +650,7 @@ export default function ProfilePage() {
             </div>
           )}
           <p className="text-xs text-gray-400 mt-2">
-            Add specific areas of focus within your speciality (e.g. Pediatric Cardiology, Sports Medicine) — these appear on your public profile so patients can find you more easily.
+            Add specific areas of focus within your speciality — these appear on your public profile so patients can find you more easily.
           </p>
         </div>
 
@@ -662,48 +715,22 @@ export default function ProfilePage() {
             <input value={profile.country} onChange={(e) => set("country", e.target.value)} className={inputClass} placeholder="Kenya" />
           </Field>
         </div>
-
-        {/* Business docs */}
         <div className="mt-5 space-y-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Facility Documents</p>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Business Registration Number">
               <input value={profile.business_reg_number} onChange={(e) => set("business_reg_number", e.target.value)} className={inputClass} placeholder="e.g. BN/2024/12345" />
             </Field>
-            <DocumentImageUpload
-              label="Business Registration Certificate"
-              fieldName="business_reg_image"
-              currentUrl={profile.business_reg_image}
-              identityId={identityId}
-              onUploaded={(url) => setProfile((prev) => ({ ...prev, business_reg_image: url }))}
-            />
+            <DocumentImageUpload label="Business Registration Certificate" fieldName="business_reg_image" currentUrl={profile.business_reg_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, business_reg_image: url }))} />
             <Field label="Operating Licence Number">
               <input value={profile.operating_licence} onChange={(e) => set("operating_licence", e.target.value)} className={inputClass} placeholder="Licence number" />
             </Field>
-            <DocumentImageUpload
-              label="Operating Licence"
-              fieldName="operating_licence_image"
-              currentUrl={profile.operating_licence_image}
-              identityId={identityId}
-              onUploaded={(url) => setProfile((prev) => ({ ...prev, operating_licence_image: url }))}
-            />
+            <DocumentImageUpload label="Operating Licence" fieldName="operating_licence_image" currentUrl={profile.operating_licence_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, operating_licence_image: url }))} />
             <Field label="KRA PIN">
               <input value={profile.kra_pin} onChange={(e) => set("kra_pin", e.target.value)} className={inputClass} placeholder="e.g. A000000000B" />
             </Field>
-            <DocumentImageUpload
-              label="KRA PIN Certificate"
-              fieldName="kra_pin_image"
-              currentUrl={profile.kra_pin_image}
-              identityId={identityId}
-              onUploaded={(url) => setProfile((prev) => ({ ...prev, kra_pin_image: url }))}
-            />
-            <DocumentImageUpload
-              label="CR12"
-              fieldName="cr12_image"
-              currentUrl={profile.cr12_image}
-              identityId={identityId}
-              onUploaded={(url) => setProfile((prev) => ({ ...prev, cr12_image: url }))}
-            />
+            <DocumentImageUpload label="KRA PIN Certificate" fieldName="kra_pin_image" currentUrl={profile.kra_pin_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, kra_pin_image: url }))} />
+            <DocumentImageUpload label="CR12" fieldName="cr12_image" currentUrl={profile.cr12_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, cr12_image: url }))} />
           </div>
         </div>
       </Section>
@@ -725,33 +752,16 @@ export default function ProfilePage() {
           <Field label="Valid Operating Licence Number">
             <input value={profile.valid_licence_number} onChange={(e) => set("valid_licence_number", e.target.value)} className={inputClass} placeholder="Valid licence number" />
           </Field>
-          <DocumentImageUpload
-            label="Valid Operating Licence"
-            fieldName="valid_licence_image"
-            currentUrl={profile.valid_licence_image}
-            identityId={identityId}
-            onUploaded={(url) => setProfile((prev) => ({ ...prev, valid_licence_image: url }))}
-          />
+          <DocumentImageUpload label="Valid Operating Licence" fieldName="valid_licence_image" currentUrl={profile.valid_licence_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, valid_licence_image: url }))} />
         </div>
-
-        {/* Extra credentials */}
         {profile.extra_credentials.length > 0 && (
           <div className="mt-5 space-y-3">
             {profile.extra_credentials.map((cred) => (
-              <ExtraCredentialCard
-                key={cred.id}
-                credential={cred}
-                identityId={identityId}
-                onChange={updateExtraCredential}
-                onRemove={() => removeExtraCredential(cred.id)}
-              />
+              <ExtraCredentialCard key={cred.id} credential={cred} identityId={identityId} onChange={updateExtraCredential} onRemove={() => removeExtraCredential(cred.id)} />
             ))}
           </div>
         )}
-        <button
-          onClick={addExtraCredential}
-          className="mt-4 flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-        >
+        <button onClick={addExtraCredential} className="mt-4 flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
           <LucidePlus size={15} />
           Add another credential
         </button>
@@ -801,8 +811,6 @@ export default function ProfilePage() {
           </div>
         )}
       </Section>
-
-      {/* No second Save button here — use the one in the header above */}
     </div>
   );
 }

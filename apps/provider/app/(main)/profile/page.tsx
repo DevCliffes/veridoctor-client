@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
 import {
@@ -17,7 +17,9 @@ import {
   LucidePlus,
   LucideTrash2,
   LucideBuilding,
-  LucideEye,
+  LucideZoomIn,
+  LucideZoomOut,
+  LucideX,
 } from "@veridoctor/design/icons";
 
 interface ExtraCredential {
@@ -85,6 +87,9 @@ const SPECIALITIES = [
 ];
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+// Card crop ratio: 4:3 width:height
+const CROP_ASPECT_W = 4;
+const CROP_ASPECT_H = 3;
 
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
@@ -140,76 +145,268 @@ const inputClass = "border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:
 const selectClass = inputClass;
 
 // ─────────────────────────────────────────────────────────────────
-// Patient card preview — mirrors ProviderImageHeader in book/page.tsx
-// exactly: same 4/3 aspect ratio, same object-cover, same fallback
+// Photo crop modal
+// The user drags and zooms their image inside a 4:3 viewport.
+// When satisfied, we render it onto a canvas and export as a blob.
 // ─────────────────────────────────────────────────────────────────
-function PatientCardPreview({ profile }: { profile: ProviderProfile }) {
-  const initials = (profile.first_name[0] ?? "") + (profile.last_name[0] ?? "");
+interface CropState {
+  x: number;   // offset of image top-left within viewport (px)
+  y: number;
+  scale: number;
+}
+
+function PhotoCropModal({
+  src,
+  onCancel,
+  onConfirm,
+}: {
+  src: string;           // object URL of the selected file
+  onCancel: () => void;
+  onConfirm: (blob: Blob) => void;
+}) {
+  const VIEWPORT_W = 480;
+  const VIEWPORT_H = Math.round(VIEWPORT_W * CROP_ASPECT_H / CROP_ASPECT_W); // 360
+
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [crop, setCrop] = useState<CropState>({ x: 0, y: 0, scale: 1 });
+  const [imgNaturalW, setImgNaturalW] = useState(1);
+  const [imgNaturalH, setImgNaturalH] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ mx: number; my: number; cx: number; cy: number } | null>(null);
+
+  // On image load: fit image to fill the viewport, centred
+  const handleImgLoad = () => {
+    const img = imgRef.current;
+    if (!img) return;
+    setImgNaturalW(img.naturalWidth);
+    setImgNaturalH(img.naturalHeight);
+    // Scale so the image fills the viewport in at least one dimension
+    const scaleW = VIEWPORT_W / img.naturalWidth;
+    const scaleH = VIEWPORT_H / img.naturalHeight;
+    const scale = Math.max(scaleW, scaleH);
+    const dispW = img.naturalWidth * scale;
+    const dispH = img.naturalHeight * scale;
+    setCrop({
+      scale,
+      x: (VIEWPORT_W - dispW) / 2,
+      y: (VIEWPORT_H - dispH) / 2,
+    });
+  };
+
+  const clampCrop = useCallback((next: CropState): CropState => {
+    const dispW = imgNaturalW * next.scale;
+    const dispH = imgNaturalH * next.scale;
+    // Image must cover the full viewport — no gaps at edges
+    const minX = Math.min(0, VIEWPORT_W - dispW);
+    const maxX = 0;
+    const minY = Math.min(0, VIEWPORT_H - dispH);
+    const maxY = 0;
+    return {
+      ...next,
+      x: Math.min(maxX, Math.max(minX, next.x)),
+      y: Math.min(maxY, Math.max(minY, next.y)),
+    };
+  }, [imgNaturalW, imgNaturalH, VIEWPORT_W, VIEWPORT_H]);
+
+  // Mouse drag
+  const onMouseDown = (e: React.MouseEvent) => {
+    setDragging(true);
+    dragStart.current = { mx: e.clientX, my: e.clientY, cx: crop.x, cy: crop.y };
+  };
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragging || !dragStart.current) return;
+    const dx = e.clientX - dragStart.current.mx;
+    const dy = e.clientY - dragStart.current.my;
+    setCrop((prev) => clampCrop({ ...prev, x: dragStart.current!.cx + dx, y: dragStart.current!.cy + dy }));
+  }, [dragging, clampCrop]);
+  const onMouseUp = useCallback(() => setDragging(false), []);
+
+  // Touch drag
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    setDragging(true);
+    dragStart.current = { mx: t.clientX, my: t.clientY, cx: crop.x, cy: crop.y };
+  };
+  const onTouchMove = useCallback((e: TouchEvent) => {
+    if (!dragging || !dragStart.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - dragStart.current.mx;
+    const dy = t.clientY - dragStart.current.my;
+    setCrop((prev) => clampCrop({ ...prev, x: dragStart.current!.cx + dx, y: dragStart.current!.cy + dy }));
+  }, [dragging, clampCrop]);
+  const onTouchEnd = useCallback(() => setDragging(false), []);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [onMouseMove, onMouseUp, onTouchMove, onTouchEnd]);
+
+  const zoom = (delta: number) => {
+    setCrop((prev) => {
+      const minScale = Math.max(
+        VIEWPORT_W / imgNaturalW,
+        VIEWPORT_H / imgNaturalH
+      );
+      const newScale = Math.min(5, Math.max(minScale, prev.scale + delta));
+      // Zoom toward centre of viewport
+      const cx = VIEWPORT_W / 2;
+      const cy = VIEWPORT_H / 2;
+      const ratio = newScale / prev.scale;
+      const newX = cx - ratio * (cx - prev.x);
+      const newY = cy - ratio * (cy - prev.y);
+      return clampCrop({ scale: newScale, x: newX, y: newY });
+    });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    zoom(e.deltaY < 0 ? 0.08 : -0.08);
+  };
+
+  // Export: draw current view onto a canvas at a fixed output size
+  const OUTPUT_W = 800;
+  const OUTPUT_H = Math.round(OUTPUT_W * CROP_ASPECT_H / CROP_ASPECT_W); // 600
+
+  const handleConfirm = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = OUTPUT_W;
+    canvas.height = OUTPUT_H;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || !imgRef.current) return;
+
+    // Map viewport coordinates back to image source coordinates
+    const scaleRatio = OUTPUT_W / VIEWPORT_W;
+    const destW = imgNaturalW * crop.scale * scaleRatio;
+    const destH = imgNaturalH * crop.scale * scaleRatio;
+    const destX = crop.x * scaleRatio;
+    const destY = crop.y * scaleRatio;
+
+    ctx.drawImage(imgRef.current, destX, destY, destW, destH);
+    canvas.toBlob((blob) => {
+      if (blob) onConfirm(blob);
+    }, "image/jpeg", 0.92);
+  };
+
+  const dispW = imgNaturalW * crop.scale;
+  const dispH = imgNaturalH * crop.scale;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      {/* Label */}
-      <div className="flex items-center gap-2 px-4 pt-4 pb-2">
-        <LucideEye size={14} className="text-blue-500" />
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          Patient view preview
-        </p>
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b">
+          <div>
+            <h2 className="font-semibold text-gray-800">Position your photo</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Drag to reposition · Scroll or use buttons to zoom</p>
+          </div>
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+            <LucideX size={18} />
+          </button>
+        </div>
 
-      <div className="px-4 pb-4">
-        {/* Exact replica of left panel from book page */}
-        <div
-          className="rounded-xl border border-gray-100 overflow-hidden"
-          style={{ maxWidth: 340 }}
-        >
-          {/* Image header — 4:3 exactly as in book page */}
-          <div className="w-full overflow-hidden relative" style={{ aspectRatio: "4/3" }}>
-            {profile.profile_picture_url ? (
-              <>
-                <img
-                  src={profile.profile_picture_url}
-                  alt="Preview"
-                  className="w-full h-full object-cover object-top"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-              </>
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-                <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-2xl font-bold shadow-lg">
-                  {initials.toUpperCase() || <LucideUser size={22} />}
-                </div>
-              </div>
-            )}
+        {/* Crop viewport */}
+        <div className="flex flex-col items-center gap-4 p-5">
+          {/* Label */}
+          <p className="text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1.5 rounded-lg w-full text-center">
+            This is exactly how your photo will appear to patients
+          </p>
+
+          {/* The 4:3 viewport */}
+          <div
+            className="relative overflow-hidden rounded-xl border-2 border-blue-200 cursor-grab active:cursor-grabbing select-none"
+            style={{ width: VIEWPORT_W, height: VIEWPORT_H, maxWidth: "100%" }}
+            onMouseDown={onMouseDown}
+            onTouchStart={onTouchStart}
+            onWheel={handleWheel}
+          >
+            {/* Hidden image used for load event and canvas drawImage */}
+            <img
+              ref={imgRef}
+              src={src}
+              alt="Crop source"
+              crossOrigin="anonymous"
+              onLoad={handleImgLoad}
+              className="hidden"
+            />
+            {/* Visible positioned image */}
+            <div
+              style={{
+                position: "absolute",
+                left: crop.x,
+                top: crop.y,
+                width: dispW,
+                height: dispH,
+                backgroundImage: `url(${src})`,
+                backgroundSize: "100% 100%",
+                backgroundRepeat: "no-repeat",
+              }}
+            />
+            {/* Rule-of-thirds grid overlay */}
+            <div className="absolute inset-0 pointer-events-none" style={{
+              backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.15) 1px, transparent 1px)",
+              backgroundSize: "33.33% 33.33%",
+            }} />
           </div>
 
-          {/* Info below */}
-          <div className="p-4">
-            <p className="font-bold text-gray-900 text-sm">
-              Dr. {profile.first_name || "First"} {profile.last_name || "Last"}
-            </p>
-            <p className="text-xs text-blue-600 font-medium mt-0.5">
-              {profile.speciality || "General Practitioner"}
-            </p>
-            {profile.subspecialties.length > 0 && (
-              <p className="text-[11px] text-gray-400 mt-1">
-                {profile.subspecialties.join(" · ")}
-              </p>
-            )}
-            {(profile.clinic_name || profile.county) && (
-              <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1">
-                <LucideMapPin size={11} className="shrink-0" />
-                {[profile.clinic_name, profile.county].filter(Boolean).join(", ")}
-              </p>
-            )}
+          {/* Zoom controls */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => zoom(-0.1)}
+              className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-100 transition-colors"
+            >
+              <LucideZoomOut size={16} className="text-gray-600" />
+            </button>
+            <input
+              type="range"
+              min={50}
+              max={300}
+              step={1}
+              value={Math.round(crop.scale * 100)}
+              onChange={(e) => {
+                const newScale = Number(e.target.value) / 100;
+                setCrop((prev) => {
+                  const cx = VIEWPORT_W / 2;
+                  const cy = VIEWPORT_H / 2;
+                  const ratio = newScale / prev.scale;
+                  const newX = cx - ratio * (cx - prev.x);
+                  const newY = cy - ratio * (cy - prev.y);
+                  return clampCrop({ scale: newScale, x: newX, y: newY });
+                });
+              }}
+              className="w-40 accent-blue-600"
+            />
+            <button
+              onClick={() => zoom(0.1)}
+              className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-100 transition-colors"
+            >
+              <LucideZoomIn size={16} className="text-gray-600" />
+            </button>
           </div>
         </div>
 
-        {/* Crop tip — only shown when there's a real photo */}
-        {profile.profile_picture_url && (
-          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
-            <span className="font-semibold">Tip:</span> The card crops your photo to a 4:3 box from the top. Make sure your face is fully visible in the preview above. If it's cut off, upload a photo where your face is centred or in the upper-middle portion of the frame.
-          </p>
-        )}
+        {/* Actions */}
+        <div className="px-5 py-4 border-t flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="flex-1 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700"
+          >
+            Use this crop
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -409,6 +606,10 @@ export default function ProfilePage() {
   const [insuranceInput, setInsuranceInput] = useState("");
   const [languageInput, setLanguageInput] = useState("");
   const [subspecialtyInput, setSubspecialtyInput] = useState("");
+
+  // Crop modal state
+  const [cropSrc, setCropSrc] = useState<string | null>(null); // object URL of selected file
+  const pendingFileRef = useRef<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -481,19 +682,36 @@ export default function ProfilePage() {
   const removeExtraCredential = (id: string) =>
     setProfile((prev) => ({ ...prev, extra_credentials: prev.extra_credentials.filter((c) => c.id !== id) }));
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Step 1: file selected → open crop modal
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setToast({ message: "Please select an image file.", type: "error" }); return; }
-    if (file.size > MAX_PHOTO_BYTES) { setToast({ message: "Image too large. Max 5MB.", type: "error" }); return; }
-    // Show local preview immediately — this is what PatientCardPreview renders
-    const localPreviewUrl = URL.createObjectURL(file);
-    setProfile((prev) => ({ ...prev, profile_picture_url: localPreviewUrl }));
+    if (!file.type.startsWith("image/")) {
+      setToast({ message: "Please select an image file.", type: "error" });
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setToast({ message: "Image too large. Max 5MB.", type: "error" });
+      return;
+    }
+    pendingFileRef.current = file;
+    setCropSrc(URL.createObjectURL(file));
+  };
+
+  // Step 2: user confirms crop → receive canvas blob → upload
+  const handleCropConfirm = async (blob: Blob) => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+
+    // Show local preview immediately while uploading
+    const localUrl = URL.createObjectURL(blob);
+    setProfile((prev) => ({ ...prev, profile_picture_url: localUrl }));
     setUploadingPhoto(true);
+
     try {
       const formData = new FormData();
-      formData.append("photo", file);
+      formData.append("photo", blob, "photo.jpg");
       const res = await axiosClient.post(
         "/provider/" + identityId + "/photo",
         formData,
@@ -507,13 +725,20 @@ export default function ProfilePage() {
     } catch {
       setProfile((prev) => ({
         ...prev,
-        profile_picture_url: prev.profile_picture_url === localPreviewUrl ? "" : prev.profile_picture_url,
+        profile_picture_url: prev.profile_picture_url === localUrl ? "" : prev.profile_picture_url,
       }));
       setToast({ message: "Failed to upload photo.", type: "error" });
     } finally {
-      URL.revokeObjectURL(localPreviewUrl);
+      URL.revokeObjectURL(localUrl);
       setUploadingPhoto(false);
+      pendingFileRef.current = null;
     }
+  };
+
+  const handleCropCancel = () => {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+    pendingFileRef.current = null;
   };
 
   const handleSave = async () => {
@@ -565,6 +790,15 @@ export default function ProfilePage() {
     <div className="space-y-4 max-w-3xl mx-auto pb-10">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
+      {/* Crop modal — rendered over everything when a file is selected */}
+      {cropSrc && (
+        <PhotoCropModal
+          src={cropSrc}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white flex items-center gap-5">
         <div className="relative">
@@ -584,7 +818,7 @@ export default function ProfilePage() {
           >
             <LucideCamera size={14} />
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelected} />
         </div>
         <div>
           <h1 className="text-xl font-bold">{profile.title} {profile.first_name} {profile.last_name}</h1>
@@ -600,9 +834,6 @@ export default function ProfilePage() {
           {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
-
-      {/* ── Patient card preview — shows immediately after photo is uploaded ── */}
-      <PatientCardPreview profile={profile} />
 
       {/* Personal Information */}
       <Section title="Personal Information" icon={<LucideUser size={18} />}>
@@ -630,13 +861,7 @@ export default function ProfilePage() {
                 placeholder="e.g. Pediatric Cardiology, Sports Medicine..."
                 className={inputClass + " flex-1"}
               />
-              <button
-                type="button"
-                onClick={addSubspecialty}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 shrink-0"
-              >
-                Add
-              </button>
+              <button type="button" onClick={addSubspecialty} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 shrink-0">Add</button>
             </div>
           </Field>
           {profile.subspecialties.length > 0 && (
@@ -677,24 +902,14 @@ export default function ProfilePage() {
           <Field label="National ID / Passport Number">
             <input value={profile.national_id_number} onChange={(e) => set("national_id_number", e.target.value)} className={inputClass} placeholder="e.g. 12345678 or A1234567" />
           </Field>
-          <DocumentImageUpload
-            label="National ID / Passport Image"
-            fieldName="national_id_image"
-            currentUrl={profile.national_id_image}
-            identityId={identityId}
-            onUploaded={(url) => setProfile((prev) => ({ ...prev, national_id_image: url }))}
-          />
+          <DocumentImageUpload label="National ID / Passport Image" fieldName="national_id_image" currentUrl={profile.national_id_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, national_id_image: url }))} />
         </div>
       </Section>
 
       {/* Practice & Location */}
       <Section title="Practice & Location" icon={<LucideMapPin size={18} />}>
         <div className="flex items-center gap-4 mb-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-          <LogoUpload
-            currentUrl={profile.clinic_logo_url}
-            identityId={identityId}
-            onUploaded={(url) => setProfile((prev) => ({ ...prev, clinic_logo_url: url }))}
-          />
+          <LogoUpload currentUrl={profile.clinic_logo_url} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, clinic_logo_url: url }))} />
           <div className="flex-1">
             <label className="text-xs text-gray-400 uppercase tracking-wide font-medium block mb-1">Clinic / Hospital Name</label>
             <input value={profile.clinic_name} onChange={(e) => set("clinic_name", e.target.value)} className={inputClass} placeholder="e.g. Nairobi Women's Hospital" />

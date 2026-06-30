@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAppSelector } from "../../hooks";
 import { axiosClient } from "@veridoctor/api-client";
@@ -15,6 +15,8 @@ import {
   LucideChevronRightCircle,
   LucideLanguages,
   LucideShieldCheck,
+  LucideChevronUp,
+  LucideChevronDown,
 } from "@veridoctor/design/icons";
 
 interface Service {
@@ -54,6 +56,7 @@ interface BookingState {
   slot: Slot;
   date: string;
   appointmentType: "virtual" | "physical";
+  _invalidate?: () => void;
 }
 
 function Toast({
@@ -110,55 +113,162 @@ function getNext7Days() {
   });
 }
 
-function ProviderAvatar({
-  provider,
-  size = "lg",
-}: {
-  provider: Provider;
-  size?: "lg" | "sm";
-}) {
+// ─────────────────────────────────────────────
+// Doctor image: full-width top section of left panel
+// Falls back to initials on a coloured background
+// ─────────────────────────────────────────────
+function ProviderImageHeader({ provider }: { provider: Provider }) {
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
-  const dimension = size === "lg" ? "w-20 h-20" : "w-12 h-12";
-  const textSize = size === "lg" ? "text-2xl" : "text-base";
 
+  if (provider.profile_picture_url) {
+    return (
+      <div className="w-full aspect-[4/3] overflow-hidden relative">
+        <img
+          src={provider.profile_picture_url}
+          alt={`Dr. ${provider.first_name} ${provider.last_name}`}
+          className="w-full h-full object-cover object-top"
+        />
+        {/* subtle gradient so text overlays readable */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full aspect-[4/3] bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="w-24 h-24 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg">
+        {initials.toUpperCase()}
+      </div>
+    </div>
+  );
+}
+
+// Small avatar for the booking modal
+function ProviderAvatar({ provider }: { provider: Provider }) {
+  const initials =
+    (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
   if (provider.profile_picture_url) {
     return (
       <img
         src={provider.profile_picture_url}
         alt={`Dr. ${provider.first_name} ${provider.last_name}`}
-        className={
-          dimension +
-          " rounded-full object-cover shrink-0 border border-gray-100"
-        }
+        className="w-12 h-12 rounded-full object-cover shrink-0 border border-gray-100"
       />
     );
   }
-
   return (
-    <div
-      className={
-        dimension +
-        " rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0 " +
-        textSize
-      }
-    >
+    <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0 text-base">
       {initials.toUpperCase()}
     </div>
   );
 }
 
+// ─────────────────────────────────────────────
+// Slot column with up/down arrows, max 5 visible
+// ─────────────────────────────────────────────
+const SLOTS_PER_PAGE = 5;
+
+function SlotColumn({
+  day,
+  slots,
+  loading,
+  onBook,
+}: {
+  day: string;
+  slots: Slot[];
+  loading: boolean;
+  onBook: (slot: Slot) => void;
+}) {
+  const [offset, setOffset] = useState(0);
+
+  // Reset offset when slots change (day navigation)
+  useEffect(() => setOffset(0), [slots]);
+
+  const visible = slots.slice(offset, offset + SLOTS_PER_PAGE);
+  const canUp = offset > 0;
+  const canDown = offset + SLOTS_PER_PAGE < slots.length;
+
+  return (
+    <div className="flex flex-col gap-1">
+      {/* Day header */}
+      <div className="border border-gray-100 rounded-lg p-2 text-center bg-gray-50">
+        <p className="text-xs font-semibold text-gray-700 leading-tight">
+          {dateLabel(day)}
+        </p>
+        {loading ? (
+          <LucideLoader2
+            size={12}
+            className="animate-spin text-gray-300 mx-auto mt-1"
+          />
+        ) : (
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            {slots.length === 0
+              ? "No slots"
+              : slots.length + " slot" + (slots.length !== 1 ? "s" : "")}
+          </p>
+        )}
+      </div>
+
+      {/* Up arrow */}
+      {!loading && slots.length > 0 && (
+        <button
+          onClick={() => setOffset(Math.max(0, offset - 1))}
+          disabled={!canUp}
+          className="flex items-center justify-center py-0.5 rounded hover:bg-gray-100 disabled:opacity-20 transition-opacity"
+        >
+          <LucideChevronUp size={14} className="text-gray-500" />
+        </button>
+      )}
+
+      {/* Slot buttons – fixed at 5 rows */}
+      {!loading && slots.length > 0 && (
+        <div className="flex flex-col gap-1" style={{ minHeight: `${SLOTS_PER_PAGE * 38}px` }}>
+          {visible.map((slot) => (
+            <button
+              key={slot.start_time}
+              onClick={() => onBook(slot)}
+              className="text-xs py-2 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors w-full"
+            >
+              {formatTime(slot.start_time)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Down arrow */}
+      {!loading && slots.length > 0 && (
+        <button
+          onClick={() => setOffset(Math.min(slots.length - SLOTS_PER_PAGE, offset + 1))}
+          disabled={!canDown}
+          className="flex items-center justify-center py-0.5 rounded hover:bg-gray-100 disabled:opacity-20 transition-opacity"
+        >
+          <LucideChevronDown size={14} className="text-gray-500" />
+        </button>
+      )}
+
+      {/* No slots placeholder so columns stay same height */}
+      {!loading && slots.length === 0 && (
+        <div
+          className="flex items-center justify-center text-[10px] text-gray-300"
+          style={{ minHeight: `${SLOTS_PER_PAGE * 38}px` }}
+        >
+          —
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Provider card — wide left panel layout
+// ─────────────────────────────────────────────
 function ProviderCard({
   provider,
   onBook,
-  onSlotBooked,
 }: {
   provider: Provider;
   onBook: (state: BookingState) => void;
-  // Called after a successful booking with the provider id + date so this
-  // card can immediately drop the booked slot from its local cache and
-  // refetch that day — no page refresh needed.
-  onSlotBooked: (providerId: string, date: string) => void;
 }) {
   const router = useRouter();
   const days = getNext7Days();
@@ -169,20 +279,24 @@ function ProviderCard({
     provider.services[0]?.id ?? null
   );
   const [selectedApptType, setSelectedApptType] = useState<"virtual" | "physical">("virtual");
+
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
 
-  const fetchDay = (day: string) => {
-    setLoadingDays((prev) => ({ ...prev, [day]: true }));
-    axiosClient
-      .get("/provider/" + provider.id + "/available-slots?date=" + day)
-      .then((res) =>
-        setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] }))
-      )
-      .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
-      .finally(() =>
-        setLoadingDays((prev) => ({ ...prev, [day]: false }))
-      );
-  };
+  const fetchDay = useCallback(
+    (day: string) => {
+      setLoadingDays((prev) => ({ ...prev, [day]: true }));
+      axiosClient
+        .get("/provider/" + provider.id + "/available-slots?date=" + day)
+        .then((res) =>
+          setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] }))
+        )
+        .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
+        .finally(() =>
+          setLoadingDays((prev) => ({ ...prev, [day]: false }))
+        );
+    },
+    [provider.id]
+  );
 
   useEffect(() => {
     visibleDays.forEach((day) => {
@@ -192,9 +306,6 @@ function ProviderCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayOffset, provider.id]);
 
-  // Called by BookingModal (via onSlotBooked) after a confirmed booking.
-  // Drops the cached slots for that day so the card immediately refetches
-  // from the server — the booked slot disappears without a page refresh.
   const invalidateDay = (date: string) => {
     setDaySlots((prev) => {
       const next = { ...prev };
@@ -204,17 +315,27 @@ function ProviderCard({
     fetchDay(date);
   };
 
-  // Expose invalidateDay upward so BookingModal can call it
-  // via the onSlotBooked callback from the parent.
-  // We pass a wrapped version that also carries the providerId.
-  const handleBookClick = (state: BookingState) => {
+  const slotsForDay = (day: string) => {
+    const allSlots = daySlots[day] ?? [];
+    const now = new Date();
+    return allSlots.filter((slot) => {
+      if (new Date(slot.start_time) <= now) return false;
+      if (selectedServiceId && slot.service_id && slot.service_id !== selectedServiceId)
+        return false;
+      if (slot.location_type !== "both" && slot.location_type !== selectedApptType)
+        return false;
+      return true;
+    });
+  };
+
+  const handleBookSlot = (slot: Slot, day: string) => {
     onBook({
-      ...state,
-      // Attach the invalidation callback so BookingModal can call it
-      // after a confirmed booking. We smuggle it via a field on state.
-      // (TypeScript: we extend BookingState below with an optional field)
-      _invalidate: () => invalidateDay(state.date),
-    } as BookingState & { _invalidate: () => void });
+      provider,
+      slot,
+      date: day,
+      appointmentType: selectedApptType,
+      _invalidate: () => invalidateDay(day),
+    });
   };
 
   const selectedService =
@@ -223,7 +344,7 @@ function ProviderCard({
     null;
 
   const insuranceSummary =
-    provider.insurances_accepted && provider.insurances_accepted.length > 0
+    provider.insurances_accepted?.length > 0
       ? provider.insurances_accepted.length > 2
         ? provider.insurances_accepted.slice(0, 2).join(", ") +
           " +" +
@@ -233,101 +354,92 @@ function ProviderCard({
       : null;
 
   const languageSummary =
-    provider.languages && provider.languages.length > 0
-      ? provider.languages.join(", ")
-      : null;
+    provider.languages?.length > 0 ? provider.languages.join(", ") : null;
 
-  function slotsForDay(day: string) {
-    const allSlots = daySlots[day] ?? [];
-    const now = new Date();
-    return allSlots.filter((slot) => {
-      if (new Date(slot.start_time) <= now) return false;
-      if (
-        selectedServiceId &&
-        slot.service_id &&
-        slot.service_id !== selectedServiceId
-      )
-        return false;
-      if (
-        slot.location_type !== "both" &&
-        slot.location_type !== selectedApptType
-      )
-        return false;
-      return true;
-    });
-  }
-
+  const allVisibleDaysLoaded = visibleDays.every((day) => !loadingDays[day]);
   const anyVisibleDayHasSlots = visibleDays.some(
     (day) => !loadingDays[day] && slotsForDay(day).length > 0
   );
-  const allVisibleDaysLoaded = visibleDays.every((day) => !loadingDays[day]);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[280px_minmax(0,1fr)]">
-      <div className="p-6 md:border-r border-gray-100 flex flex-col gap-4">
-        <div className="flex flex-col items-center text-center gap-2.5">
-          <ProviderAvatar provider={provider} size="lg" />
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[340px_minmax(0,1fr)]">
+      {/* ── LEFT PANEL (340 px) ── */}
+      <div className="md:border-r border-gray-100 flex flex-col">
+        {/* Full-width image / avatar header */}
+        <ProviderImageHeader provider={provider} />
+
+        {/* Info below image */}
+        <div className="p-5 flex flex-col gap-3 flex-1">
+          {/* Name + specialty */}
           <div>
-            <h3 className="font-bold text-gray-800 text-lg">
+            <h3 className="font-bold text-gray-900 text-lg leading-tight">
               Dr. {provider.first_name} {provider.last_name}
             </h3>
-            <p className="text-sm text-blue-600 font-medium mt-1">
+            <p className="text-sm text-blue-600 font-medium mt-0.5">
               {provider.speciality || "General Practitioner"}
             </p>
             {provider.subspecialties && provider.subspecialties.length > 0 && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                 {provider.subspecialties.join(" · ")}
               </p>
             )}
           </div>
+
+          {/* Location */}
+          {(provider.clinic_name || provider.county) && (
+            <p className="text-xs text-gray-500 flex items-start gap-1.5">
+              <LucideMapPin size={13} className="shrink-0 mt-0.5" />
+              {[provider.clinic_name, provider.county].filter(Boolean).join(", ")}
+            </p>
+          )}
+
+          {/* Price */}
+          {selectedService && (
+            <div className="bg-blue-50 rounded-xl px-4 py-3">
+              <p className="text-xs text-blue-500 font-medium">
+                {selectedService.name}
+              </p>
+              <p className="text-xl font-bold text-gray-900 mt-0.5">
+                {selectedService.currency}{" "}
+                {Number(selectedService.price).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {selectedService.estimated_duration} min session
+              </p>
+            </div>
+          )}
+
+          {/* Languages & insurance */}
+          {(languageSummary || insuranceSummary) && (
+            <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
+              {languageSummary && (
+                <div className="flex items-start gap-2 text-xs text-gray-500">
+                  <LucideLanguages size={13} className="shrink-0 mt-0.5" />
+                  <span>{languageSummary}</span>
+                </div>
+              )}
+              {insuranceSummary && (
+                <div className="flex items-start gap-2 text-xs text-gray-500">
+                  <LucideShieldCheck size={13} className="shrink-0 mt-0.5" />
+                  <span>{insuranceSummary}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* View full profile */}
+          <button
+            onClick={() => router.push("/book/provider/" + provider.id)}
+            className="mt-auto flex items-center justify-center gap-1.5 text-[13px] text-blue-600 hover:text-blue-700 font-medium bg-gray-50 hover:bg-gray-100 rounded-lg py-2.5 transition-colors"
+          >
+            Full profile <LucideChevronRightCircle size={14} />
+          </button>
         </div>
-
-        {(provider.clinic_name || provider.county) && (
-          <p className="text-[13px] text-gray-500 flex items-center justify-center gap-1.5 text-center">
-            <LucideMapPin size={15} className="shrink-0" />
-            {[provider.clinic_name, provider.county].filter(Boolean).join(", ")}
-          </p>
-        )}
-
-        {selectedService && (
-          <div className="border-t border-gray-100 pt-3.5 text-center">
-            <p className="text-[13px] text-gray-500">{selectedService.name}</p>
-            <p className="text-xl font-bold text-gray-800 mt-1">
-              {selectedService.currency}{" "}
-              {Number(selectedService.price).toLocaleString()}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {selectedService.estimated_duration} min
-            </p>
-          </div>
-        )}
-
-        {(languageSummary || insuranceSummary) && (
-          <div className="border-t border-gray-100 pt-3.5 flex flex-col gap-2">
-            {languageSummary && (
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <LucideLanguages size={15} className="shrink-0" />
-                <span>{languageSummary}</span>
-              </div>
-            )}
-            {insuranceSummary && (
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <LucideShieldCheck size={15} className="shrink-0" />
-                <span>{insuranceSummary}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <button
-          onClick={() => router.push("/book/provider/" + provider.id)}
-          className="mt-auto flex items-center justify-center gap-1.5 text-[13px] text-blue-600 hover:text-blue-700 font-medium bg-gray-50 hover:bg-gray-100 rounded-lg py-2.5 transition-colors"
-        >
-          Full profile <LucideChevronRightCircle size={14} />
-        </button>
       </div>
 
-      <div className="p-6 flex flex-col gap-4">
+      {/* ── RIGHT PANEL ── */}
+      <div className="p-5 flex flex-col gap-4">
+        {/* Service selector */}
         {provider.services.length > 0 && (
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
@@ -352,6 +464,7 @@ function ProviderCard({
           </div>
         )}
 
+        {/* Appointment type */}
         <div>
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
             Appointment type
@@ -382,8 +495,9 @@ function ProviderCard({
           </div>
         </div>
 
+        {/* Availability */}
         <div>
-          <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-gray-400 uppercase tracking-wide">
               Availability
             </p>
@@ -407,58 +521,16 @@ function ProviderCard({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5">
-            {visibleDays.map((day) => {
-              const futureSlots = slotsForDay(day);
-              const loading = loadingDays[day];
-              return (
-                <div key={day} className="flex flex-col gap-1.5">
-                  <div className="border border-gray-100 rounded-lg p-2 text-center">
-                    <p className="text-xs font-medium text-gray-700">
-                      {dateLabel(day)}
-                    </p>
-                    {loading ? (
-                      <LucideLoader2
-                        size={13}
-                        className="animate-spin text-gray-300 mx-auto my-0.5"
-                      />
-                    ) : (
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        {futureSlots.length === 0
-                          ? "No slots"
-                          : futureSlots.length + " slots"}
-                      </p>
-                    )}
-                  </div>
-
-                  {!loading && futureSlots.length > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                      {futureSlots.slice(0, 5).map((slot) => (
-                        <button
-                          key={slot.start_time}
-                          onClick={() =>
-                            handleBookClick({
-                              provider,
-                              slot,
-                              date: day,
-                              appointmentType: selectedApptType,
-                            })
-                          }
-                          className="text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors"
-                        >
-                          {formatTime(slot.start_time)}
-                        </button>
-                      ))}
-                      {futureSlots.length > 5 && (
-                        <p className="text-[11px] text-gray-400 text-center">
-                          +{futureSlots.length - 5} more
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-3 gap-2">
+            {visibleDays.map((day) => (
+              <SlotColumn
+                key={day}
+                day={day}
+                slots={slotsForDay(day)}
+                loading={!!loadingDays[day]}
+                onBook={(slot) => handleBookSlot(slot, day)}
+              />
+            ))}
           </div>
 
           {allVisibleDaysLoaded && !anyVisibleDayHasSlots && (
@@ -474,6 +546,9 @@ function ProviderCard({
   );
 }
 
+// ─────────────────────────────────────────────
+// Booking modal (unchanged from previous)
+// ─────────────────────────────────────────────
 function BookingModal({
   booking,
   patientEmail,
@@ -483,7 +558,7 @@ function BookingModal({
   onClose,
   onConfirmed,
 }: {
-  booking: BookingState & { _invalidate?: () => void };
+  booking: BookingState;
   patientEmail: string;
   patientFirst: string;
   patientLast: string;
@@ -522,8 +597,6 @@ function BookingModal({
           status: "scheduled",
         }
       );
-      // Immediately drop the booked slot from the card's cache so the
-      // UI updates without a page refresh.
       booking._invalidate?.();
       onConfirmed();
     } catch (err: any) {
@@ -548,7 +621,7 @@ function BookingModal({
 
         <div className="px-5 py-4 space-y-4">
           <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-3">
-            <ProviderAvatar provider={booking.provider} size="sm" />
+            <ProviderAvatar provider={booking.provider} />
             <div>
               <p className="font-semibold text-gray-800">
                 Dr. {booking.provider.first_name} {booking.provider.last_name}
@@ -628,6 +701,9 @@ function BookingModal({
   );
 }
 
+// ─────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────
 export default function BookPage() {
   const { identity } = useAppSelector((store) => store.auth);
   const identityId = typeof identity === "string" ? identity : "";
@@ -642,7 +718,7 @@ export default function BookPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [booking, setBooking] = useState<(BookingState & { _invalidate?: () => void }) | null>(null);
+  const [booking, setBooking] = useState<BookingState | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -682,9 +758,7 @@ export default function BookPage() {
       (p.clinic_name ?? "").toLowerCase().includes(q) ||
       (p.subspecialties ?? []).some((sub) => sub.toLowerCase().includes(q)) ||
       p.services.some((s) => s.name.toLowerCase().includes(q)) ||
-      (p.insurances_accepted ?? []).some((ins) =>
-        ins.toLowerCase().includes(q)
-      )
+      (p.insurances_accepted ?? []).some((ins) => ins.toLowerCase().includes(q))
     );
   });
 
@@ -692,7 +766,7 @@ export default function BookPage() {
     ...new Set(providers.map((p) => p.speciality).filter(Boolean)),
   ];
 
-  const handleBookClick = (state: BookingState & { _invalidate?: () => void }) => {
+  const handleBookClick = (state: BookingState) => {
     if (profileLoading) {
       setToast({
         message: "Still loading your profile, please wait a moment...",
@@ -702,7 +776,8 @@ export default function BookPage() {
     }
     if (profileError || !patientEmail) {
       setToast({
-        message: "We couldn't load your account details. Please refresh and try again.",
+        message:
+          "We couldn't load your account details. Please refresh and try again.",
         type: "error",
       });
       return;
@@ -781,12 +856,7 @@ export default function BookPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((p) => (
-            <ProviderCard
-              key={p.id}
-              provider={p}
-              onBook={handleBookClick}
-              onSlotBooked={() => {}}
-            />
+            <ProviderCard key={p.id} provider={p} onBook={handleBookClick} />
           ))}
         </div>
       )}

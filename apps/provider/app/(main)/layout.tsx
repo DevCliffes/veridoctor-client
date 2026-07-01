@@ -4,7 +4,6 @@ import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ChevronDown,
   LayoutDashboard,
-  LucideBookUser,
   LucideCalendarCheck,
   LucideCircleUser,
   LucideClipboardClock,
@@ -174,10 +173,6 @@ function ProfileDropdown({
         >
           <LucideUser size={16} />
           <p>Profile</p>
-        </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">
-          <LucideBookUser size={16} />
-          <p>Accounts</p>
         </DropdownMenuItem>
         <DropdownMenuItem
           className="cursor-pointer text-red-600 focus:text-red-600"

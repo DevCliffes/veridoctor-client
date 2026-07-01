@@ -32,6 +32,7 @@ interface Provider {
   id: string;
   first_name: string;
   last_name: string;
+  title?: string;
   speciality: string;
   subspecialties?: string[];
   clinic_name: string;
@@ -121,13 +122,14 @@ function getNext7Days() {
 function ProviderImageHeader({ provider }: { provider: Provider }) {
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
+  const title = provider.title || "Dr.";
 
   if (provider.profile_picture_url) {
     return (
       <div className="w-full aspect-[4/3] overflow-hidden relative">
         <Image
           src={provider.profile_picture_url}
-          alt={`Dr. ${provider.first_name} ${provider.last_name}`}
+          alt={`${title} ${provider.first_name} ${provider.last_name}`}
           fill
           className="object-cover object-top"
         />
@@ -150,11 +152,12 @@ function ProviderImageHeader({ provider }: { provider: Provider }) {
 function ProviderAvatar({ provider }: { provider: Provider }) {
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
+  const title = provider.title || "Dr.";
   if (provider.profile_picture_url) {
     return (
       <Image
         src={provider.profile_picture_url}
-        alt={`Dr. ${provider.first_name} ${provider.last_name}`}
+        alt={`${title} ${provider.first_name} ${provider.last_name}`}
         width={48}
         height={48}
         className="w-12 h-12 rounded-full object-cover shrink-0 border border-gray-100"
@@ -367,7 +370,7 @@ function ProviderCard({
         <div className="p-5 flex flex-col gap-3 flex-1">
           <div>
             <h3 className="font-bold text-gray-900 text-lg leading-tight">
-              Dr. {provider.first_name} {provider.last_name}
+              {provider.title || "Dr."} {provider.first_name} {provider.last_name}
             </h3>
             <p className="text-sm text-blue-600 font-medium mt-0.5">
               {provider.speciality || "General Practitioner"}
@@ -611,7 +614,7 @@ function BookingModal({
             <ProviderAvatar provider={booking.provider} />
             <div>
               <p className="font-semibold text-gray-800">
-                Dr. {booking.provider.first_name} {booking.provider.last_name}
+                {booking.provider.title || "Dr."} {booking.provider.first_name} {booking.provider.last_name}
               </p>
               <p className="text-sm text-blue-600 mt-0.5">
                 {booking.provider.speciality}

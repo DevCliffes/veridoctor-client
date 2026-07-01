@@ -38,13 +38,17 @@ const accounts: {
     description:
       "Create your schedule manage patients and track your perfomance.",
   },
-  {
-    type: "healthFacility",
-    icon: <LucideHospital size="42" />,
-    title: "Healthcare Facility",
-    description:
-      "Build a great care system with the veridoctor operating system.",
-  },
+  // Healthcare Facility account type is temporarily hidden from signup.
+  // The underlying flow (FacilityForm, additional-info step handling) is
+  // left intact below in case this needs to be re-enabled later — just
+  // uncomment this entry to restore it.
+  // {
+  //   type: "healthFacility",
+  //   icon: <LucideHospital size="42" />,
+  //   title: "Healthcare Facility",
+  //   description:
+  //     "Build a great care system with the veridoctor operating system.",
+  // },
 ];
 export default function RegisterAccount() {
   const [selectedAccount, setSelectedAccount] = useState<AccountType>();

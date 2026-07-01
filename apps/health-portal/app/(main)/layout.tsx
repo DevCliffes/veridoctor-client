@@ -5,7 +5,6 @@ import {
   ChevronDown,
   LayoutDashboard,
   LucideActivitySquare,
-  LucideBookUser,
   LucideCalendarCheck,
   LucideCircleUser,
   LucideFileText,
@@ -177,10 +176,6 @@ function ProfileDropdown() {
         >
           <LucideUser />
           <p>Profile</p>
-        </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">
-          <LucideBookUser />
-          <p>Accounts</p>
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
           <LucideLogOut />

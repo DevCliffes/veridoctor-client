@@ -14,6 +14,18 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+// Kept in sync with the SPECIALITIES list used on the profile edit page
+// (apps/provider/app/(main)/profile/page.tsx) so the value selected here
+// matches exactly and auto-pulls through to the profile without needing
+// to be re-selected.
+const SPECIALITIES = [
+  "General Practitioner", "Cardiologist", "Dermatologist", "Endocrinologist",
+  "Gastroenterologist", "Gynecologist", "Neurologist", "Oncologist", "Ophthalmologist",
+  "Orthopedic Surgeon", "Pediatrician", "Psychiatrist", "Pulmonologist", "Radiologist",
+  "Rheumatologist", "Urologist", "ENT Specialist", "Dentist", "Physiotherapist",
+  "Nutritionist", "Pharmacist", "Anesthesiologist", "General Surgeon",
+];
+
 type ProviderForm = {
   phone: { value: string; valid: boolean };
   licenceNumber: { value: string; valid: boolean };
@@ -76,8 +88,6 @@ export default function ProviderForm() {
 
   const checkNum = (str: string): boolean => {
     const regex = /^\d+$/;
-    console.log("THE RESULT OF THE CHECK NUMBER FUNCTION IS", regex.test(str));
-    console.log("THE STRING BEING TESTED IS", str);
     return regex.test(str);
   };
   return (
@@ -142,6 +152,12 @@ export default function ProviderForm() {
             setForm((prev) => ({
               ...prev,
               licenceType: { value: e, valid: true },
+              // Reset speciality if the user switches away from "specialist"
+              // so a stale value doesn't get submitted silently.
+              speciality:
+                e === "specialist"
+                  ? prev.speciality
+                  : { value: "", valid: true },
             }))
           }
         >
@@ -158,14 +174,29 @@ export default function ProviderForm() {
       {form.licenceType.value === "specialist" && (
         <div className="w-full">
           <label className="block">
-            Specialty <span className="text-red-500">*</span>
+            Speciality <span className="text-red-500">*</span>
           </label>
-          <input
+          <Select
             name="speciality"
-            placeholder="General Practice"
-            className="border border-gray-400 rounded focus:outline-primary px-2 w-full h-10"
-            onChange={handleFormChange}
-          ></input>
+            value={form.speciality.value || undefined}
+            onValueChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                speciality: { value: e, valid: true },
+              }))
+            }
+          >
+            <SelectTrigger className="w-full border border-gray-400 rounded focus:outline-primary px-2 h-10">
+              <SelectValue placeholder="Select speciality" />
+            </SelectTrigger>
+            <SelectContent>
+              {SPECIALITIES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
       <div className="my-4">

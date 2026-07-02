@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAppSelector } from "../../hooks";
-import { axiosClient } from "@veridoctor/api-client";
+import { axiosClient, recordsPinApi } from "@veridoctor/api-client";
+import { useRecordsUnlock } from "../../useRecordsUnlock";
+import RecordsPinGate from "../../../components/RecordsPinGate";
 import {
   LucideActivitySquare,
   LucideLoader2,
@@ -603,9 +605,8 @@ function PrescriptionCard({ record }: { record: HealthRecord }) {
   );
 }
 
-export default function RecordsPage() {
-  const { identity } = useAppSelector((store) => store.auth);
-  const identityId = typeof identity === "string" ? identity : "";
+function RecordsContent({ identityId }: { identityId: string }) {
+  const { getUnlockToken, lock } = useRecordsUnlock();
 
   const [records, setRecords] = useState<HealthRecord[]>([]);
   const [total, setTotal] = useState(0);
@@ -614,17 +615,26 @@ export default function RecordsPage() {
 
   useEffect(() => {
     if (!identityId) return;
+    const token = getUnlockToken();
+    if (!token) return;
+
     setLoading(true);
-    const params = activeType ? `?type=${activeType}` : "";
-    axiosClient
-      .get(`/records/patient/${identityId}/timeline${params}`)
+    const params = activeType ? { type: activeType } : undefined;
+
+    recordsPinApi
+      .getTimeline(identityId, token, params)
       .then((res) => {
+        if (res.status === 401 || res.status === 403) {
+          // Unlock token expired/invalid mid-session — re-prompt via the gate.
+          lock();
+          return;
+        }
         setRecords(res.data.records ?? []);
         setTotal(res.data.total ?? 0);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [identityId, activeType]);
+  }, [identityId, activeType, getUnlockToken, lock]);
 
   // Update sensitivity locally after a successful PATCH so the UI
   // reflects the change without a full refetch.
@@ -715,5 +725,16 @@ export default function RecordsPage() {
         Only you and your treating providers can access your clinical data.
       </p>
     </div>
+  );
+}
+
+export default function RecordsPage() {
+  const { identity } = useAppSelector((store) => store.auth);
+  const identityId = typeof identity === "string" ? identity : "";
+
+  return (
+    <RecordsPinGate>
+      <RecordsContent identityId={identityId} />
+    </RecordsPinGate>
   );
 }

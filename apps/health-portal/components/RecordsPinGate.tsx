@@ -12,6 +12,7 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
   const { isUnlocked, unlock } = useRecordsUnlock();
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -23,8 +24,16 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
     if (isUnlocked) return;
     recordsPinApi
       .status()
-      .then((res) => setHasPin(res.data.has_pin))
-      .catch(() => setHasPin(false))
+      .then((res) => {
+        if (res.status !== 200) {
+          setStatusError(
+            `Could not check PIN status (HTTP ${res.status}). Please try again shortly.`
+          );
+          return;
+        }
+        setHasPin(res.data.has_pin);
+      })
+      .catch(() => setStatusError("Could not reach the server. Please try again."))
       .finally(() => setCheckingStatus(false));
   }, [isUnlocked]);
 
@@ -33,25 +42,25 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
     setError(null);
     setLockedMessage(null);
     setLoading(true);
-    try {
-      const res = await recordsPinApi.verifyPin(pin);
+
+    const res = await recordsPinApi.verifyPin(pin);
+
+    if (res.status === 200) {
       unlock(res.data.unlock_token, res.data.expires_in);
       setPin("");
-    } catch (err: any) {
-      if (err?.response?.status === 423) {
-        setLockedMessage(err.response.data?.error || "Too many attempts. Try again later.");
-      } else {
-        const remaining = err?.response?.data?.remaining_attempts;
-        setError(
-          remaining !== undefined
-            ? `Incorrect PIN. ${remaining} attempt${remaining === 1 ? "" : "s"} left.`
-            : "Incorrect PIN. Please try again."
-        );
-      }
+    } else if (res.status === 423) {
+      setLockedMessage(res.data?.error || "Too many attempts. Try again later.");
       setPin("");
-    } finally {
-      setLoading(false);
+    } else {
+      const remaining = res.data?.remaining_attempts;
+      setError(
+        remaining !== undefined
+          ? `Incorrect PIN. ${remaining} attempt${remaining === 1 ? "" : "s"} left.`
+          : res.data?.error || `Something went wrong (HTTP ${res.status}). Please try again.`
+      );
+      setPin("");
     }
+    setLoading(false);
   };
 
   const handleSetup = async (e: React.FormEvent) => {
@@ -68,17 +77,26 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
     }
 
     setLoading(true);
-    try {
-      await recordsPinApi.setPin(pin);
-      const res = await recordsPinApi.verifyPin(pin);
-      unlock(res.data.unlock_token, res.data.expires_in);
+
+    const setRes = await recordsPinApi.setPin(pin);
+    if (setRes.status !== 201) {
+      setError(setRes.data?.error || `Could not set PIN (HTTP ${setRes.status}).`);
+      setLoading(false);
+      return;
+    }
+
+    const verifyRes = await recordsPinApi.verifyPin(pin);
+    if (verifyRes.status === 200) {
+      unlock(verifyRes.data.unlock_token, verifyRes.data.expires_in);
       setPin("");
       setConfirmPin("");
-    } catch (err: any) {
-      setError(err?.response?.data?.error || "Could not set PIN. Please try again.");
-    } finally {
-      setLoading(false);
+    } else {
+      setError(
+        verifyRes.data?.error ||
+          `PIN was set but could not unlock (HTTP ${verifyRes.status}). Try entering it again.`
+      );
     }
+    setLoading(false);
   };
 
   if (isUnlocked) {
@@ -89,6 +107,16 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (statusError) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
+          <p className="text-sm text-red-600">{statusError}</p>
+        </div>
       </div>
     );
   }

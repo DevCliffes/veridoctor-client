@@ -37,6 +37,7 @@ type ScheduleBlock = {
   recurrence_end_type: EndType | null;
   recurrence_end_date: string | null;
   recurrence_count: number | null;
+  excluded_dates: string[]; // NEW
 };
 
 type BookedAppointment = {
@@ -60,7 +61,17 @@ function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-// Compute end time string given a start time string and duration in minutes
+// NEW: local calendar date key, avoids UTC off-by-one when matching excluded_dates
+function dateKey(d: Date) {
+  return (
+    d.getFullYear() +
+    "-" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(d.getDate()).padStart(2, "0")
+  );
+}
+
 function computeEndTime(startTime: string, durationMins: number): string {
   const [h, m] = startTime.split(":").map(Number);
   const total = h * 60 + m + durationMins;
@@ -100,6 +111,8 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
 
   if (rangeStart > rangeEnd) return events;
 
+  const excluded = new Set(s.excluded_dates ?? []); // NEW
+
   const cursor = new Date(rangeStart);
   while (cursor <= rangeEnd) {
     const dow_abbr = DAY_ABBR[cursor.getDay()];
@@ -116,17 +129,28 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
       include = s.recurrence_days?.includes(dow_abbr) ?? false;
     }
 
+    const key = dateKey(cursor); // NEW
+
+    if (include && excluded.has(key)) {
+      // NEW: this occurrence was deleted individually — render nothing for it
+      include = false;
+    }
+
     if (include) {
       const evStart = new Date(cursor);
       evStart.setHours(sh, sm, 0, 0);
       const evEnd = new Date(cursor);
       evEnd.setHours(eh, em, 0, 0);
       events.push({
-        id: "sched-" + s.id + "-" + cursor.toISOString(),
+        id: "sched-" + s.id + "-" + key,
         start: evStart,
         end: evEnd,
         patientName: s.service_name ?? "Available",
-        meta: { scheduleId: s.id, type: "schedule" },
+        meta: {
+          scheduleId: s.id,
+          type: "schedule",
+          occurrenceDate: key, // NEW: exact date this instance represents
+        },
       });
     }
 
@@ -140,18 +164,21 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
 
 function EditScheduleModal({
   block,
+  occurrenceDate, // NEW
+  userId,
   services,
   onClose,
   onSaved,
   onDeleted,
 }: {
   block: ScheduleBlock;
+  occurrenceDate: string; // NEW
+  userId: string;
   services: Service[];
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
 }) {
-  const userId = useSelector((state: RootState) => state.auth.identity);
   const [serviceId, setServiceId] = useState(block.service ?? "");
   const [startDate, setStartDate] = useState(block.start_date);
   const [endDate, setEndDate] = useState(block.end_date);
@@ -167,6 +194,10 @@ function EditScheduleModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // NEW: scope picker, only meaningful when the block actually recurs
+  const isRecurring = block.recurrence !== "none";
+  const [scope, setScope] = useState<"this" | "all">("this");
+
   const weekdayLabel = DAY_FULL[new Date(startDate + "T00:00:00").getDay()];
 
   const toggleRepeatDay = (day: string) =>
@@ -174,40 +205,66 @@ function EditScheduleModal({
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
     );
 
-  // Auto-fill end time when service changes
   const handleServiceChange = (id: string) => {
     setServiceId(id);
     const svc = services.find((s) => s.id === id);
     if (svc) setEndTime(computeEndTime(startTime, svc.estimated_duration));
   };
 
-  // Auto-fill end time when start time changes (if a service is selected)
   const handleStartTimeChange = (val: string) => {
     setStartTime(val);
     const svc = services.find((s) => s.id === serviceId);
     if (svc) setEndTime(computeEndTime(val, svc.estimated_duration));
   };
 
+  // NEW: branches on scope
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axiosClient.patch(
-        "provider/" + userId + "/schedule/" + block.id,
-        {
+      if (isRecurring && scope === "this") {
+        // 1. Exclude this date from the recurring series
+        const nextExcluded = Array.from(
+          new Set([...(block.excluded_dates ?? []), occurrenceDate])
+        );
+        await axiosClient.patch(
+          "provider/" + userId + "/schedule/" + block.id,
+          { excluded_dates: nextExcluded }
+        );
+        // 2. Create a standalone one-off block for just this date, carrying the edits
+        await axiosClient.post("provider/" + userId + "/schedule", {
           service: serviceId,
           location_type: locationType,
-          start_date: startDate,
-          end_date: endDate,
+          start_date: occurrenceDate,
+          end_date: occurrenceDate,
           start_time: startTime,
           end_time: endTime,
-          recurrence: repeat,
-          recurrence_interval: repeat === "custom" ? repeatInterval : 1,
-          recurrence_days: repeat === "weekly" || repeat === "custom" ? repeatDays : [],
-          recurrence_end_type: repeat === "none" ? null : endType,
-          recurrence_end_date: endType === "on_date" ? endAfterDate : null,
-          recurrence_count: endType === "after" ? endAfterCount : null,
-        }
-      );
+          recurrence: "none",
+          recurrence_interval: 1,
+          recurrence_days: [],
+          recurrence_end_type: null,
+          recurrence_end_date: null,
+          recurrence_count: null,
+        });
+      } else {
+        // Non-recurring block, or user explicitly chose "All events"
+        await axiosClient.patch(
+          "provider/" + userId + "/schedule/" + block.id,
+          {
+            service: serviceId,
+            location_type: locationType,
+            start_date: startDate,
+            end_date: endDate,
+            start_time: startTime,
+            end_time: endTime,
+            recurrence: repeat,
+            recurrence_interval: repeat === "custom" ? repeatInterval : 1,
+            recurrence_days: repeat === "weekly" || repeat === "custom" ? repeatDays : [],
+            recurrence_end_type: repeat === "none" ? null : endType,
+            recurrence_end_date: endType === "on_date" ? endAfterDate : null,
+            recurrence_count: endType === "after" ? endAfterCount : null,
+          }
+        );
+      }
       onSaved();
     } catch {
       // silent
@@ -216,11 +273,27 @@ function EditScheduleModal({
     }
   };
 
+  // NEW: branches on scope, matches the existing DELETE query param contract exactly
   const handleDelete = async () => {
-    if (!confirm("Delete this schedule block?")) return;
+    const confirmMsg =
+      isRecurring && scope === "this"
+        ? "Delete this single occurrence (" + occurrenceDate + ")?"
+        : "Delete this entire recurring schedule block?";
+    if (!confirm(confirmMsg)) return;
+
     setDeleting(true);
     try {
-      await axiosClient.delete("provider/" + userId + "/schedule/" + block.id);
+      if (isRecurring && scope === "this") {
+        await axiosClient.delete(
+          "provider/" + userId + "/schedule/" + block.id,
+          { params: { occurrence_date: occurrenceDate } }
+        );
+      } else {
+        await axiosClient.delete(
+          "provider/" + userId + "/schedule/" + block.id,
+          { params: { delete_series: "true" } }
+        );
+      }
       onDeleted();
     } catch {
       // silent
@@ -258,6 +331,31 @@ function EditScheduleModal({
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
+          {/* NEW: scope picker, shown only for recurring blocks */}
+          {isRecurring && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">
+                Editing {occurrenceDate}
+              </p>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  checked={scope === "this"}
+                  onChange={() => setScope("this")}
+                />
+                This event only
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  checked={scope === "all"}
+                  onChange={() => setScope("all")}
+                />
+                All events in this series
+              </label>
+            </div>
+          )}
+
           <select
             value={serviceId}
             onChange={(e) => handleServiceChange(e.target.value)}
@@ -272,15 +370,18 @@ function EditScheduleModal({
           <div className="flex items-start gap-2">
             <LucideClock size={16} className="text-gray-400 mt-2 shrink-0" />
             <div className="flex flex-wrap items-center gap-2 flex-1">
+              {/* NEW: dates locked when editing a single occurrence — moving a date
+                  is out of scope here; "This event" only edits time/service/location */}
               <input
                 type="date"
                 value={startDate}
+                disabled={isRecurring && scope === "this"}
                 onChange={(e) => {
                   setStartDate(e.target.value);
                   if (new Date(e.target.value) > new Date(endDate))
                     setEndDate(e.target.value);
                 }}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50"
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50 disabled:opacity-50"
               />
               <input
                 type="time"
@@ -298,14 +399,14 @@ function EditScheduleModal({
               <input
                 type="date"
                 value={endDate}
+                disabled={isRecurring && scope === "this"}
                 onChange={(e) => setEndDate(e.target.value)}
                 min={startDate}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50"
+                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50 disabled:opacity-50"
               />
             </div>
           </div>
 
-          {/* End time hint */}
           {serviceId && (
             <p className="text-xs text-gray-400 -mt-2 pl-6">
               End time auto-filled from service duration
@@ -316,77 +417,80 @@ function EditScheduleModal({
             </p>
           )}
 
-          <div className="flex items-start gap-2">
-            <LucideRepeat size={16} className="text-gray-400 mt-2 shrink-0" />
-            <div className="flex-1 space-y-3">
-              <select
-                value={repeat}
-                onChange={(e) => setRepeat(e.target.value as RepeatType)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50 w-full"
-              >
-                <option value="none">Does not repeat</option>
-                <option value="daily">Daily</option>
-                <option value="weekdays">Every weekday (Mon–Fri)</option>
-                <option value="weekly">Weekly on {weekdayLabel}</option>
-                <option value="custom">Custom</option>
-              </select>
+          {/* Recurrence editing only makes sense in "all events" scope */}
+          {(!isRecurring || scope === "all") && (
+            <div className="flex items-start gap-2">
+              <LucideRepeat size={16} className="text-gray-400 mt-2 shrink-0" />
+              <div className="flex-1 space-y-3">
+                <select
+                  value={repeat}
+                  onChange={(e) => setRepeat(e.target.value as RepeatType)}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50 w-full"
+                >
+                  <option value="none">Does not repeat</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekdays">Every weekday (Mon–Fri)</option>
+                  <option value="weekly">Weekly on {weekdayLabel}</option>
+                  <option value="custom">Custom</option>
+                </select>
 
-              {(repeat === "weekly" || repeat === "custom") && (
-                <div className="flex gap-1.5">
-                  {DAY_ABBR.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => toggleRepeatDay(d)}
-                      className={
-                        "w-8 h-8 rounded-full text-xs font-medium border transition-colors " +
-                        (repeatDays.includes(d)
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-white text-gray-600 border-gray-200")
-                      }
-                    >
-                      {d[0]}
-                    </button>
-                  ))}
-                </div>
-              )}
+                {(repeat === "weekly" || repeat === "custom") && (
+                  <div className="flex gap-1.5">
+                    {DAY_ABBR.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => toggleRepeatDay(d)}
+                        className={
+                          "w-8 h-8 rounded-full text-xs font-medium border transition-colors " +
+                          (repeatDays.includes(d)
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-600 border-gray-200")
+                        }
+                      >
+                        {d[0]}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-              {repeat !== "none" && (
-                <div className="space-y-2 pl-1">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Ends</p>
-                  <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input type="radio" checked={endType === "never"} onChange={() => setEndType("never")} />
-                    Never
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input type="radio" checked={endType === "on_date"} onChange={() => setEndType("on_date")} />
-                    On
-                    <input
-                      type="date"
-                      disabled={endType !== "on_date"}
-                      value={endAfterDate}
-                      onChange={(e) => setEndAfterDate(e.target.value)}
-                      min={startDate}
-                      className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input type="radio" checked={endType === "after"} onChange={() => setEndType("after")} />
-                    After
-                    <input
-                      type="number"
-                      min={1}
-                      disabled={endType !== "after"}
-                      value={endAfterCount}
-                      onChange={(e) => setEndAfterCount(Number(e.target.value))}
-                      className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
-                    />
-                    occurrence(s)
-                  </label>
-                </div>
-              )}
+                {repeat !== "none" && (
+                  <div className="space-y-2 pl-1">
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Ends</p>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input type="radio" checked={endType === "never"} onChange={() => setEndType("never")} />
+                      Never
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input type="radio" checked={endType === "on_date"} onChange={() => setEndType("on_date")} />
+                      On
+                      <input
+                        type="date"
+                        disabled={endType !== "on_date"}
+                        value={endAfterDate}
+                        onChange={(e) => setEndAfterDate(e.target.value)}
+                        min={startDate}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input type="radio" checked={endType === "after"} onChange={() => setEndType("after")} />
+                      After
+                      <input
+                        type="number"
+                        min={1}
+                        disabled={endType !== "after"}
+                        value={endAfterCount}
+                        onChange={(e) => setEndAfterCount(Number(e.target.value))}
+                        className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                      />
+                      occurrence(s)
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex items-start gap-2">
             <LucideMapPin size={16} className="text-gray-400 mt-2 shrink-0" />
@@ -439,6 +543,7 @@ export default function Schedule() {
   const [schedules, setSchedules] = useState<ScheduleBlock[]>([]);
   const [bookedAppts, setBookedAppts] = useState<BookedAppointment[]>([]);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
+  const [editingOccurrenceDate, setEditingOccurrenceDate] = useState<string>(""); // NEW
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [startDate, setStartDate] = useState(todayStr());
@@ -479,14 +584,12 @@ export default function Schedule() {
     fetchBookedAppts();
   }, [userId, fetchSchedules, fetchBookedAppts]);
 
-  // Auto-fill end time when service is selected
   const handleServiceChange = (id: string) => {
     setSelectedServiceId(id);
     const svc = services.find((s) => s.id === id);
     if (svc) setEndTime(computeEndTime(startTime, svc.estimated_duration));
   };
 
-  // Auto-fill end time when start time changes (if service already selected)
   const handleStartTimeChange = (val: string) => {
     setStartTime(val);
     const svc = services.find((s) => s.id === selectedServiceId);
@@ -529,10 +632,14 @@ export default function Schedule() {
     }
   };
 
+  // NEW: read occurrenceDate out of the clicked event's meta
   const handleEventClick = (appt: Appointment) => {
     if (appt.meta?.type === "schedule") {
       const block = schedules.find((s) => s.id === appt.meta?.scheduleId);
-      if (block) setEditingBlock(block);
+      if (block) {
+        setEditingBlock(block);
+        setEditingOccurrenceDate((appt.meta?.occurrenceDate as string) ?? block.start_date);
+      }
     } else if (appt.meta?.type === "booked" && appt.meta?.appointmentId) {
       window.location.href = "/appointments/" + appt.meta.appointmentId;
     }
@@ -668,7 +775,6 @@ export default function Schedule() {
               </div>
             </div>
 
-            {/* Duration hint */}
             {selectedService && (
               <p className="text-xs text-blue-500 -mt-2 pl-6">
                 End time auto-filled from &quot;{selectedService.name}&quot; duration ({selectedService.estimated_duration} mins) — you can adjust manually.
@@ -781,6 +887,8 @@ export default function Schedule() {
       {editingBlock && (
         <EditScheduleModal
           block={editingBlock}
+          occurrenceDate={editingOccurrenceDate}
+          userId={userId}
           services={services}
           onClose={() => setEditingBlock(null)}
           onSaved={() => { setEditingBlock(null); fetchSchedules(); }}
@@ -790,4 +898,3 @@ export default function Schedule() {
     </div>
   );
 }
-

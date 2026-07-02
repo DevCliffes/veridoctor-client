@@ -69,7 +69,7 @@ export default function NotificationBell({
   const handleNotificationClick = (notification: NotificationItem) => {
     if (!notification.is_read) {
       axiosClient
-        .patch(`/notifications/${notification.id}/read`)
+        .patch(`/notifications/${notification.id}/read/`)
         .then(() => {
           setNotifications((prev) =>
             prev.map((n) =>
@@ -89,7 +89,7 @@ export default function NotificationBell({
   const handleMarkAllRead = () => {
     if (!identityId || unreadCount === 0) return;
     axiosClient
-      .post("/notifications/mark-all-read", { identity_id: identityId })
+      .post("/notifications/mark-all-read/", { identity_id: identityId })
       .then(() => {
         setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
         setUnreadCount(0);

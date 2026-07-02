@@ -1,8 +1,13 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { axiosClient } from "@veridoctor/api-client";
-import { Bell } from "@veridoctor/design/icons";
+import {
+  axiosClient,
+  subscribeToPush,
+  getPushPermissionState,
+  playNotificationChime,
+} from "@veridoctor/api-client";
+import { Bell, BellRing } from "@veridoctor/design/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +47,10 @@ export default function NotificationBell({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
+  const [pushPermission, setPushPermission] = useState
+    NotificationPermission | "unsupported"
+  >("default");
+  const [pushLoading, setPushLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNotifications = useCallback(() => {
@@ -65,6 +74,31 @@ export default function NotificationBell({
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [fetchNotifications]);
+
+  useEffect(() => {
+    setPushPermission(getPushPermissionState());
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    const channel = new BroadcastChannel("vd-push");
+    channel.onmessage = () => {
+      playNotificationChime();
+      fetchNotifications();
+    };
+    return () => channel.close();
+  }, [fetchNotifications]);
+
+  const handleEnablePush = async () => {
+    if (!identityId || pushLoading) return;
+    setPushLoading(true);
+    const success = await subscribeToPush(identityId);
+    setPushPermission(getPushPermissionState());
+    setPushLoading(false);
+    if (!success) {
+      console.error("Failed to enable push notifications");
+    }
+  };
 
   const handleNotificationClick = (notification: NotificationItem) => {
     if (!notification.is_read) {
@@ -121,6 +155,17 @@ export default function NotificationBell({
             </button>
           )}
         </div>
+
+        {pushPermission === "default" && (
+          <button
+            onClick={handleEnablePush}
+            disabled={pushLoading}
+            className="w-full flex items-center gap-2 px-3 py-2.5 border-b text-xs text-blue-600 hover:bg-blue-50/60 disabled:opacity-50"
+          >
+            <BellRing size={14} />
+            {pushLoading ? "Enabling…" : "Enable push notifications"}
+          </button>
+        )}
 
         <div className="max-h-96 overflow-y-auto">
           {notifications.length === 0 ? (

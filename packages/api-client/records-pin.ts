@@ -9,27 +9,38 @@ export interface VerifyPinResponse {
   expires_in: number;
 }
 
-export const recordsPinApi = {
-  status: () => axiosClient.get<PinStatusResponse>("/records/pin/status"),
+// validateStatus: (s) => s < 500 on every call here is deliberate.
+// It stops 400/401/403/423 responses from being treated as thrown errors,
+// which stops them from ever reaching axiosClient's global response
+// interceptor — the one that force-redirects to /auth/login on any 401/403.
+// Without this, a bug in these specific endpoints logs the whole app out
+// instead of just showing an error in the PIN form.
+const PIN_REQUEST_CONFIG = { validateStatus: (s: number) => s < 500 };
 
-  setPin: (pin: string) => axiosClient.post("/records/pin/set", { pin }),
+export const recordsPinApi = {
+  status: () =>
+    axiosClient.get<PinStatusResponse>("/records/pin/status", PIN_REQUEST_CONFIG),
+
+  setPin: (pin: string) =>
+    axiosClient.post("/records/pin/set", { pin }, PIN_REQUEST_CONFIG),
 
   verifyPin: (pin: string) =>
-    axiosClient.post<VerifyPinResponse>("/records/pin/verify", { pin }),
+    axiosClient.post<VerifyPinResponse>("/records/pin/verify", { pin }, PIN_REQUEST_CONFIG),
 
   changePin: (currentPin: string, newPin: string) =>
-    axiosClient.post("/records/pin/change", {
-      current_pin: currentPin,
-      new_pin: newPin,
-    }),
+    axiosClient.post(
+      "/records/pin/change",
+      { current_pin: currentPin, new_pin: newPin },
+      PIN_REQUEST_CONFIG
+    ),
 
   resetPin: (password: string, newPin: string) =>
-    axiosClient.post("/records/pin/reset", { password, new_pin: newPin }),
+    axiosClient.post(
+      "/records/pin/reset",
+      { password, new_pin: newPin },
+      PIN_REQUEST_CONFIG
+    ),
 
-  // Timeline fetch with the unlock token attached. Uses validateStatus so a
-  // 401/403/423 (missing/expired/locked PIN) resolves as a normal response
-  // instead of throwing into axiosClient's global interceptor, which would
-  // otherwise incorrectly redirect the patient to /auth/login.
   getTimeline: (
     patientIdentityId: string,
     unlockToken: string,
@@ -38,6 +49,6 @@ export const recordsPinApi = {
     axiosClient.get(`/records/patient/${patientIdentityId}/timeline`, {
       headers: { "X-Records-Unlock": unlockToken },
       params,
-      validateStatus: (s) => s < 500,
+      ...PIN_REQUEST_CONFIG,
     }),
 };

@@ -1,5 +1,9 @@
 import axios from "axios";
-import { ACCESS_TOKEN_KEY, AUTH_CODE_KEY, IDENTITY_KEY } from "./constants";
+import {
+  PATIENT_ACCESS_TOKEN_KEY,
+  PATIENT_AUTH_CODE_KEY,
+  PATIENT_IDENTITY_KEY,
+} from "./constants";
 
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -17,11 +21,9 @@ function setCookie(name: string, value: string): void {
 
 function getSafeLoginUrl(): string {
   const webAppUrl = process.env.NEXT_PUBLIC_WEB_APP_URL;
-  // Only trust the env var if it's a full https:// URL
   if (webAppUrl && webAppUrl.startsWith("https://")) {
     return webAppUrl;
   }
-  // Fallback: use current window origin (safe on any subdomain)
   if (typeof window !== "undefined") {
     return `${window.location.protocol}//${window.location.host}`;
   }
@@ -37,11 +39,17 @@ const axiosClient = axios.create({
 let authorisePromise: Promise<string | null> | null = null;
 
 async function maybeAuthorise(): Promise<string | null> {
-  const token = getCookie(ACCESS_TOKEN_KEY);
+  // health-portal is patient-facing, so it must read the patient-scoped
+  // cookies (vd_patient_*), not the legacy generic ones (access_token,
+  // auth_code, identity) which are no longer being written by login and
+  // were causing every authenticated request to go out with no token.
+  const token = getCookie(PATIENT_ACCESS_TOKEN_KEY);
   if (token) return token;
+
   if (authorisePromise) return authorisePromise;
-  const authCode = getCookie(AUTH_CODE_KEY);
-  const identity = getCookie(IDENTITY_KEY);
+
+  const authCode = getCookie(PATIENT_AUTH_CODE_KEY);
+  const identity = getCookie(PATIENT_IDENTITY_KEY);
   if (!authCode || !identity) return null;
 
   authorisePromise = axios
@@ -52,7 +60,7 @@ async function maybeAuthorise(): Promise<string | null> {
     )
     .then((res) => {
       const { a_token } = res.data;
-      setCookie(ACCESS_TOKEN_KEY, a_token);
+      setCookie(PATIENT_ACCESS_TOKEN_KEY, a_token);
       return a_token as string;
     })
     .catch(() => null)

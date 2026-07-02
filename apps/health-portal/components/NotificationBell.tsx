@@ -26,6 +26,8 @@ interface NotificationItem {
   created_at: string;
 }
 
+type PushPermissionState = NotificationPermission | "unsupported";
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -47,9 +49,7 @@ export default function NotificationBell({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
-  const [pushPermission, setPushPermission] = useState
-    NotificationPermission | "unsupported"
-  >("default");
+  const [pushPermission, setPushPermission] = useState<PushPermissionState>("default");
   const [pushLoading, setPushLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 

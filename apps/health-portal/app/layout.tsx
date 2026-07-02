@@ -3,6 +3,7 @@ import "./globals.css";
 import "@veridoctor/design/styles/globals.css";
 import StoreProvider from "./StoreProvider";
 import { Toaster } from "sonner";
+import { RecordsUnlockProvider } from "./useRecordsUnlock";
 
 export const metadata: Metadata = {
   title: {
@@ -30,7 +31,9 @@ export default function RootLayout({
     <html lang="en">
       <StoreProvider>
         <body className="antialiased font-sans">
-          <div>{children}</div>
+          <RecordsUnlockProvider>
+            <div>{children}</div>
+          </RecordsUnlockProvider>
           <Toaster richColors position="top-right" />
         </body>
       </StoreProvider>

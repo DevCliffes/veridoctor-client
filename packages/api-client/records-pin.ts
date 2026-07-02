@@ -4,17 +4,23 @@ export interface PinStatusResponse {
   has_pin: boolean;
 }
 
-export interface VerifyPinResponse {
+export interface VerifyPinSuccess {
   unlock_token: string;
   expires_in: number;
 }
 
-// validateStatus: (s) => s < 500 on every call here is deliberate.
-// It stops 400/401/403/423 responses from being treated as thrown errors,
-// which stops them from ever reaching axiosClient's global response
-// interceptor — the one that force-redirects to /auth/login on any 401/403.
-// Without this, a bug in these specific endpoints logs the whole app out
-// instead of just showing an error in the PIN form.
+export interface PinErrorResponse {
+  error?: string;
+  remaining_attempts?: number;
+  locked_until?: string;
+}
+
+// Union type: on success the body matches VerifyPinSuccess, on any
+// non-200 (400/423/etc) it matches PinErrorResponse instead. Both shapes
+// are declared here so res.data?.error and res.data?.remaining_attempts
+// type-check correctly regardless of which branch actually ran.
+export type VerifyPinResponse = VerifyPinSuccess & PinErrorResponse;
+
 const PIN_REQUEST_CONFIG = { validateStatus: (s: number) => s < 500 };
 
 export const recordsPinApi = {
@@ -22,20 +28,20 @@ export const recordsPinApi = {
     axiosClient.get<PinStatusResponse>("/records/pin/status", PIN_REQUEST_CONFIG),
 
   setPin: (pin: string) =>
-    axiosClient.post("/records/pin/set", { pin }, PIN_REQUEST_CONFIG),
+    axiosClient.post<PinErrorResponse>("/records/pin/set", { pin }, PIN_REQUEST_CONFIG),
 
   verifyPin: (pin: string) =>
     axiosClient.post<VerifyPinResponse>("/records/pin/verify", { pin }, PIN_REQUEST_CONFIG),
 
   changePin: (currentPin: string, newPin: string) =>
-    axiosClient.post(
+    axiosClient.post<PinErrorResponse>(
       "/records/pin/change",
       { current_pin: currentPin, new_pin: newPin },
       PIN_REQUEST_CONFIG
     ),
 
   resetPin: (password: string, newPin: string) =>
-    axiosClient.post(
+    axiosClient.post<PinErrorResponse>(
       "/records/pin/reset",
       { password, new_pin: newPin },
       PIN_REQUEST_CONFIG

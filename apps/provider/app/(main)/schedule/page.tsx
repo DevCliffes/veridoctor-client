@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store";
 import { axiosClient } from "@veridoctor/api-client";
+import { toast } from "sonner";
 import {
   LucidePlus,
   LucideClock,
@@ -80,6 +81,30 @@ function computeEndTime(startTime: string, durationMins: number): string {
     ":" +
     String(total % 60).padStart(2, "0")
   );
+}
+
+// NEW: extracts a human-readable message from a failed schedule API call.
+// Handles the 409 conflict shape returned by _check_schedule_overlap
+// ({ error: "..." }) and falls back to DRF's default serializer-error
+// shape ({ field: [messages] }) for 400s, plus a generic fallback for
+// anything else (network errors, 500s, etc).
+function scheduleErrorMessage(err: unknown): string {
+  const anyErr = err as { response?: { status?: number; data?: unknown } };
+  const data = anyErr?.response?.data as
+    | { error?: string; [key: string]: unknown }
+    | undefined;
+
+  if (data?.error && typeof data.error === "string") return data.error;
+
+  if (data && typeof data === "object") {
+    const firstKey = Object.keys(data)[0];
+    const firstVal = firstKey ? data[firstKey] : undefined;
+    if (firstKey && Array.isArray(firstVal) && typeof firstVal[0] === "string") {
+      return `${firstKey.replace(/_/g, " ")}: ${firstVal[0]}`;
+    }
+  }
+
+  return "Something went wrong saving this schedule block.";
 }
 
 const EXPAND_DAYS_BEFORE = 7;
@@ -266,8 +291,8 @@ function EditScheduleModal({
         );
       }
       onSaved();
-    } catch {
-      // silent
+    } catch (err) {
+      toast.error(scheduleErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -295,8 +320,8 @@ function EditScheduleModal({
         );
       }
       onDeleted();
-    } catch {
-      // silent
+    } catch (err) {
+      toast.error(scheduleErrorMessage(err));
     } finally {
       setDeleting(false);
     }
@@ -627,8 +652,8 @@ export default function Schedule() {
         recurrence_count: endType === "after" ? endAfterCount : null,
       });
       fetchSchedules();
-    } catch {
-      // silent
+    } catch (err) {
+      toast.error(scheduleErrorMessage(err));
     }
   };
 

@@ -52,7 +52,16 @@ export default function MainAppLayout({
   const dispatch = useAppDispatch();
   const [profileReady, setProfileReady] = useState(false);
 
-  const identityId = typeof identity === "string" ? identity : "";
+  // FIX: identity can end up as the literal string "null" or "undefined"
+  // (e.g. if something upstream does String(decoded.identity) on a value
+  // that was actually null/undefined when the token was decoded), which
+  // passes typeof === "string" but isn't a real id. Treat those the same
+  // as "no identity yet" so we don't pass a bad value down to
+  // NotificationBell and trigger a 500 on the notifications poll.
+  const identityId =
+    typeof identity === "string" && identity !== "null" && identity !== "undefined"
+      ? identity
+      : "";
 
   const authInfo = {
     isLoggedIn: access_token ? true : false,

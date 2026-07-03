@@ -113,8 +113,9 @@ export const authSlice = createSlice({
       CookieService.set(keys.refreshTokenKey, action.payload);
     },
     setAuthCode: (state, action) => {
-      state.auth_code = action.payload;
-      CookieService.set(keys.authCodeKey, action.payload);
+      const clean = sanitizeIdentity(action.payload); // reuse same guard
+      state.auth_code = clean;
+      CookieService.set(keys.authCodeKey, clean);
     },
     setUser: (state, action) => {
       state.user = action.payload;

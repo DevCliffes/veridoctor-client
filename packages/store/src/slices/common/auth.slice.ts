@@ -62,6 +62,17 @@ function getScopedKeys() {
 
 const keys = getScopedKeys();
 
+// FIX: some cookie writes have historically stored the literal strings
+// "null"/"undefined" (see cookieStorage.ts fix). This guards every place
+// identity enters Redux state so a bad stored value can never leak into
+// components again, even for users who already have a poisoned cookie
+// from before that fix shipped.
+function sanitizeIdentity(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  if (value === "" || value === "null" || value === "undefined") return null;
+  return value;
+}
+
 export type authState = {
   isLoggedIn: boolean;
   access_token: string | null;
@@ -82,7 +93,7 @@ const initialAuthState: authState = {
   refresh_token: CookieService.get(keys.refreshTokenKey) || null,
   auth_code: CookieService.get(keys.authCodeKey) || null,
   user: safeStorage.get(keys.userStorageKey),
-  identity: CookieService.get(keys.identityKey) || null,
+  identity: sanitizeIdentity(CookieService.get(keys.identityKey)),
 };
 
 export const authSlice = createSlice({
@@ -110,8 +121,9 @@ export const authSlice = createSlice({
       safeStorage.set(keys.userStorageKey, action.payload);
     },
     setUserId: (state, action) => {
-      state.identity = action.payload;
-      CookieService.set(keys.identityKey, action.payload);
+      const clean = sanitizeIdentity(action.payload);
+      state.identity = clean;
+      CookieService.set(keys.identityKey, clean);
     },
     revokeTokens: (state) => {
       state.access_token = null;
@@ -141,4 +153,3 @@ export const {
 } = authSlice.actions;
 
 export const authReducer = authSlice.reducer;
-

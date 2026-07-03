@@ -679,7 +679,7 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
   const fetchOwnRecords = () => {
     if (!summary?.patient?.identity_id) return;
     axiosClient
-      .get(`/records/patient/${summary.patient.identity_id}/timeline?type=consultation`)
+      .get(`/records/provider/patient/${summary.patient.identity_id}/timeline?type=consultation`)
       .then((res) => setOwnRecords(res.data.records ?? []))
       .catch(() => {})
       .finally(() => setLoadingOwn(false));

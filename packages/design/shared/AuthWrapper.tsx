@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ensurePatientAccessToken } from "@veridoctor/api-client";
 
 export type TokenPayload = {
   a_token: string;
@@ -16,9 +17,6 @@ function getSafeLoginUrl(): string {
   return "";
 }
 
-// FIX: treat the literal strings "null"/"undefined" the same as a real
-// missing value — these can end up in props if an upstream cookie/store
-// value was ever poisoned (see cookieStorage.ts / authSlice.ts fixes).
 function isRealValue(value: string | null | undefined): value is string {
   return (
     typeof value === "string" &&
@@ -46,35 +44,33 @@ function AuthWrapper({
     authInfo.isLoggedIn
   );
 
-  // FIX: this used to run as a synchronous side effect during render,
-  // which meant it also fired during Next.js's server-side render pass
-  // (before cookies/hydration were available) — that's why requests
-  // were showing up server-side with literal "undefined" params and
-  // userAgent="node" in the logs. Moving this into useEffect ensures
-  // it only ever runs client-side, after real values are available.
   React.useEffect(() => {
     if (authInfo.isLoggedIn) {
       setIsAuthenticated(true);
       setChecked(true);
       return;
     }
-
     if (!isRealValue(authInfo.identity) || !isRealValue(authInfo.auth_code)) {
       setIsAuthenticated(false);
       setChecked(true);
       return;
     }
 
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise?auth_code=${authInfo.auth_code}&identity=${authInfo.identity}`,
-      { method: "POST" }
-    )
-      .then((response) => {
-        if (!response.ok) throw new Error("Network response was not ok");
-        return response.json();
-      })
-      .then((result: TokenPayload) => {
-        setAuthInfo(result);
+    // FIX: this used to fire its own raw POST to /identity/authorise using
+    // whatever auth_code sat in Redux — with no idea whether that code was
+    // already consumed elsewhere (e.g. page.tsx's handoff flow already
+    // exchanged it via the cookie-based maybeAuthorise()). A one-time-use
+    // auth_code being spent twice always fails the second time, which
+    // marked the user unauthenticated and bounced them to /auth/login even
+    // though a valid session already existed. Routing through
+    // ensurePatientAccessToken() instead means: if a valid access-token
+    // cookie already exists, it's reused with no network call; if a
+    // cookie-based exchange is already in flight, this awaits the same
+    // promise instead of racing it with a second, redundant exchange.
+    ensurePatientAccessToken()
+      .then((token) => {
+        if (!token) throw new Error("No access token");
+        setAuthInfo({ a_token: token, refresh_token: "" });
         setIsAuthenticated(true);
       })
       .catch((err) => {
@@ -101,7 +97,6 @@ function AuthWrapper({
 
   if (!checked) return null;
   if (!isAuthenticated) return null;
-
   return <>{children}</>;
 }
 

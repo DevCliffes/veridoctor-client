@@ -326,7 +326,7 @@ export default function AppointmentDetailPage() {
 
   // Same 30-minutes-before-start to 30-minutes-after-end window used on
   // the appointments list page. A terminal status (completed/cancelled/
-  // no-show) always shows "Call ended" regardless of timing.
+  // no-show) always shows "Call has ended" regardless of timing.
   const CALL_WINDOW_MS = 30 * 60 * 1000;
   const isWithinCallWindow = (startIso: string, endIso: string) => {
     const nowMs = Date.now();
@@ -478,19 +478,19 @@ export default function AppointmentDetailPage() {
                   <p className="text-sm text-gray-700 font-medium capitalize">{appointment.appointment_type}</p>
                 </div>
               </div>
-              {!isTerminal && appointment.appointment_type === "virtual" && appointment.meet_id && (
+              {appointment.appointment_type === "virtual" && appointment.meet_id && (
                 <div className="flex items-start gap-3">
                   <LucideVideo size={16} className={canJoinCall ? "text-indigo-500 mt-0.5 shrink-0" : "text-gray-300 mt-0.5 shrink-0"} />
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wide">Call</p>
                     {canJoinCall ? (
                       <button onClick={handleJoinCall} className="text-sm text-blue-600 hover:underline font-medium">Join video call →</button>
+                    ) : callHasEnded ? (
+                      <p className="text-sm text-gray-400 font-medium">Call has ended</p>
+                    ) : callNotYetOpen ? (
+                      <p className="text-sm text-gray-400 font-medium">Available 30 min before start</p>
                     ) : (
-                      <p className="text-sm text-gray-400 font-medium">
-                        {startTime.getTime() - Date.now() > CALL_WINDOW_MS
-                          ? "Available 30 min before start"
-                          : "Call window has ended"}
-                      </p>
+                      <p className="text-sm text-gray-400 font-medium">Call unavailable</p>
                     )}
                   </div>
                 </div>

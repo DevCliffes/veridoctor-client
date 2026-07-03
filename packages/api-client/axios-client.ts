@@ -67,16 +67,25 @@ async function maybeAuthorise(): Promise<string | null> {
   return authorisePromise;
 }
 
-// FIX: endpoints a user hits *before* having a valid session must never
-// carry a stale/expired Authorization header. Previously every request —
-// including the login POST itself — ran through maybeAuthorise() and, if a
-// leftover (expired or otherwise invalid) vd_patient_access_token cookie
-// existed from a prior session, attached it to /identity/login. The backend's
-// global JWTAuthentication class then rejected the whole request with 401
-// before LoginView.post() ever inspected the email/password — which the
-// response interceptor below then treated as a session expiry and bounced
-// straight back to the login page. Net effect: entering correct credentials
-// still "logged you out immediately".
+// FIX: the post-login handoff page (apps/health-portal/app/page.tsx) receives
+// ?auth_tkn=...&identity=... as URL query params and previously only
+// dispatched them into Redux, which maybeAuthorise() above never reads —
+// it reads document.cookie. That meant vd_patient_auth_code /
+// vd_patient_identity were never written, so maybeAuthorise() always
+// returned null immediately, every request went out with no Authorization
+// header, and the response interceptor's 401 handler bounced straight back
+// to /auth/login on every page load. These two exports let the handoff page
+// write the cookies maybeAuthorise() actually reads, and wait for the
+// code -> access-token exchange to finish before navigating anywhere.
+function persistPatientSession(authCode: string, identity: string): void {
+  setCookie(PATIENT_AUTH_CODE_KEY, authCode);
+  setCookie(PATIENT_IDENTITY_KEY, identity);
+}
+
+async function ensurePatientAccessToken(): Promise<string | null> {
+  return maybeAuthorise();
+}
+
 const PUBLIC_PATHS = [
   "/identity/login",
   "/identity/authorise",
@@ -106,13 +115,6 @@ axiosClient.interceptors.request.use(async (config) => {
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // FIX: a 401 from a public endpoint (e.g. genuinely wrong login
-    // credentials) must not trigger the "session expired, redirect to
-    // login" flow — that's only meaningful for authenticated requests.
-    // Without this check, a real "invalid credentials" response from
-    // LoginView itself would immediately redirect back to /auth/login,
-    // which looks identical to being logged out and swallows the actual
-    // error message the login form is supposed to show.
     const requestUrl = error.config?.url as string | undefined;
     const isPublic = isPublicPath(requestUrl);
     if (
@@ -129,4 +131,4 @@ axiosClient.interceptors.response.use(
   }
 );
 
-export { axiosClient };
+export { axiosClient, persistPatientSession, ensurePatientAccessToken };

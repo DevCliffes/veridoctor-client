@@ -52,6 +52,10 @@ export default function NotificationBell({
   const [pushPermission, setPushPermission] = useState<PushPermissionState>("default");
   const [pushLoading, setPushLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracks unread_count across polls so we can detect an increase and
+  // chime — without this we can't tell "3 unread on load" (no sound)
+  // apart from "went from 2 to 3 unread" (should sound).
+  const prevUnreadRef = useRef<number | null>(null);
 
   const fetchNotifications = useCallback(() => {
     // Guards against real empty values AND the literal strings "null"/
@@ -69,8 +73,20 @@ export default function NotificationBell({
     axiosClient
       .get(`/notifications/?identity_id=${identityId}`)
       .then((res) => {
+        const newUnread = res.data?.unread_count ?? 0;
+        // Only chime when unread count *increases* between polls. The
+        // first successful poll just establishes the baseline (no
+        // sound on page load); every poll after that compares against
+        // the previous value.
+        if (
+          prevUnreadRef.current !== null &&
+          newUnread > prevUnreadRef.current
+        ) {
+          playNotificationChime();
+        }
+        prevUnreadRef.current = newUnread;
         setNotifications(res.data?.results ?? []);
-        setUnreadCount(res.data?.unread_count ?? 0);
+        setUnreadCount(newUnread);
       })
       .catch(() => {});
   }, [identityId]);

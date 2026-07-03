@@ -228,10 +228,21 @@ export default function Appointments() {
     window.location.href = `https://telehealth.veridoctor.com/${meetId}?userId=${userId}&isOfferer=true`;
   };
 
+  // Join is only allowed from 30 minutes before start_time through 30
+  // minutes after end_time — outside that window the button is disabled
+  // even if the appointment is virtual and not yet marked done.
+  const CALL_WINDOW_MS = 30 * 60 * 1000;
+  const isWithinCallWindow = (startIso: string, endIso: string) => {
+    const now = Date.now();
+    const start = new Date(startIso).getTime();
+    const end = new Date(endIso).getTime();
+    return now >= start - CALL_WINDOW_MS && now <= end + CALL_WINDOW_MS;
+  };
+
   const isJoinEnabled = (appt: Appointment) => {
     if (DONE_STATUSES.includes(appt.status)) return false;
     if (appt.appointment_type !== "virtual") return false;
-    return new Date(appt.start_time).toDateString() === new Date().toDateString();
+    return isWithinCallWindow(appt.start_time, appt.end_time);
   };
 
   const handleCancel = async (id: string) => {

@@ -54,17 +54,25 @@ export default function NotificationBell({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNotifications = useCallback(() => {
-    if (!identityId) return;
+    // Guards against real empty values AND the literal strings "null"/
+    // "undefined", which can happen if identityId is built from a
+    // template literal or String() call before the parent's user object
+    // has actually loaded (e.g. `${user?.id}` -> "undefined").
+    if (
+      !identityId ||
+      identityId.trim() === "" ||
+      identityId === "null" ||
+      identityId === "undefined"
+    ) {
+      return;
+    }
     axiosClient
       .get(`/notifications/?identity_id=${identityId}`)
       .then((res) => {
         setNotifications(res.data?.results ?? []);
         setUnreadCount(res.data?.unread_count ?? 0);
       })
-      .catch(() => {
-        // Silent — a failed notification fetch shouldn't surface as an
-        // app-wide error, the bell just won't update this cycle.
-      });
+      .catch(() => {});
   }, [identityId]);
 
   useEffect(() => {

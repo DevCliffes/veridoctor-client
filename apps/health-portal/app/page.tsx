@@ -3,6 +3,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAppDispatch } from "./hooks";
 import { useEffect, Suspense } from "react";
 import { setAuthCode, setUserId } from "@veridoctor/store";
+import { persistPatientSession, ensurePatientAccessToken } from "@veridoctor/api-client";
 import { PageLoader } from "@veridoctor/design/shared";
 
 function HomeContent() {
@@ -11,15 +12,32 @@ function HomeContent() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    dispatch(setAuthCode(searchParams.get("auth_tkn")));
-    dispatch(setUserId(searchParams.get("identity")));
-
-    // If the user was sent here from the public homepage "View profile"
-    // button, a `redirect` param will be present, e.g:
-    //   ?auth_tkn=...&identity=...&redirect=/book/provider/abc-123
-    // Send them there instead of the default dashboard.
+    const authTkn = searchParams.get("auth_tkn");
+    const identity = searchParams.get("identity");
     const redirect = searchParams.get("redirect");
-    router.push(redirect ?? "/dashboard");
+
+    async function completeHandoff() {
+      if (authTkn) dispatch(setAuthCode(authTkn));
+      if (identity) dispatch(setUserId(identity));
+
+      if (authTkn && identity) {
+        // Write the vd_patient_auth_code / vd_patient_identity cookies that
+        // maybeAuthorise() in axios-client.ts actually reads (Redux alone
+        // isn't enough — axios never looks at the store), then wait for the
+        // code -> access-token exchange to finish before navigating away.
+        // Otherwise the dashboard's first requests (notifications,
+        // appointments) fire before any token exists and 401 immediately,
+        // which the response interceptor treats as session-expired and
+        // bounces straight back to /auth/login.
+        persistPatientSession(authTkn, identity);
+        await ensurePatientAccessToken();
+      }
+
+      router.push(redirect ?? "/dashboard");
+    }
+
+    completeHandoff();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <PageLoader />;

@@ -323,7 +323,22 @@ export default function AppointmentDetailPage() {
   const isPast = endTime < now;
   const isFuture = startTime > now;
   const isTerminal = ["cancelled", "completed", "no-show"].includes(appointment.status);
-  const canJoinCall = appointment.appointment_type === "virtual" && appointment.meet_id && isToday;
+
+  // Same 30-minutes-before-start to 30-minutes-after-end window used on
+  // the appointments list page. A terminal status (completed/cancelled/
+  // no-show) always disables the call regardless of timing.
+  const CALL_WINDOW_MS = 30 * 60 * 1000;
+  const isWithinCallWindow = (startIso: string, endIso: string) => {
+    const nowMs = Date.now();
+    const start = new Date(startIso).getTime();
+    const end = new Date(endIso).getTime();
+    return nowMs >= start - CALL_WINDOW_MS && nowMs <= end + CALL_WINDOW_MS;
+  };
+  const canJoinCall =
+    !isTerminal &&
+    appointment.appointment_type === "virtual" &&
+    !!appointment.meet_id &&
+    isWithinCallWindow(appointment.start_time, appointment.end_time);
 
   return (
     <div className="p-4 space-y-4 max-w-3xl mx-auto">
@@ -459,15 +474,20 @@ export default function AppointmentDetailPage() {
                   <p className="text-sm text-gray-700 font-medium capitalize">{appointment.appointment_type}</p>
                 </div>
               </div>
-              {appointment.appointment_type === "virtual" && appointment.meet_id && (
+              {!isTerminal && appointment.appointment_type === "virtual" && appointment.meet_id && (
                 <div className="flex items-start gap-3">
                   <LucideVideo size={16} className={canJoinCall ? "text-indigo-500 mt-0.5 shrink-0" : "text-gray-300 mt-0.5 shrink-0"} />
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wide">Call</p>
-                    {canJoinCall
-                      ? <button onClick={handleJoinCall} className="text-sm text-blue-600 hover:underline font-medium">Join video call →</button>
-                      : <p className="text-sm text-gray-400 font-medium">{isFuture ? "Available on the day" : "Call has ended"}</p>
-                    }
+                    {canJoinCall ? (
+                      <button onClick={handleJoinCall} className="text-sm text-blue-600 hover:underline font-medium">Join video call →</button>
+                    ) : (
+                      <p className="text-sm text-gray-400 font-medium">
+                        {startTime.getTime() - Date.now() > CALL_WINDOW_MS
+                          ? "Available 30 min before start"
+                          : "Call window has ended"}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

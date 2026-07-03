@@ -6,6 +6,7 @@ import {
   subscribeToPush,
   getPushPermissionState,
   playNotificationChime,
+  unlockNotificationAudio,
 } from "@veridoctor/api-client";
 import { Bell, BellRing } from "@veridoctor/design/icons";
 import {
@@ -157,7 +158,10 @@ export default function NotificationBell({
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger className="relative flex items-center justify-center p-2 rounded-full hover:bg-black/5 cursor-pointer">
+      <DropdownMenuTrigger
+        onClick={unlockNotificationAudio}
+        className="relative flex items-center justify-center p-2 rounded-full hover:bg-black/5 cursor-pointer"
+      >
         <Bell size={20} />
         {unreadCount > 0 && (
           <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none">

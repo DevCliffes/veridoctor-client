@@ -326,7 +326,7 @@ export default function AppointmentDetailPage() {
 
   // Same 30-minutes-before-start to 30-minutes-after-end window used on
   // the appointments list page. A terminal status (completed/cancelled/
-  // no-show) always disables the call regardless of timing.
+  // no-show) always shows "Call ended" regardless of timing.
   const CALL_WINDOW_MS = 30 * 60 * 1000;
   const isWithinCallWindow = (startIso: string, endIso: string) => {
     const nowMs = Date.now();
@@ -334,6 +334,10 @@ export default function AppointmentDetailPage() {
     const end = new Date(endIso).getTime();
     return nowMs >= start - CALL_WINDOW_MS && nowMs <= end + CALL_WINDOW_MS;
   };
+  const callHasEnded =
+    isTerminal || Date.now() > endTime.getTime() + CALL_WINDOW_MS;
+  const callNotYetOpen =
+    !isTerminal && Date.now() < startTime.getTime() - CALL_WINDOW_MS;
   const canJoinCall =
     !isTerminal &&
     appointment.appointment_type === "virtual" &&

@@ -131,10 +131,10 @@ export function TodaySchedule({ identityId }: TodayScheduleProps) {
           No more appointments scheduled for today.
         </p>
       ) : (
-        <div
-          className="space-y-2 overflow-y-auto pr-1"
-          style={{ maxHeight: "420px" }}
-        >
+        // max-h-[26rem] replaces the old inline maxHeight: "420px" —
+        // 26rem scales with root font size / browser zoom exactly like
+        // every other spacing value in this file.
+        <div className="space-y-2 overflow-y-auto pr-1 max-h-[26rem]">
           {visibleAppointments.map((appt) => (
             <Row key={appt.id} appt={appt} />
           ))}

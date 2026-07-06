@@ -1,9 +1,12 @@
 "use client";
 import type { DashboardStats } from "../../app/(main)/dashboard/page";
-
 interface MetricsRowProps {
   stats: DashboardStats | null;
   loading: boolean;
+}
+
+function formatKES(amount: number): string {
+  return `KES ${amount.toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
 
 export function MetricsRow({ stats, loading }: MetricsRowProps) {
@@ -32,10 +35,15 @@ export function MetricsRow({ stats, loading }: MetricsRowProps) {
       sub: "per consultation",
       color: "bg-orange-50 text-orange-700",
     },
+    {
+      label: "Revenue (MTD)",
+      value: formatKES(stats?.revenue_mtd ?? 0),
+      sub: "from completed appointments",
+      color: "bg-emerald-50 text-emerald-700",
+    },
   ];
-
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       {cards.map((card) => (
         <div
           key={card.label}

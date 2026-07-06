@@ -32,7 +32,7 @@ import {
   setRefreshToken,
   setUser,
 } from "@veridoctor/store";
-import { axiosClient } from "@veridoctor/api-client";
+import { axiosClient, ensurePatientAccessToken } from "@veridoctor/api-client";
 import NotificationBell from "../../components/NotificationBell";
 
 export const dynamic = "force-dynamic";
@@ -117,6 +117,7 @@ export default function MainAppLayout({
     <AuthWrapper
       authInfo={authInfo}
       setAuthInfo={(token) => setAuthInfo(token)}
+      ensureAccessToken={ensurePatientAccessToken}
     >
       {/* ✅ overflow-hidden on the outer shell so only the inner content
           area scrolls — prevents the whole page from being measured

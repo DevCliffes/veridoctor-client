@@ -29,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@veridoctor/design/components";
-import { axiosClient } from "@veridoctor/api-client";
+import { axiosClient, ensureProviderAccessToken } from "@veridoctor/api-client";
 import {
   setIsLoggedIn,
   setAccessToken,
@@ -119,6 +119,7 @@ export default function MainAppLayout({
     <AuthWrapper
       authInfo={authInfo}
       setAuthInfo={(token) => setAuthInfo(token)}
+      ensureAccessToken={ensureProviderAccessToken}
     >
       <GlobalNewAppointmentDialog userId={identityId} />
 
@@ -185,4 +186,3 @@ function ProfileDropdown({
     </DropdownMenu>
   );
 }
-

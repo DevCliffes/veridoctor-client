@@ -34,6 +34,7 @@ export interface DashboardStats {
   this_week_appointments: number;
   total_patients_month: number;
   avg_duration_minutes: number;
+  revenue_mtd: number;
   weekly_data: { date: string; day: string; count: number }[];
 }
 

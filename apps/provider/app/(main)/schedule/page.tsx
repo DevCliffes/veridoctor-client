@@ -83,6 +83,35 @@ function computeEndTime(startTime: string, durationMins: number): string {
   );
 }
 
+// FIX: previously every submit sent `end_date` straight from its own
+// standalone `endDate` state -- a date input in the top date-range row
+// that has no relationship at all to the "Ends" section below it (Never
+// / On [date] / After [n] occurrences). That meant a "weekly, ends on
+// 2026-08-15" schedule could ship end_date as whatever unrelated date the
+// top field happened to hold (often just today, from initial state),
+// silently truncating the recurrence's real window. The backend now
+// authoritatively resolves end_date server-side for every
+// recurrence_end_type (see _resolve_end_date in views.py), so this
+// only needs to send a value that (a) reflects intent when it's the
+// source of truth (non-recurring, or "on_date"), and (b) is a valid
+// placeholder (>= start_date) the rest of the time, since the server
+// will overwrite it anyway.
+function computeSubmittedEndDate(params: {
+  repeat: RepeatType;
+  endType: EndType;
+  startDate: string;
+  endDate: string;
+  endAfterDate: string;
+}): string {
+  const { repeat, endType, startDate, endDate, endAfterDate } = params;
+  if (repeat === "none") return endDate;
+  if (endType === "on_date") return endAfterDate || startDate;
+  // "never" and "after" are fully resolved server-side from
+  // recurrence_end_type / recurrence_count. This is just a valid
+  // placeholder so serializer validation (end_date >= start_date) passes.
+  return startDate;
+}
+
 // NEW: extracts a human-readable message from a failed schedule API call.
 // Handles the 409 conflict shape returned by _check_schedule_overlap
 // ({ error: "..." }) and falls back to DRF's default serializer-error
@@ -271,14 +300,23 @@ function EditScheduleModal({
           recurrence_count: null,
         });
       } else {
-        // Non-recurring block, or user explicitly chose "All events"
+        // Non-recurring block, or user explicitly chose "All events".
+        // FIX: end_date is now derived via computeSubmittedEndDate instead
+        // of sending the standalone `endDate` state unconditionally --
+        // see that function's comment for why the old behavior was wrong.
         await axiosClient.patch(
           "provider/" + userId + "/schedule/" + block.id,
           {
             service: serviceId,
             location_type: locationType,
             start_date: startDate,
-            end_date: endDate,
+            end_date: computeSubmittedEndDate({
+              repeat,
+              endType,
+              startDate,
+              endDate,
+              endAfterDate,
+            }),
             start_time: startTime,
             end_time: endTime,
             recurrence: repeat,
@@ -637,11 +675,21 @@ export default function Schedule() {
   const handleSave = async () => {
     if (!selectedServiceId) return;
     try {
+      // FIX: end_date now derived via computeSubmittedEndDate instead of
+      // sending the standalone `endDate` state unconditionally -- see
+      // that function's comment for why the old behavior silently
+      // truncated recurring schedules' real valid window.
       await axiosClient.post("provider/" + userId + "/schedule", {
         service: selectedServiceId,
         location_type: locationType,
         start_date: startDate,
-        end_date: endDate,
+        end_date: computeSubmittedEndDate({
+          repeat,
+          endType,
+          startDate,
+          endDate,
+          endAfterDate,
+        }),
         start_time: startTime,
         end_time: endTime,
         recurrence: repeat,

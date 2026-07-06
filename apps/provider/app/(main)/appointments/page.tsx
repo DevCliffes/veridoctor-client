@@ -5,6 +5,7 @@ import {
   DataTable,
   DatatableColumnHeader,
   DatatableFilterTabs,
+  StatusBadge,
 } from "@veridoctor/design/shared";
 import { axiosClient } from "@veridoctor/api-client";
 import { LucideVideo, LucidePlus } from "@veridoctor/design/icons";
@@ -131,13 +132,13 @@ function RescheduleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm space-y-4 p-6">
-        <h3 className="font-semibold text-gray-800 text-base">
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm space-y-4 p-6">
+        <h3 className="font-semibold text-foreground text-base">
           Reschedule — {appt.patient_first_name} {appt.patient_last_name}
         </h3>
 
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1">
+          <label className="text-xs text-muted-foreground uppercase tracking-wide block mb-1">
             Select Date
           </label>
           <input
@@ -145,24 +146,24 @@ function RescheduleModal({
             value={date}
             min={minDate}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary"
           />
         </div>
 
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-2">
+          <label className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">
             Available Times
           </label>
           {!date ? (
-            <p className="text-sm text-gray-400">Pick a date first</p>
+            <p className="text-sm text-muted-foreground">Pick a date first</p>
           ) : loadingSlots ? (
             <div className="grid grid-cols-3 gap-2">
               {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="h-9 bg-muted rounded-lg animate-pulse" />
               ))}
             </div>
           ) : slots.length === 0 ? (
-            <p className="text-sm text-gray-400">No available slots for this date</p>
+            <p className="text-sm text-muted-foreground">No available slots for this date</p>
           ) : (
             <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
               {slots.map((slot) => (
@@ -173,8 +174,8 @@ function RescheduleModal({
                   className={
                     "px-2 py-2 rounded-lg text-xs font-medium border transition-colors " +
                     (selectedSlot?.start_time === slot.start_time
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-blue-400")
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-foreground border-border hover:border-primary")
                   }
                 >
                   {formatTime(slot.start_time)}
@@ -187,14 +188,14 @@ function RescheduleModal({
         <div className="flex gap-2 pt-1">
           <button
             onClick={onClose}
-            className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+            className="flex-1 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={saving || !selectedSlot}
-            className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
           >
             {saving ? "Saving..." : "Confirm"}
           </button>
@@ -273,26 +274,6 @@ export default function Appointments() {
     );
   };
 
-  const statusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      cancelled: "bg-red-100 text-red-700",
-      confirmed: "bg-green-100 text-green-700",
-      completed: "bg-blue-100 text-blue-700",
-      scheduled: "bg-yellow-100 text-yellow-700",
-      "in-progress": "bg-indigo-100 text-indigo-700",
-      "no-show": "bg-gray-100 text-gray-500",
-    };
-    return (
-      <span
-        className={`text-xs px-2 py-1 rounded-full font-medium ${
-          styles[status] ?? "bg-gray-100 text-gray-600"
-        }`}
-      >
-        {status}
-      </span>
-    );
-  };
-
   const tableRows: {
     id: string;
     name: ReactNode;
@@ -305,23 +286,23 @@ export default function Appointments() {
     id: appointment.id,
     name: (
       <button
-        className="text-blue-600 hover:underline font-medium text-left"
+        className="text-primary hover:underline font-medium text-left"
         onClick={() => router.push(`/appointments/${appointment.id}`)}
       >
         {appointment.patient_first_name} {appointment.patient_last_name}
       </button>
     ),
     service: (
-      <span className="text-xs text-gray-600">
+      <span className="text-xs text-muted-foreground">
         {appointment.service_name ?? (
-          <span className="text-gray-300 italic">—</span>
+          <span className="text-muted-foreground/50 italic">—</span>
         )}
       </span>
     ),
     date: new Date(appointment.start_time).toLocaleString("en-KE"),
-    status: statusBadge(appointment.status),
+    status: <StatusBadge status={appointment.status} />,
     call: DONE_STATUSES.includes(appointment.status) ? (
-      <span className="text-xs text-gray-400">—</span>
+      <span className="text-xs text-muted-foreground">—</span>
     ) : appointment.appointment_type === "virtual" ? (
       <Button
         size="sm"
@@ -332,22 +313,22 @@ export default function Appointments() {
         <LucideVideo /> Join call
       </Button>
     ) : (
-      <span className="text-xs text-gray-500">In-person</span>
+      <span className="text-xs text-muted-foreground">In-person</span>
     ),
     actions: DONE_STATUSES.includes(appointment.status) ? (
-      <span className="text-xs text-gray-400">—</span>
+      <span className="text-xs text-muted-foreground">—</span>
     ) : (
       <div className="flex gap-1">
         <button
           onClick={() => setReschedulingAppt(appointment)}
-          className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+          className="text-xs px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
         >
           Reschedule
         </button>
         <button
           onClick={() => handleCancel(appointment.id)}
           disabled={cancellingId === appointment.id}
-          className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+          className="text-xs px-2 py-1 rounded border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
         >
           {cancellingId === appointment.id ? "..." : "Cancel"}
         </button>
@@ -409,7 +390,7 @@ export default function Appointments() {
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg mx-4">
+    <div className="p-4 bg-card rounded-lg mx-4">
       {reschedulingAppt && (
         <RescheduleModal
           appt={reschedulingAppt}
@@ -421,8 +402,8 @@ export default function Appointments() {
 
       <div className="flex justify-between mb-4">
         <div>
-          <h1 className="text-xl font-bold">Appointments</h1>
-          <p className="text-gray-600 mt-2">Manage your appointments here.</p>
+          <h1 className="text-xl font-semibold text-foreground">Appointments</h1>
+          <p className="text-muted-foreground mt-2">Manage your appointments here.</p>
         </div>
         <Button onClick={openNewAppointment}>
           <LucidePlus /> New appointment

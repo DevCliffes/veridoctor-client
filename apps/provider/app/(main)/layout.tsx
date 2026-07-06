@@ -123,7 +123,7 @@ export default function MainAppLayout({
     >
       <GlobalNewAppointmentDialog userId={identityId} />
 
-      <div className="fixed bg-blue-50 top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
+      <div className="fixed bg-white top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
         <TopNav
           center={<p>{displayName}</p>}
           right={
@@ -135,7 +135,7 @@ export default function MainAppLayout({
         />
         <div className="flex flex-1 min-h-0">
           <SideNav navItems={navItems} activePath={pathname} />
-          <div className="flex-1 min-h-0 overflow-y-auto bg-neutral-100 p-1">
+          <div className="flex-1 min-h-0 overflow-y-auto bg-white p-1">
             <div className="max-w-6xl mx-auto pb-8">
               {children}
             </div>

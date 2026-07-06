@@ -3,6 +3,9 @@ import {
   PATIENT_ACCESS_TOKEN_KEY,
   PATIENT_AUTH_CODE_KEY,
   PATIENT_IDENTITY_KEY,
+  PROVIDER_ACCESS_TOKEN_KEY,
+  PROVIDER_AUTH_CODE_KEY,
+  PROVIDER_IDENTITY_KEY,
 } from "./constants";
 
 function getCookie(name: string): string | null {
@@ -30,12 +33,20 @@ function getSafeLoginUrl(): string {
   return "";
 }
 
+// NOTE: confirm this matches how apps/provider is actually served
+// (subdomain vs path) before relying on this in the request interceptor.
+function isProviderApp(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.startsWith("provider.");
+}
+
 const axiosClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   timeout: 10000,
   withCredentials: true,
 });
 
+// ── Patient auth ────────────────────────────────────────────────
 let authorisePromise: Promise<string | null> | null = null;
 
 async function maybeAuthorise(): Promise<string | null> {
@@ -86,6 +97,48 @@ async function ensurePatientAccessToken(): Promise<string | null> {
   return maybeAuthorise();
 }
 
+// ── Provider auth ───────────────────────────────────────────────
+let providerAuthorisePromise: Promise<string | null> | null = null;
+
+async function maybeAuthoriseProvider(): Promise<string | null> {
+  // Mirrors maybeAuthorise() but reads/writes the vd_provider_* cookies
+  // instead of vd_patient_*. AuthWrapper is shared between apps/provider
+  // and apps/health-portal, so each app must supply its own ensure-fn
+  // rather than both silently sharing the patient-only implementation
+  // (that mismatch was the root cause of the provider auto-logout bug).
+  const token = getCookie(PROVIDER_ACCESS_TOKEN_KEY);
+  if (token) return token;
+  if (providerAuthorisePromise) return providerAuthorisePromise;
+  const authCode = getCookie(PROVIDER_AUTH_CODE_KEY);
+  const identity = getCookie(PROVIDER_IDENTITY_KEY);
+  if (!authCode || !identity) return null;
+  providerAuthorisePromise = axios
+    .post(
+      `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
+      null,
+      { params: { auth_code: authCode, identity } }
+    )
+    .then((res) => {
+      const { a_token } = res.data;
+      setCookie(PROVIDER_ACCESS_TOKEN_KEY, a_token);
+      return a_token as string;
+    })
+    .catch(() => null)
+    .finally(() => {
+      providerAuthorisePromise = null;
+    });
+  return providerAuthorisePromise;
+}
+
+function persistProviderSession(authCode: string, identity: string): void {
+  setCookie(PROVIDER_AUTH_CODE_KEY, authCode);
+  setCookie(PROVIDER_IDENTITY_KEY, identity);
+}
+
+async function ensureProviderAccessToken(): Promise<string | null> {
+  return maybeAuthoriseProvider();
+}
+
 const PUBLIC_PATHS = [
   "/identity/login",
   "/identity/authorise",
@@ -105,7 +158,9 @@ axiosClient.interceptors.request.use(async (config) => {
   if (isPublicPath(config.url)) {
     return config;
   }
-  const token = await maybeAuthorise();
+  const token = isProviderApp()
+    ? await maybeAuthoriseProvider()
+    : await maybeAuthorise();
   if (token) {
     config.headers["Authorization"] = `Bearer ${token}`;
   }
@@ -131,4 +186,10 @@ axiosClient.interceptors.response.use(
   }
 );
 
-export { axiosClient, persistPatientSession, ensurePatientAccessToken };
+export {
+  axiosClient,
+  persistPatientSession,
+  ensurePatientAccessToken,
+  persistProviderSession,
+  ensureProviderAccessToken,
+};

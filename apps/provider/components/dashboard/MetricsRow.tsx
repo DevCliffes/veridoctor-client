@@ -15,31 +15,31 @@ export function MetricsRow({ stats, loading }: MetricsRowProps) {
       label: "Today's Appointments",
       value: stats?.today_count ?? 0,
       sub: "scheduled for today",
-      color: "bg-blue-50 text-blue-700",
+      color: "bg-primary/10 text-primary",
     },
     {
       label: "This Week",
       value: stats?.this_week_appointments ?? 0,
       sub: "consultations this week",
-      color: "bg-green-50 text-green-700",
+      color: "bg-brand-light/10 text-brand-light",
     },
     {
       label: "Total Patients",
       value: stats?.total_patients_month ?? 0,
       sub: "served this month",
-      color: "bg-purple-50 text-purple-700",
+      color: "bg-muted text-muted-foreground",
     },
     {
       label: "Avg. Duration",
       value: stats?.avg_duration_minutes ? `${stats.avg_duration_minutes}m` : "—",
       sub: "per consultation",
-      color: "bg-orange-50 text-orange-700",
+      color: "bg-primary/10 text-primary",
     },
     {
       label: "Revenue (MTD)",
       value: formatKES(stats?.revenue_mtd ?? 0),
       sub: "from completed appointments",
-      color: "bg-emerald-50 text-emerald-700",
+      color: "bg-brand-mint/10 text-brand-mint-dark",
     },
   ];
   return (
@@ -47,17 +47,17 @@ export function MetricsRow({ stats, loading }: MetricsRowProps) {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="bg-white rounded-xl p-4 shadow-sm border border-gray-100"
+          className="bg-card rounded-xl p-4 shadow-sm border border-border"
         >
-          <p className="text-sm text-gray-500 mb-1">{card.label}</p>
+          <p className="text-sm text-muted-foreground mb-1">{card.label}</p>
           {loading ? (
-            <div className="h-8 w-16 bg-gray-100 animate-pulse rounded mt-1" />
+            <div className="h-8 w-16 bg-muted animate-pulse rounded mt-1" />
           ) : (
-            <p className={`text-2xl font-bold rounded px-2 py-0.5 inline-block ${card.color}`}>
+            <p className={`text-2xl font-semibold rounded px-2 py-0.5 inline-block ${card.color}`}>
               {card.value}
             </p>
           )}
-          <p className="text-xs text-gray-400 mt-1">{card.sub}</p>
+          <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>
         </div>
       ))}
     </div>

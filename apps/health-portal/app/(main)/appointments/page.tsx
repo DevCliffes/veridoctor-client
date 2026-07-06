@@ -6,6 +6,7 @@ import {
   DataTable,
   DatatableColumnHeader,
   DatatableFilterTabs,
+  StatusBadge,
 } from "@veridoctor/design/shared";
 import { LucideVideo } from "@veridoctor/design/icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -57,28 +58,6 @@ function isPastAppointment(appt: Appointment): boolean {
   return new Date(appt.end_time) < new Date();
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  confirmed: "bg-green-100 text-green-700",
-  scheduled: "bg-yellow-100 text-yellow-700",
-  cancelled: "bg-red-100 text-red-700",
-  completed: "bg-blue-100 text-blue-700",
-  "in-progress": "bg-blue-100 text-blue-700",
-  "no-show": "bg-gray-100 text-gray-500",
-};
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={
-        "text-xs px-2 py-1 rounded-full font-medium capitalize " +
-        (STATUS_STYLES[status] ?? "bg-gray-100 text-gray-600")
-      }
-    >
-      {status}
-    </span>
-  );
-}
-
 function JoinButton({ meetId, patientEmail }: { meetId: string; patientEmail: string }) {
   return (
     <button
@@ -86,7 +65,7 @@ function JoinButton({ meetId, patientEmail }: { meetId: string; patientEmail: st
         window.location.href =
           TELEHEALTH_URL + "/" + meetId + "?userId=" + patientEmail + "&isOfferer=false";
       }}
-      className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium"
+      className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:bg-primary/90 font-medium"
     >
       <LucideVideo size={13} /> Join call
     </button>
@@ -152,30 +131,30 @@ function RescheduleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm space-y-4 p-6">
-        <h3 className="font-semibold text-gray-800 text-base">Reschedule Appointment</h3>
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm space-y-4 p-6">
+        <h3 className="font-semibold text-foreground text-base">Reschedule Appointment</h3>
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1">Select Date</label>
+          <label className="text-xs text-muted-foreground uppercase tracking-wide block mb-1">Select Date</label>
           <input
             type="date"
             value={date}
             min={minDate}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            className="w-full border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-2">Available Times</label>
+          <label className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">Available Times</label>
           {!date ? (
-            <p className="text-sm text-gray-400">Pick a date first</p>
+            <p className="text-sm text-muted-foreground">Pick a date first</p>
           ) : loadingSlots ? (
             <div className="grid grid-cols-3 gap-2">
               {[1,2,3,4,5,6].map((i) => (
-                <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="h-9 bg-muted rounded-lg animate-pulse" />
               ))}
             </div>
           ) : slots.length === 0 ? (
-            <p className="text-sm text-gray-400">No available slots for this date</p>
+            <p className="text-sm text-muted-foreground">No available slots for this date</p>
           ) : (
             <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
               {slots.map((slot) => (
@@ -186,8 +165,8 @@ function RescheduleModal({
                   className={
                     "px-2 py-2 rounded-lg text-xs font-medium border transition-colors " +
                     (selectedSlot?.start_time === slot.start_time
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-blue-400")
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-foreground border-border hover:border-primary")
                   }
                 >
                   {formatTime(slot.start_time)}
@@ -197,8 +176,8 @@ function RescheduleModal({
           )}
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button onClick={handleConfirm} disabled={saving || !selectedSlot} className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted">Cancel</button>
+          <button onClick={handleConfirm} disabled={saving || !selectedSlot} className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
             {saving ? "Saving..." : "Confirm"}
           </button>
         </div>
@@ -251,7 +230,6 @@ function AppointmentsContent() {
     setCancellingId(id);
     try {
       await axiosClient.patch(`/appointments/${id}/`, { status: "cancelled" });
-      // Optimistic update — no refresh needed
       setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a)));
       toast.success("Appointment cancelled");
     } catch {
@@ -262,7 +240,6 @@ function AppointmentsContent() {
   };
 
   const handleRescheduled = (id: string, newStart: string, newEnd: string) => {
-    // Optimistic update — no refresh needed
     setAppointments((prev) =>
       prev.map((a) => a.id === id ? { ...a, start_time: newStart, end_time: newEnd, status: "scheduled" } : a)
     );
@@ -292,10 +269,9 @@ function AppointmentsContent() {
 
     return {
       id: appt.id,
-      // Doctor name now links to the provider's profile page
       name: (
         <button
-          className="text-blue-600 hover:underline font-medium text-left"
+          className="text-primary hover:underline font-medium text-left"
           onClick={() =>
             appt.provider_identity_id
               ? router.push("/doctors/" + appt.provider_identity_id)
@@ -308,42 +284,41 @@ function AppointmentsContent() {
         </button>
       ),
       service_name: (
-        <span className="text-xs text-gray-600">
-          {appt.service_name ?? <span className="text-gray-300 italic">—</span>}
+        <span className="text-xs text-muted-foreground">
+          {appt.service_name ?? <span className="text-muted-foreground/50 italic">—</span>}
         </span>
       ),
       date: formatDateTime(appt.start_time),
       status: <StatusBadge status={appt.status} />,
       call: terminated ? (
-        <span className="text-xs text-gray-400">—</span>
+        <span className="text-xs text-muted-foreground">—</span>
       ) : appt.appointment_type === "virtual" ? (
         isJoinable(appt) && appt.meet_id ? (
           <JoinButton meetId={appt.meet_id} patientEmail={patientEmail} />
         ) : (
           <button
             disabled
-            className="flex items-center gap-1.5 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium opacity-40 cursor-not-allowed"
+            className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-medium opacity-40 cursor-not-allowed"
           >
             <LucideVideo size={13} /> Join call
           </button>
         )
       ) : (
-        <span className="text-xs text-gray-500">In-person</span>
+        <span className="text-xs text-muted-foreground">In-person</span>
       ),
-      // Actions: greyed out for past or terminated appointments — no interaction possible
       actions: actionsDisabled ? (
         <div className="flex gap-1">
           <button
             disabled
             title={past ? "Cannot modify past appointments" : undefined}
-            className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-300 cursor-not-allowed select-none"
+            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground/50 cursor-not-allowed select-none"
           >
             Reschedule
           </button>
           <button
             disabled
             title={past ? "Cannot modify past appointments" : undefined}
-            className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-300 cursor-not-allowed select-none"
+            className="text-xs px-2 py-1 rounded border border-border text-muted-foreground/50 cursor-not-allowed select-none"
           >
             Cancel
           </button>
@@ -352,14 +327,14 @@ function AppointmentsContent() {
         <div className="flex gap-1">
           <button
             onClick={() => setReschedulingAppt(appt)}
-            className="text-xs px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+            className="text-xs px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
           >
             Reschedule
           </button>
           <button
             onClick={() => handleCancel(appt.id)}
             disabled={cancellingId === appt.id}
-            className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            className="text-xs px-2 py-1 rounded border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
           >
             {cancellingId === appt.id ? "..." : "Cancel"}
           </button>
@@ -378,7 +353,7 @@ function AppointmentsContent() {
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg mx-4">
+    <div className="p-4 bg-card rounded-lg mx-4">
       {reschedulingAppt && (
         <RescheduleModal
           appt={reschedulingAppt}
@@ -387,8 +362,8 @@ function AppointmentsContent() {
         />
       )}
       <div className="mb-4">
-        <h1 className="text-xl font-bold">My Appointments</h1>
-        <p className="text-gray-600 mt-1">View and manage your consultations.</p>
+        <h1 className="text-xl font-semibold text-foreground">My Appointments</h1>
+        <p className="text-muted-foreground mt-1">View and manage your consultations.</p>
       </div>
       <DataTable rows={tableRows} columns={tableColumns} isLoading={loading} filterTabs={filterTabs} />
     </div>

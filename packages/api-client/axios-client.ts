@@ -40,6 +40,31 @@ function isProviderApp(): boolean {
   return window.location.hostname.startsWith("provider.");
 }
 
+// FIX: maybeAuthorise()/maybeAuthoriseProvider() previously returned a
+// cached access-token cookie purely based on presence, with no check on
+// whether it had actually expired. Once a token expired, every subsequent
+// authenticated request went out with a dead token, got a 401 "Access
+// token has expired" response, and the response interceptor bounced the
+// user to /auth/login -- but the stale cookie was never cleared, so the
+// same dead token was picked up again on the next load, causing a login
+// loop. This decodes the JWT payload (no signature verification needed
+// client-side, we just need `exp`) and treats it as expired slightly
+// before its real expiry so a token that's about to die mid-request
+// doesn't slip through.
+function isTokenExpired(token: string): boolean {
+  try {
+    const payloadB64 = token.split(".")[1];
+    const payload = JSON.parse(
+      atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    if (!payload.exp) return false; // no exp claim -- treat as non-expiring
+    // 30s buffer so a token that's about to expire mid-request doesn't slip through
+    return Date.now() >= payload.exp * 1000 - 30_000;
+  } catch {
+    return true; // unparseable token -- treat as expired, force re-auth
+  }
+}
+
 const axiosClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   timeout: 10000,
@@ -55,7 +80,7 @@ async function maybeAuthorise(): Promise<string | null> {
   // auth_code, identity) which are no longer being written by login and
   // were causing every authenticated request to go out with no token.
   const token = getCookie(PATIENT_ACCESS_TOKEN_KEY);
-  if (token) return token;
+  if (token && !isTokenExpired(token)) return token;
   if (authorisePromise) return authorisePromise;
   const authCode = getCookie(PATIENT_AUTH_CODE_KEY);
   const identity = getCookie(PATIENT_IDENTITY_KEY);
@@ -80,7 +105,7 @@ async function maybeAuthorise(): Promise<string | null> {
 
 // FIX: the post-login handoff page (apps/health-portal/app/page.tsx) receives
 // ?auth_tkn=...&identity=... as URL query params and previously only
-// dispatched them into Redux, which maybeAuthorise() above never reads —
+// dispatched them into Redux, which maybeAuthorise() above never reads --
 // it reads document.cookie. That meant vd_patient_auth_code /
 // vd_patient_identity were never written, so maybeAuthorise() always
 // returned null immediately, every request went out with no Authorization
@@ -107,7 +132,7 @@ async function maybeAuthoriseProvider(): Promise<string | null> {
   // rather than both silently sharing the patient-only implementation
   // (that mismatch was the root cause of the provider auto-logout bug).
   const token = getCookie(PROVIDER_ACCESS_TOKEN_KEY);
-  if (token) return token;
+  if (token && !isTokenExpired(token)) return token;
   if (providerAuthorisePromise) return providerAuthorisePromise;
   const authCode = getCookie(PROVIDER_AUTH_CODE_KEY);
   const identity = getCookie(PROVIDER_IDENTITY_KEY);

@@ -1,9 +1,7 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
-
 import { cn } from "../lib/utils";
-
 const badgeVariants = cva(
   "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 text-xs font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3",
   {
@@ -15,7 +13,11 @@ const badgeVariants = cva(
         destructive:
           "bg-destructive text-white focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/90",
         success:
-          "bg-green-500 text-black focus-visible:ring-green-500/20 dark:bg-green-500/60 dark:focus-visible:ring-green-500/40 [a&]:hover:bg-green-500/90",
+          "bg-brand-mint/15 text-brand-mint-dark focus-visible:ring-brand-mint/20 [a&]:hover:bg-brand-mint/25",
+        warning:
+          "bg-amber-100 text-amber-700 focus-visible:ring-amber-500/20 [a&]:hover:bg-amber-200",
+        info:
+          "bg-brand-light/15 text-brand-light focus-visible:ring-brand-light/20 [a&]:hover:bg-brand-light/25",
         outline:
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
@@ -27,7 +29,6 @@ const badgeVariants = cva(
     },
   },
 );
-
 function Badge({
   className,
   variant = "default",
@@ -36,7 +37,6 @@ function Badge({
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : "span";
-
   return (
     <Comp
       data-slot="badge"
@@ -46,5 +46,4 @@ function Badge({
     />
   );
 }
-
 export { Badge, badgeVariants };

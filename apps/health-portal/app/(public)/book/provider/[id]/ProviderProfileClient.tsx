@@ -80,23 +80,29 @@ export default function ProviderProfileClient({
         <LucideArrowLeft size={14} /> Back to Find a Doctor
       </button>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        {/* Profile picture — large, centered above details */}
-        <div className="flex flex-col items-center mb-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* Photo — full-width square, bleeds to the card edges rather than
+            sitting inside a small circle. object-cover crops sensibly if
+            the source image isn't a perfect square. */}
+        <div className="w-full aspect-square bg-blue-50 relative">
           {provider.profile_picture_url ? (
             <Image
               src={provider.profile_picture_url}
               alt={`${provider.first_name} ${provider.last_name}`}
-              width={128}
-              height={128}
-              className="w-32 h-32 rounded-full object-cover border-4 border-blue-100 shadow-md"
+              fill
+              className="object-cover"
             />
           ) : (
-            <div className="w-32 h-32 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-4xl font-bold border-4 border-blue-50 shadow-md">
-              {initials.toUpperCase()}
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+              <div className="w-24 h-24 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-bold shadow-md">
+                {initials.toUpperCase()}
+              </div>
             </div>
           )}
-          <div className="mt-3 text-center">
+        </div>
+
+        <div className="p-6">
+          <div className="text-center">
             <h1 className="text-xl font-bold text-gray-800">
               {provider.title} {provider.first_name} {provider.last_name}
             </h1>
@@ -124,14 +130,14 @@ export default function ProviderProfileClient({
               </p>
             )}
           </div>
-        </div>
 
-        <button
-          onClick={() => router.push(`/book?provider=${provider.id}`)}
-          className="w-full bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          View available slots →
-        </button>
+          <button
+            onClick={() => router.push(`/book?provider=${provider.id}`)}
+            className="w-full mt-5 bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            View available slots →
+          </button>
+        </div>
       </div>
 
       {provider.bio && (

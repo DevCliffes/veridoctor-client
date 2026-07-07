@@ -1,3 +1,14 @@
+/**
+ * cookies - shared generic keys (legacy, kept for backward compat)
+ */
+export const ACCESS_TOKEN_KEY = "access_token";
+export const REFRESH_TOKEN_KEY = "refresh_token";
+export const AUTH_CODE_KEY = "auth_code";
+export const LOGGED_IN_KEY = "loggedin";
+export const IDENTITY_KEY = "identity";
+
+// App-scoped keys — prevent cookie bleed between patient and provider
+// on the shared .veridoctor.com domain.
 export const PATIENT_IDENTITY_KEY = "vd_patient_identity";
 export const PATIENT_LOGGED_IN_KEY = "vd_patient_loggedin";
 export const PATIENT_ACCESS_TOKEN_KEY = "vd_patient_access_token";

@@ -3,11 +3,9 @@ import {
   PATIENT_ACCESS_TOKEN_KEY,
   PATIENT_AUTH_CODE_KEY,
   PATIENT_IDENTITY_KEY,
-  PATIENT_REFRESH_TOKEN_KEY,
   PROVIDER_ACCESS_TOKEN_KEY,
   PROVIDER_AUTH_CODE_KEY,
   PROVIDER_IDENTITY_KEY,
-  PROVIDER_REFRESH_TOKEN_KEY,
 } from "./constants";
 
 function getCookie(name: string): string | null {
@@ -22,17 +20,6 @@ function setCookie(name: string, value: string): void {
     ? "; domain=.veridoctor.com"
     : "";
   document.cookie = `${name}=${encodeURIComponent(value)};path=/${domain};secure;samesite=lax`;
-}
-
-// Used on hard-failure (refresh token itself dead/invalid) so a stale,
-// unusable cookie doesn't get picked up again on the next request and
-// keep failing silently. Setting max-age=0 deletes the cookie outright.
-function clearCookie(name: string): void {
-  if (typeof document === "undefined") return;
-  const domain = window.location.hostname.includes("veridoctor.com")
-    ? "; domain=.veridoctor.com"
-    : "";
-  document.cookie = `${name}=;path=/${domain};max-age=0;secure;samesite=lax`;
 }
 
 function getSafeLoginUrl(): string {
@@ -53,6 +40,17 @@ function isProviderApp(): boolean {
   return window.location.hostname.startsWith("provider.");
 }
 
+// FIX: maybeAuthorise()/maybeAuthoriseProvider() previously returned a
+// cached access-token cookie purely based on presence, with no check on
+// whether it had actually expired. Once a token expired, every subsequent
+// authenticated request went out with a dead token, got a 401 "Access
+// token has expired" response, and the response interceptor bounced the
+// user to /auth/login -- but the stale cookie was never cleared, so the
+// same dead token was picked up again on the next load, causing a login
+// loop. This decodes the JWT payload (no signature verification needed
+// client-side, we just need `exp`) and treats it as expired slightly
+// before its real expiry so a token that's about to die mid-request
+// doesn't slip through.
 function isTokenExpired(token: string): boolean {
   try {
     const payloadB64 = token.split(".")[1];
@@ -73,32 +71,8 @@ const axiosClient = axios.create({
   withCredentials: true,
 });
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 // ── Patient auth ────────────────────────────────────────────────
 let authorisePromise: Promise<string | null> | null = null;
-
-// Exchanges a still-valid refresh token for a new access token via
-// /identity/refresh-token. This is the normal path for a session that's
-// been open a while — it does NOT touch auth_code at all, so it works
-// even though auth_code was already consumed (one-time-use) back at
-// initial login. Returns null on any failure (refresh token expired,
-// tampered, or missing) so the caller can fall back appropriately.
-async function refreshPatientAccessToken(): Promise<string | null> {
-  const refreshToken = getCookie(PATIENT_REFRESH_TOKEN_KEY);
-  if (!refreshToken) return null;
-  try {
-    const res = await axios.post(`${API_URL}/identity/refresh-token`, {
-      refresh_token: refreshToken,
-    });
-    const { a_token } = res.data;
-    if (!a_token) return null;
-    setCookie(PATIENT_ACCESS_TOKEN_KEY, a_token);
-    return a_token as string;
-  } catch {
-    return null;
-  }
-}
 
 async function maybeAuthorise(): Promise<string | null> {
   // health-portal is patient-facing, so it must read the patient-scoped
@@ -108,58 +82,37 @@ async function maybeAuthorise(): Promise<string | null> {
   const token = getCookie(PATIENT_ACCESS_TOKEN_KEY);
   if (token && !isTokenExpired(token)) return token;
   if (authorisePromise) return authorisePromise;
-
-  authorisePromise = (async () => {
-    // 1. Access token is missing/expired — try the refresh token first.
-    // This is the path that runs every time a session that's been open
-    // a while needs a new access token. auth_code is one-time-use and
-    // will already be gone by this point in any long-lived session, so
-    // it must never be the primary path here.
-    const refreshed = await refreshPatientAccessToken();
-    if (refreshed) return refreshed;
-
-    // 2. No usable refresh token (e.g. very first token issuance right
-    // after the login handoff, before a refresh token has ever been
-    // stored, or the refresh token itself has now expired/been revoked).
-    // Fall back to the auth_code exchange -- but only ever as a
-    // best-effort attempt. If auth_code has already been consumed (the
-    // normal case for anything but a brand-new login), this will fail
-    // and that's expected, not a bug.
-    const authCode = getCookie(PATIENT_AUTH_CODE_KEY);
-    const identity = getCookie(PATIENT_IDENTITY_KEY);
-    if (!authCode || !identity) return null;
-
-    try {
-      const res = await axios.post(
-        `${API_URL}/identity/authorise`,
-        null,
-        { params: { auth_code: authCode, identity } }
-      );
-      const { a_token, refresh_token } = res.data;
+  const authCode = getCookie(PATIENT_AUTH_CODE_KEY);
+  const identity = getCookie(PATIENT_IDENTITY_KEY);
+  if (!authCode || !identity) return null;
+  authorisePromise = axios
+    .post(
+      `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
+      null,
+      { params: { auth_code: authCode, identity } }
+    )
+    .then((res) => {
+      const { a_token } = res.data;
       setCookie(PATIENT_ACCESS_TOKEN_KEY, a_token);
-      if (refresh_token) setCookie(PATIENT_REFRESH_TOKEN_KEY, refresh_token);
       return a_token as string;
-    } catch {
-      // 3. Both refresh and auth_code exchange failed -- this is a genuine
-      // dead session, not a transient hiccup. Clear the stale auth_code/
-      // identity cookies so they can't be retried again on every
-      // subsequent request (which previously just kept silently failing
-      // forever until the response interceptor's 401 handler happened to
-      // fire). Letting this fall through to a real 401 and a real
-      // redirect-to-login is the correct behaviour here.
-      clearCookie(PATIENT_AUTH_CODE_KEY);
-      clearCookie(PATIENT_IDENTITY_KEY);
-      clearCookie(PATIENT_ACCESS_TOKEN_KEY);
-      clearCookie(PATIENT_REFRESH_TOKEN_KEY);
-      return null;
-    }
-  })().finally(() => {
-    authorisePromise = null;
-  });
-
+    })
+    .catch(() => null)
+    .finally(() => {
+      authorisePromise = null;
+    });
   return authorisePromise;
 }
 
+// FIX: the post-login handoff page (apps/health-portal/app/page.tsx) receives
+// ?auth_tkn=...&identity=... as URL query params and previously only
+// dispatched them into Redux, which maybeAuthorise() above never reads --
+// it reads document.cookie. That meant vd_patient_auth_code /
+// vd_patient_identity were never written, so maybeAuthorise() always
+// returned null immediately, every request went out with no Authorization
+// header, and the response interceptor's 401 handler bounced straight back
+// to /auth/login on every page load. These two exports let the handoff page
+// write the cookies maybeAuthorise() actually reads, and wait for the
+// code -> access-token exchange to finish before navigating anywhere.
 function persistPatientSession(authCode: string, identity: string): void {
   setCookie(PATIENT_AUTH_CODE_KEY, authCode);
   setCookie(PATIENT_IDENTITY_KEY, identity);
@@ -172,58 +125,33 @@ async function ensurePatientAccessToken(): Promise<string | null> {
 // ── Provider auth ───────────────────────────────────────────────
 let providerAuthorisePromise: Promise<string | null> | null = null;
 
-async function refreshProviderAccessToken(): Promise<string | null> {
-  const refreshToken = getCookie(PROVIDER_REFRESH_TOKEN_KEY);
-  if (!refreshToken) return null;
-  try {
-    const res = await axios.post(`${API_URL}/identity/refresh-token`, {
-      refresh_token: refreshToken,
-    });
-    const { a_token } = res.data;
-    if (!a_token) return null;
-    setCookie(PROVIDER_ACCESS_TOKEN_KEY, a_token);
-    return a_token as string;
-  } catch {
-    return null;
-  }
-}
-
 async function maybeAuthoriseProvider(): Promise<string | null> {
   // Mirrors maybeAuthorise() but reads/writes the vd_provider_* cookies
-  // instead of vd_patient_*.
+  // instead of vd_patient_*. AuthWrapper is shared between apps/provider
+  // and apps/health-portal, so each app must supply its own ensure-fn
+  // rather than both silently sharing the patient-only implementation
+  // (that mismatch was the root cause of the provider auto-logout bug).
   const token = getCookie(PROVIDER_ACCESS_TOKEN_KEY);
   if (token && !isTokenExpired(token)) return token;
   if (providerAuthorisePromise) return providerAuthorisePromise;
-
-  providerAuthorisePromise = (async () => {
-    const refreshed = await refreshProviderAccessToken();
-    if (refreshed) return refreshed;
-
-    const authCode = getCookie(PROVIDER_AUTH_CODE_KEY);
-    const identity = getCookie(PROVIDER_IDENTITY_KEY);
-    if (!authCode || !identity) return null;
-
-    try {
-      const res = await axios.post(
-        `${API_URL}/identity/authorise`,
-        null,
-        { params: { auth_code: authCode, identity } }
-      );
-      const { a_token, refresh_token } = res.data;
+  const authCode = getCookie(PROVIDER_AUTH_CODE_KEY);
+  const identity = getCookie(PROVIDER_IDENTITY_KEY);
+  if (!authCode || !identity) return null;
+  providerAuthorisePromise = axios
+    .post(
+      `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
+      null,
+      { params: { auth_code: authCode, identity } }
+    )
+    .then((res) => {
+      const { a_token } = res.data;
       setCookie(PROVIDER_ACCESS_TOKEN_KEY, a_token);
-      if (refresh_token) setCookie(PROVIDER_REFRESH_TOKEN_KEY, refresh_token);
       return a_token as string;
-    } catch {
-      clearCookie(PROVIDER_AUTH_CODE_KEY);
-      clearCookie(PROVIDER_IDENTITY_KEY);
-      clearCookie(PROVIDER_ACCESS_TOKEN_KEY);
-      clearCookie(PROVIDER_REFRESH_TOKEN_KEY);
-      return null;
-    }
-  })().finally(() => {
-    providerAuthorisePromise = null;
-  });
-
+    })
+    .catch(() => null)
+    .finally(() => {
+      providerAuthorisePromise = null;
+    });
   return providerAuthorisePromise;
 }
 
@@ -244,7 +172,6 @@ const PUBLIC_PATHS = [
   "/identity/confirm-reset-password",
   "/identity/send-otp",
   "/identity/verify-otp",
-  "/identity/refresh-token",
 ];
 
 function isPublicPath(url?: string): boolean {

@@ -11,7 +11,7 @@ function formatKES(amount: number): string {
 // under a minute). Using `!= null` rather than a truthiness check means a
 // genuine 0-second average still displays as "0s" instead of silently
 // falling back to "—", which was indistinguishable from "no data yet".
-function formatDuration(totalSeconds: number | null | undefined): string {
+function formatDuration(totalSeconds) {
   if (totalSeconds == null) return "—";
   const mins = Math.floor(totalSeconds / 60);
   const secs = Math.round(totalSeconds % 60);

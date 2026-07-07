@@ -126,7 +126,7 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex flex-col items-center m-auto w-full">
+    <div className="flex flex-col items-center w-full">
       <p className="text-xl font-bold mb-5">Login to your account</p>
 
       <form className="flex flex-col gap-2 p-4 w-full max-w-[400px] lg:max-w-[600px]">

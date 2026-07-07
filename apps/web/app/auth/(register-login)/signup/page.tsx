@@ -151,7 +151,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="flex flex-col items-center m-auto w-full">
+    <div className="flex flex-col items-center w-full">
       <p className="text-xl font-bold mb-5">Get started with veri doctor</p>
 
       <form className="flex flex-col gap-2 p-4 rounded-lg max-w-[400px] lg:max-w-[600px] w-full">

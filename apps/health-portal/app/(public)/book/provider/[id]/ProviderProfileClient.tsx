@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -8,6 +9,8 @@ import {
   LucideLanguages,
   LucideShieldCheck,
   LucideStethoscope,
+  LucideStar,
+  LucideMessageSquare,
 } from "@veridoctor/design/icons";
 
 interface Service {
@@ -37,16 +40,60 @@ interface ProviderProfile {
   services: Service[];
 }
 
+interface Review {
+  id: string;
+  patient_first_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+}
+
+interface ReviewsData {
+  average_rating: number | null;
+  review_count: number;
+  reviews: Review[];
+}
+
 function capitalizeFirst(text: string) {
   if (!text) return text;
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function formatReviewDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-KE", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** Renders 5 stars, filled up to `rating` (rounded to nearest whole star
+ * for display purposes — the underlying average can still be fractional,
+ * e.g. 4.3, which is shown as text alongside the stars). */
+function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <LucideStar
+          key={i}
+          size={size}
+          className={
+            i <= Math.round(rating)
+              ? "fill-amber-400 text-amber-400"
+              : "fill-gray-200 text-gray-200"
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function ProviderProfileClient({
   initialProvider,
+  reviewsData,
   id,
 }: {
   initialProvider: ProviderProfile | null;
+  reviewsData: ReviewsData;
   id: string;
 }) {
   const router = useRouter();
@@ -70,6 +117,8 @@ export default function ProviderProfileClient({
 
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
+
+  const hasReviews = reviewsData.review_count > 0 && reviewsData.average_rating !== null;
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto p-4">
@@ -109,6 +158,22 @@ export default function ProviderProfileClient({
             <p className="text-sm text-blue-600 font-medium mt-0.5">
               {provider.speciality || "General Practitioner"}
             </p>
+
+            {/* Star rating summary — only shown once at least one review
+                exists, right under the speciality line where a patient
+                scanning the page will look for it first. */}
+            {hasReviews && (
+              <div className="flex items-center justify-center gap-1.5 mt-2">
+                <StarRow rating={reviewsData.average_rating!} size={15} />
+                <span className="text-sm font-semibold text-gray-700">
+                  {reviewsData.average_rating!.toFixed(1)}
+                </span>
+                <span className="text-xs text-gray-400">
+                  ({reviewsData.review_count} review{reviewsData.review_count !== 1 ? "s" : ""})
+                </span>
+              </div>
+            )}
+
             {provider.subspecialties.length > 0 && (
               <div className="flex flex-wrap justify-center gap-1.5 mt-2">
                 {provider.subspecialties.map((sub) => (
@@ -212,6 +277,41 @@ export default function ProviderProfileClient({
               >
                 {ins}
               </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reviews — only rendered once at least one exists. Only
+          patient_first_name is ever shown, per the API's public serializer,
+          which deliberately excludes last name and identity. */}
+      {reviewsData.reviews.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h2 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <LucideMessageSquare size={16} className="text-blue-500" />
+            Patient Reviews
+          </h2>
+          <div className="space-y-4">
+            {reviewsData.reviews.map((r) => (
+              <div
+                key={r.id}
+                className="border-b border-gray-100 last:border-0 pb-4 last:pb-0"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">
+                    {r.patient_first_name}
+                  </p>
+                  <span className="text-xs text-gray-400">
+                    {formatReviewDate(r.created_at)}
+                  </span>
+                </div>
+                <StarRow rating={r.rating} size={13} />
+                {r.comment && (
+                  <p className="text-sm text-gray-600 mt-1.5 whitespace-pre-wrap">
+                    {r.comment}
+                  </p>
+                )}
+              </div>
             ))}
           </div>
         </div>

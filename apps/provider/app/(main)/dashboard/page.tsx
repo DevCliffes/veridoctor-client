@@ -33,7 +33,11 @@ export interface DashboardStats {
   pending_count: number;
   this_week_appointments: number;
   total_patients_month: number;
-  avg_duration_minutes: number;
+  // Renamed from avg_duration_minutes: the backend now returns whole
+  // seconds instead of pre-rounding to minutes, so short/demo consultations
+  // (a few seconds each) don't collapse down to a misleading "0m" — the
+  // frontend formats this as minutes+seconds instead.
+  avg_duration_seconds: number;
   revenue_mtd: number;
   weekly_data: { date: string; day: string; count: number }[];
 }

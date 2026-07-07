@@ -136,7 +136,11 @@ export default function MainAppLayout({
         <div className="flex flex-1 min-h-0">
           <SideNav navItems={navItems} activePath={pathname} />
           <div className="flex-1 min-h-0 overflow-y-auto bg-white p-1">
-            <div className="max-w-6xl mx-auto pb-8">
+            {/* Removed max-w-6xl mx-auto — that capped content at 1152px
+                and left a growing dead-space border around it at lower
+                zoom levels. w-full + px-4 lets the dashboard grid and
+                charts actually use the available width at any zoom. */}
+            <div className="w-full px-4 pb-8">
               {children}
             </div>
           </div>

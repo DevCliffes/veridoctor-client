@@ -7,6 +7,16 @@ interface MetricsRowProps {
 function formatKES(amount: number): string {
   return `KES ${amount.toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
+// Formats a duration given in whole seconds as "Xm Ys" (or just "Ys" when
+// under a minute). Using `!= null` rather than a truthiness check means a
+// genuine 0-second average still displays as "0s" instead of silently
+// falling back to "—", which was indistinguishable from "no data yet".
+function formatDuration(totalSeconds: number | null | undefined): string {
+  if (totalSeconds == null) return "—";
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = Math.round(totalSeconds % 60);
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
 export function MetricsRow({ stats, loading }: MetricsRowProps) {
   const cards = [
     {
@@ -29,13 +39,7 @@ export function MetricsRow({ stats, loading }: MetricsRowProps) {
     },
     {
       label: "Avg. Duration",
-      // FIX: `stats?.avg_duration_minutes ? ... : "—"` treated a genuine 0
-      // (e.g. an appointment completed in under a minute) as falsy, so the
-      // card silently showed "—" instead of "0m" — indistinguishable from
-      // "no data yet" even though the backend sent a valid number. Using
-      // `!= null` only falls back to "—" when the value is actually
-      // missing (null/undefined), and displays 0 correctly otherwise.
-      value: stats?.avg_duration_minutes != null ? `${stats.avg_duration_minutes}m` : "—",
+      value: formatDuration(stats?.avg_duration_seconds),
       sub: "per consultation",
       color: "bg-primary/10 text-primary",
     },

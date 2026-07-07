@@ -18,6 +18,7 @@ import {
   LucideShieldCheck,
   LucideChevronUp,
   LucideChevronDown,
+  LucideStar,
 } from "@veridoctor/design/icons";
 
 interface Service {
@@ -42,6 +43,8 @@ interface Provider {
   insurances_accepted: string[];
   profile_picture_url?: string;
   services: Service[];
+  average_rating?: number | null;
+  review_count?: number;
 }
 
 interface Slot {
@@ -115,6 +118,25 @@ function getNext7Days() {
   });
 }
 
+/** Renders 5 stars, filled up to the nearest whole star for `rating`. */
+function StarRow({ rating, size = 13 }: { rating: number; size?: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <LucideStar
+          key={i}
+          size={size}
+          className={
+            i <= Math.round(rating)
+              ? "fill-amber-400 text-amber-400"
+              : "fill-gray-200 text-gray-200"
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
 // Doctor image: full-width top section of left panel
 // Falls back to initials on a coloured background
@@ -133,7 +155,6 @@ function ProviderImageHeader({ provider }: { provider: Provider }) {
           fill
           className="object-cover object-top"
         />
-        {/* subtle gradient so text overlays readable */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
       </div>
     );
@@ -375,6 +396,21 @@ function ProviderCard({
             <p className="text-sm text-blue-600 font-medium mt-0.5">
               {provider.speciality || "General Practitioner"}
             </p>
+
+            {/* Star rating summary — only shown once at least one review
+                exists, right under the speciality line. */}
+            {typeof provider.average_rating === "number" && (provider.review_count ?? 0) > 0 && (
+              <div className="flex items-center gap-1.5 mt-1">
+                <StarRow rating={provider.average_rating} size={12} />
+                <span className="text-xs font-semibold text-gray-700">
+                  {provider.average_rating.toFixed(1)}
+                </span>
+                <span className="text-[11px] text-gray-400">
+                  ({provider.review_count})
+                </span>
+              </div>
+            )}
+
             {provider.subspecialties && provider.subspecialties.length > 0 && (
               <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                 {provider.subspecialties.join(" · ")}

@@ -298,7 +298,7 @@ function ProviderCard({
   );
   const [selectedApptType, setSelectedApptType] = useState<"virtual" | "physical">("virtual");
 
-  const visibleDays = days.slice(dayOffset, dayOffset + 2);
+  const visibleDays = days.slice(dayOffset, dayOffset + 3);
 
   const fetchDay = useCallback(
     (day: string) => {
@@ -518,7 +518,7 @@ function ProviderCard({
           </p>
           <div className="flex gap-1">
             <button
-              onClick={() => setDayOffset(Math.max(0, dayOffset - 2))}
+              onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
               disabled={dayOffset === 0}
               className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
             >
@@ -526,9 +526,9 @@ function ProviderCard({
             </button>
             <button
               onClick={() =>
-                setDayOffset(Math.min(days.length - 2, dayOffset + 2))
+                setDayOffset(Math.min(days.length - 3, dayOffset + 3))
               }
-              disabled={dayOffset + 2 >= days.length}
+              disabled={dayOffset + 3 >= days.length}
               className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
             >
               <LucideChevronRight size={14} />
@@ -536,7 +536,7 @@ function ProviderCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {visibleDays.map((day) => (
             <SlotColumn
               key={day}
@@ -895,4 +895,3 @@ export default function BookPage() {
     </div>
   );
 }
-

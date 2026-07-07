@@ -35,43 +35,48 @@ function BenefitsCarousel() {
   }, []);
 
   return (
-    <>
-      <div className="min-h-[140px]">
-        <p className="text-2xl font-bold leading-snug mb-4 text-white">
+    <div className="flex flex-col items-center text-center max-w-md mx-auto">
+      <div className="min-h-[180px] flex flex-col justify-center">
+        <p className="text-4xl font-bold leading-snug mb-5 text-white">
           {SLIDES[current].title}
         </p>
-        <p className="text-sm leading-relaxed text-blue-100 max-w-sm">
+        <p className="text-lg leading-relaxed text-blue-100">
           {SLIDES[current].body}
         </p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 mt-8">
         {SLIDES.map((_, i) => (
           <button
             key={i}
             aria-label={`Show slide ${i + 1}`}
             onClick={() => setCurrent(i)}
-            className={`h-[3px] w-5 rounded-full transition-colors ${
+            className={`h-[3px] w-6 rounded-full transition-colors ${
               i === current ? "bg-white" : "bg-white/35"
             }`}
           />
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex justify-center lg:justify-start w-full min-h-svh">
-      {/* ── Branding panel — logo top, rotating benefits middle, dots bottom ── */}
-      <div className="bg-blue-500 hidden lg:flex flex-col justify-between w-1/2 py-12 px-10">
+      {/* ── Branding panel — logo top, carousel centered in remaining space ── */}
+      <div className="bg-blue-500 hidden lg:flex flex-col w-1/2 py-12 px-10">
         <Link href={"/"} className="flex gap-2 w-fit">
           <p className="text-2xl font-bold text-white">
             VERI <span className="text-blue-100">DOCTOR</span>
           </p>
         </Link>
 
-        <BenefitsCarousel />
+        {/* flex-1 + items-center justify-center centers the carousel both
+            vertically and horizontally in the space below the logo,
+            instead of pinning it to the bottom-left via justify-between. */}
+        <div className="flex-1 flex items-center justify-center">
+          <BenefitsCarousel />
+        </div>
       </div>
 
       {/* ── Form column ── */}
@@ -80,10 +85,6 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           VERI <span className="text-primary">DOCTOR</span>
         </p>
 
-        {/* flex-1 + items-center justify-center centers whatever form is
-            passed in (login, signup, reset-password, verify-email) both
-            vertically and horizontally, instead of relying on the form's
-            own m-auto against a column that also contains the footer. */}
         <div className="flex-1 flex items-center justify-center px-4">
           {children}
         </div>

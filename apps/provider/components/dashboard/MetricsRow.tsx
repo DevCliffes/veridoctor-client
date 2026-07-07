@@ -4,11 +4,9 @@ interface MetricsRowProps {
   stats: DashboardStats | null;
   loading: boolean;
 }
-
 function formatKES(amount: number): string {
   return `KES ${amount.toLocaleString("en-KE", { maximumFractionDigits: 0 })}`;
 }
-
 export function MetricsRow({ stats, loading }: MetricsRowProps) {
   const cards = [
     {
@@ -31,7 +29,13 @@ export function MetricsRow({ stats, loading }: MetricsRowProps) {
     },
     {
       label: "Avg. Duration",
-      value: stats?.avg_duration_minutes ? `${stats.avg_duration_minutes}m` : "—",
+      // FIX: `stats?.avg_duration_minutes ? ... : "—"` treated a genuine 0
+      // (e.g. an appointment completed in under a minute) as falsy, so the
+      // card silently showed "—" instead of "0m" — indistinguishable from
+      // "no data yet" even though the backend sent a valid number. Using
+      // `!= null` only falls back to "—" when the value is actually
+      // missing (null/undefined), and displays 0 correctly otherwise.
+      value: stats?.avg_duration_minutes != null ? `${stats.avg_duration_minutes}m` : "—",
       sub: "per consultation",
       color: "bg-primary/10 text-primary",
     },

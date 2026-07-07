@@ -138,33 +138,29 @@ function StarRow({ rating, size = 13 }: { rating: number; size?: number }) {
 }
 
 // ─────────────────────────────────────────────
-// Doctor image: full-width top section of left panel
-// Falls back to initials on a coloured background
+// Round avatar used in the card's horizontal identity strip.
+// Falls back to initials on a coloured background.
 // ─────────────────────────────────────────────
-function ProviderImageHeader({ provider }: { provider: Provider }) {
+function ProviderAvatarLarge({ provider }: { provider: Provider }) {
   const initials =
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
   const title = provider.title || "Dr.";
 
   if (provider.profile_picture_url) {
     return (
-      <div className="w-full aspect-[4/3] overflow-hidden relative">
-        <Image
-          src={provider.profile_picture_url}
-          alt={`${title} ${provider.first_name} ${provider.last_name}`}
-          fill
-          className="object-cover object-top"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-      </div>
+      <Image
+        src={provider.profile_picture_url}
+        alt={`${title} ${provider.first_name} ${provider.last_name}`}
+        width={64}
+        height={64}
+        className="w-16 h-16 object-cover object-top"
+      />
     );
   }
 
   return (
-    <div className="w-full aspect-[4/3] bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-      <div className="w-24 h-24 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl font-bold shadow-lg">
-        {initials.toUpperCase()}
-      </div>
+    <div className="w-16 h-16 flex items-center justify-center bg-blue-600 text-white font-bold text-lg">
+      {initials.toUpperCase()}
     </div>
   );
 }
@@ -384,23 +380,27 @@ function ProviderCard({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden md:grid md:grid-cols-[340px_minmax(0,1fr)]">
-      {/* ── LEFT PANEL (340 px) ── */}
-      <div className="md:border-r border-gray-100 flex flex-col">
-        <ProviderImageHeader provider={provider} />
-        <div className="p-5 flex flex-col gap-3 flex-1">
-          <div>
-            <h3 className="font-bold text-gray-900 text-lg leading-tight">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* ── IDENTITY STRIP (horizontal, full width) ── */}
+      <div className="flex items-start gap-4 p-5 border-b border-gray-100">
+        <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 bg-blue-50">
+          <ProviderAvatarLarge provider={provider} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <h3 className="font-bold text-gray-900 text-base leading-tight">
               {provider.title || "Dr."} {provider.first_name} {provider.last_name}
             </h3>
-            <p className="text-sm text-blue-600 font-medium mt-0.5">
+            <span className="text-sm text-blue-600 font-medium">
               {provider.speciality || "General Practitioner"}
-            </p>
+            </span>
+          </div>
 
-            {/* Star rating summary — only shown once at least one review
-                exists, right under the speciality line. */}
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            {/* Star rating summary — only shown once at least one review exists */}
             {typeof provider.average_rating === "number" && (provider.review_count ?? 0) > 0 && (
-              <div className="flex items-center gap-1.5 mt-1">
+              <div className="flex items-center gap-1">
                 <StarRow rating={provider.average_rating} size={12} />
                 <span className="text-xs font-semibold text-gray-700">
                   {provider.average_rating.toFixed(1)}
@@ -410,163 +410,151 @@ function ProviderCard({
                 </span>
               </div>
             )}
-
             {provider.subspecialties && provider.subspecialties.length > 0 && (
-              <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                {provider.subspecialties.join(" · ")}
-              </p>
+              <>
+                {typeof provider.average_rating === "number" && (provider.review_count ?? 0) > 0 && (
+                  <span className="text-gray-300">·</span>
+                )}
+                <span className="text-xs text-gray-500">
+                  {provider.subspecialties.join(" · ")}
+                </span>
+              </>
             )}
           </div>
 
-          {(provider.clinic_name || provider.county) && (
-            <p className="text-xs text-gray-500 flex items-start gap-1.5">
-              <LucideMapPin size={13} className="shrink-0 mt-0.5" />
-              {[provider.clinic_name, provider.county].filter(Boolean).join(", ")}
-            </p>
-          )}
+          <div className="flex items-center gap-3 flex-wrap mt-2">
+            {(provider.clinic_name || provider.county) && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <LucideMapPin size={12} className="shrink-0" />
+                {[provider.clinic_name, provider.county].filter(Boolean).join(", ")}
+              </span>
+            )}
+            {languageSummary && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <LucideLanguages size={12} className="shrink-0" />
+                {languageSummary}
+              </span>
+            )}
+            {insuranceSummary && (
+              <span className="flex items-center gap-1 text-xs text-gray-400">
+                <LucideShieldCheck size={12} className="shrink-0" />
+                {insuranceSummary}
+              </span>
+            )}
+          </div>
+        </div>
 
+        <div className="text-right shrink-0">
           {selectedService && (
-            <div className="bg-blue-50 rounded-xl px-4 py-3">
-              <p className="text-xs text-blue-500 font-medium">
-                {selectedService.name}
-              </p>
-              <p className="text-xl font-bold text-gray-900 mt-0.5">
+            <>
+              <p className="text-[11px] text-gray-400">{selectedService.name}</p>
+              <p className="text-lg font-bold text-gray-900 mt-0.5">
                 {selectedService.currency}{" "}
                 {Number(selectedService.price).toLocaleString()}
               </p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {selectedService.estimated_duration} min session
-              </p>
-            </div>
+            </>
           )}
-
-          {(languageSummary || insuranceSummary) && (
-            <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
-              {languageSummary && (
-                <div className="flex items-start gap-2 text-xs text-gray-500">
-                  <LucideLanguages size={13} className="shrink-0 mt-0.5" />
-                  <span>{languageSummary}</span>
-                </div>
-              )}
-              {insuranceSummary && (
-                <div className="flex items-start gap-2 text-xs text-gray-500">
-                  <LucideShieldCheck size={13} className="shrink-0 mt-0.5" />
-                  <span>{insuranceSummary}</span>
-                </div>
-              )}
-            </div>
-          )}
-
           <button
             onClick={() => router.push("/book/provider/" + provider.id)}
-            className="mt-auto flex items-center justify-center gap-1.5 text-[13px] text-blue-600 hover:text-blue-700 font-medium bg-gray-50 hover:bg-gray-100 rounded-lg py-2.5 transition-colors"
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium mt-1.5 ml-auto"
           >
-            Full profile <LucideChevronRightCircle size={14} />
+            Full profile <LucideChevronRightCircle size={13} />
           </button>
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div className="p-5 flex flex-col gap-4">
+      {/* ── CONTROLS ROW (services + appointment type, full width) ── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap p-4 border-b border-gray-100">
         {provider.services.length > 0 && (
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              Service
-            </p>
-            <div className="flex gap-2 flex-wrap">
-              {provider.services.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedServiceId(s.id)}
-                  className={
-                    "text-xs px-3 py-1.5 rounded-lg border transition-colors " +
-                    (selectedServiceId === s.id
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "border-gray-200 text-gray-600 hover:border-gray-300")
-                  }
-                >
-                  {s.name} · {s.estimated_duration}m
-                </button>
-              ))}
-            </div>
+          <div className="flex gap-2 flex-wrap">
+            {provider.services.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedServiceId(s.id)}
+                className={
+                  "text-xs px-3 py-1.5 rounded-lg border transition-colors " +
+                  (selectedServiceId === s.id
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "border-gray-200 text-gray-600 hover:border-gray-300")
+                }
+              >
+                {s.name} · {s.estimated_duration}m
+              </button>
+            ))}
           </div>
         )}
 
-        <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-            Appointment type
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSelectedApptType("virtual")}
+            className={
+              "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors " +
+              (selectedApptType === "virtual"
+                ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
+                : "border-gray-200 text-gray-600")
+            }
+          >
+            <LucideVideo size={13} /> Virtual
+          </button>
+          <button
+            onClick={() => setSelectedApptType("physical")}
+            className={
+              "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors " +
+              (selectedApptType === "physical"
+                ? "bg-green-50 border-green-300 text-green-700 font-medium"
+                : "border-gray-200 text-gray-600")
+            }
+          >
+            <LucideMapPin size={13} /> In-person
+          </button>
+        </div>
+      </div>
+
+      {/* ── AVAILABILITY (full width) ── */}
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-gray-400 uppercase tracking-wide">
+            Availability
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-1">
             <button
-              onClick={() => setSelectedApptType("virtual")}
-              className={
-                "flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs border transition-colors " +
-                (selectedApptType === "virtual"
-                  ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
-                  : "border-gray-200 text-gray-600")
-              }
+              onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
+              disabled={dayOffset === 0}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
             >
-              <LucideVideo size={13} /> Virtual
+              <LucideChevronLeft size={14} />
             </button>
             <button
-              onClick={() => setSelectedApptType("physical")}
-              className={
-                "flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs border transition-colors " +
-                (selectedApptType === "physical"
-                  ? "bg-green-50 border-green-300 text-green-700 font-medium"
-                  : "border-gray-200 text-gray-600")
+              onClick={() =>
+                setDayOffset(Math.min(days.length - 3, dayOffset + 3))
               }
+              disabled={dayOffset + 3 >= days.length}
+              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
             >
-              <LucideMapPin size={13} /> In-person
+              <LucideChevronRight size={14} />
             </button>
           </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-gray-400 uppercase tracking-wide">
-              Availability
-            </p>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
-                disabled={dayOffset === 0}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
-              >
-                <LucideChevronLeft size={14} />
-              </button>
-              <button
-                onClick={() =>
-                  setDayOffset(Math.min(days.length - 3, dayOffset + 3))
-                }
-                disabled={dayOffset + 3 >= days.length}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
-              >
-                <LucideChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {visibleDays.map((day) => (
-              <SlotColumn
-                key={day}
-                day={day}
-                slots={slotsForDay(day)}
-                loading={!!loadingDays[day]}
-                onBook={(slot) => handleBookSlot(slot, day)}
-              />
-            ))}
-          </div>
-
-          {allVisibleDaysLoaded && !anyVisibleDayHasSlots && (
-            <p className="text-xs text-gray-400 text-center mt-3">
-              No bookable times in this range for{" "}
-              {selectedService?.name ?? "this service"} ·{" "}
-              {selectedApptType === "virtual" ? "Virtual" : "In-person"}
-            </p>
-          )}
+        <div className="grid grid-cols-3 gap-3">
+          {visibleDays.map((day) => (
+            <SlotColumn
+              key={day}
+              day={day}
+              slots={slotsForDay(day)}
+              loading={!!loadingDays[day]}
+              onBook={(slot) => handleBookSlot(slot, day)}
+            />
+          ))}
         </div>
+
+        {allVisibleDaysLoaded && !anyVisibleDayHasSlots && (
+          <p className="text-xs text-gray-400 text-center mt-3">
+            No bookable times in this range for{" "}
+            {selectedService?.name ?? "this service"} ·{" "}
+            {selectedApptType === "virtual" ? "Virtual" : "In-person"}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -907,4 +895,3 @@ export default function BookPage() {
     </div>
   );
 }
-

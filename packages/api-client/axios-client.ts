@@ -3,9 +3,11 @@ import {
   PATIENT_ACCESS_TOKEN_KEY,
   PATIENT_AUTH_CODE_KEY,
   PATIENT_IDENTITY_KEY,
+  PATIENT_REFRESH_TOKEN_KEY,
   PROVIDER_ACCESS_TOKEN_KEY,
   PROVIDER_AUTH_CODE_KEY,
   PROVIDER_IDENTITY_KEY,
+  PROVIDER_REFRESH_TOKEN_KEY,
 } from "./constants";
 
 function getCookie(name: string): string | null {
@@ -74,6 +76,36 @@ const axiosClient = axios.create({
 // ── Patient auth ────────────────────────────────────────────────
 let authorisePromise: Promise<string | null> | null = null;
 
+// FIX (intermittent 401s, e.g. on /records/pin/status): auth_code minted at
+// login is single-use -- TokenView deletes the AuthCode row the moment it's
+// exchanged. maybeAuthorise() previously re-used the *same* stored auth_code
+// cookie every time the access token expired, which works exactly once. On
+// every subsequent expiry the exchange 500s server-side (AuthCode.DoesNotExist),
+// the .catch(() => null) below swallows that, and the request goes out with
+// no Authorization header at all -- indistinguishable from "not logged in"
+// to any endpoint using IsAuthenticated. This mints a fresh access token from
+// the long-lived refresh_token instead (which TokenView already returns --
+// it just wasn't being persisted), and only falls back to the one-time
+// auth_code exchange if no refresh token has been stored yet.
+async function refreshPatientAccessToken(): Promise<string | null> {
+  const refreshToken = getCookie(PATIENT_REFRESH_TOKEN_KEY);
+  if (!refreshToken) return null;
+  try {
+    const res = await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/identity/refresh-token`,
+      { refresh_token: refreshToken }
+    );
+    const { a_token } = res.data;
+    setCookie(PATIENT_ACCESS_TOKEN_KEY, a_token);
+    return a_token as string;
+  } catch {
+    // Refresh token itself is dead/invalid (e.g. >1 day old, per
+    // RefreshTokenView's own docstring) -- fall through to auth_code
+    // exchange / eventual re-login rather than erroring here.
+    return null;
+  }
+}
+
 async function maybeAuthorise(): Promise<string | null> {
   // health-portal is patient-facing, so it must read the patient-scoped
   // cookies (vd_patient_*), not the legacy generic ones (access_token,
@@ -82,24 +114,34 @@ async function maybeAuthorise(): Promise<string | null> {
   const token = getCookie(PATIENT_ACCESS_TOKEN_KEY);
   if (token && !isTokenExpired(token)) return token;
   if (authorisePromise) return authorisePromise;
-  const authCode = getCookie(PATIENT_AUTH_CODE_KEY);
-  const identity = getCookie(PATIENT_IDENTITY_KEY);
-  if (!authCode || !identity) return null;
-  authorisePromise = axios
-    .post(
-      `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
-      null,
-      { params: { auth_code: authCode, identity } }
-    )
-    .then((res) => {
-      const { a_token } = res.data;
+
+  authorisePromise = (async () => {
+    const refreshed = await refreshPatientAccessToken();
+    if (refreshed) return refreshed;
+
+    // No usable refresh token yet -- fall back to the original one-time
+    // auth_code exchange (e.g. the very first authenticated request right
+    // after the post-login handoff page, before any refresh token exists).
+    const authCode = getCookie(PATIENT_AUTH_CODE_KEY);
+    const identity = getCookie(PATIENT_IDENTITY_KEY);
+    if (!authCode || !identity) return null;
+    try {
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
+        null,
+        { params: { auth_code: authCode, identity } }
+      );
+      const { a_token, refresh_token } = res.data;
       setCookie(PATIENT_ACCESS_TOKEN_KEY, a_token);
+      if (refresh_token) setCookie(PATIENT_REFRESH_TOKEN_KEY, refresh_token);
       return a_token as string;
-    })
-    .catch(() => null)
-    .finally(() => {
-      authorisePromise = null;
-    });
+    } catch {
+      return null;
+    }
+  })().finally(() => {
+    authorisePromise = null;
+  });
+
   return authorisePromise;
 }
 
@@ -125,6 +167,23 @@ async function ensurePatientAccessToken(): Promise<string | null> {
 // ── Provider auth ───────────────────────────────────────────────
 let providerAuthorisePromise: Promise<string | null> | null = null;
 
+// Mirrors refreshPatientAccessToken() but for the vd_provider_* cookies.
+async function refreshProviderAccessToken(): Promise<string | null> {
+  const refreshToken = getCookie(PROVIDER_REFRESH_TOKEN_KEY);
+  if (!refreshToken) return null;
+  try {
+    const res = await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/identity/refresh-token`,
+      { refresh_token: refreshToken }
+    );
+    const { a_token } = res.data;
+    setCookie(PROVIDER_ACCESS_TOKEN_KEY, a_token);
+    return a_token as string;
+  } catch {
+    return null;
+  }
+}
+
 async function maybeAuthoriseProvider(): Promise<string | null> {
   // Mirrors maybeAuthorise() but reads/writes the vd_provider_* cookies
   // instead of vd_patient_*. AuthWrapper is shared between apps/provider
@@ -134,24 +193,31 @@ async function maybeAuthoriseProvider(): Promise<string | null> {
   const token = getCookie(PROVIDER_ACCESS_TOKEN_KEY);
   if (token && !isTokenExpired(token)) return token;
   if (providerAuthorisePromise) return providerAuthorisePromise;
-  const authCode = getCookie(PROVIDER_AUTH_CODE_KEY);
-  const identity = getCookie(PROVIDER_IDENTITY_KEY);
-  if (!authCode || !identity) return null;
-  providerAuthorisePromise = axios
-    .post(
-      `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
-      null,
-      { params: { auth_code: authCode, identity } }
-    )
-    .then((res) => {
-      const { a_token } = res.data;
+
+  providerAuthorisePromise = (async () => {
+    const refreshed = await refreshProviderAccessToken();
+    if (refreshed) return refreshed;
+
+    const authCode = getCookie(PROVIDER_AUTH_CODE_KEY);
+    const identity = getCookie(PROVIDER_IDENTITY_KEY);
+    if (!authCode || !identity) return null;
+    try {
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/identity/authorise`,
+        null,
+        { params: { auth_code: authCode, identity } }
+      );
+      const { a_token, refresh_token } = res.data;
       setCookie(PROVIDER_ACCESS_TOKEN_KEY, a_token);
+      if (refresh_token) setCookie(PROVIDER_REFRESH_TOKEN_KEY, refresh_token);
       return a_token as string;
-    })
-    .catch(() => null)
-    .finally(() => {
-      providerAuthorisePromise = null;
-    });
+    } catch {
+      return null;
+    }
+  })().finally(() => {
+    providerAuthorisePromise = null;
+  });
+
   return providerAuthorisePromise;
 }
 

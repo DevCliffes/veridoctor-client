@@ -8,7 +8,7 @@ import {
   DatatableFilterTabs,
   StatusBadge,
 } from "@veridoctor/design/shared";
-import { LucideVideo } from "@veridoctor/design/icons";
+import { LucideVideo, LucideStar, LucideX } from "@veridoctor/design/icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type { ReactNode } from "react";
@@ -186,6 +186,161 @@ function RescheduleModal({
   );
 }
 
+// ─────────────────────────────────────────────
+// Review modal — POST /provider/<provider_identity_id>/reviews
+// Backend enforces: appointment must belong to that provider, must be
+// "completed", and can only be reviewed once (see ProviderReviewListView).
+// The 400 "already reviewed" case is treated as a normal outcome here,
+// not an error state — it just means someone already left a review for
+// this exact appointment (e.g. from another tab/device), so we surface a
+// plain message and let the parent hide the button going forward.
+// ─────────────────────────────────────────────
+function StarPicker({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onChange(i)}
+          onMouseEnter={() => setHovered(i)}
+          onMouseLeave={() => setHovered(null)}
+          className="p-0.5"
+        >
+          <LucideStar
+            size={26}
+            className={
+              i <= (hovered ?? value)
+                ? "fill-amber-400 text-amber-400"
+                : "fill-gray-200 text-gray-200"
+            }
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReviewModal({
+  appt,
+  onClose,
+  onSubmitted,
+  onAlreadyReviewed,
+}: {
+  appt: Appointment;
+  onClose: () => void;
+  onSubmitted: (id: string) => void;
+  onAlreadyReviewed: (id: string) => void;
+}) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const doctorLabel = appt.doctor_first_name
+    ? "Dr. " + appt.doctor_first_name + " " + (appt.doctor_last_name ?? "")
+    : "your provider";
+
+  const handleSubmit = async () => {
+    if (rating < 1) {
+      setError("Please select a star rating.");
+      return;
+    }
+    if (!appt.provider_identity_id) {
+      setError("Missing provider information for this appointment.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await axiosClient.post(`/provider/${appt.provider_identity_id}/reviews`, {
+        appointment: appt.id,
+        rating,
+        comment,
+      });
+      toast.success("Thanks for your review!");
+      onSubmitted(appt.id);
+      onClose();
+    } catch (err: any) {
+      const backendError: string | undefined = err?.response?.data?.error;
+      if (backendError?.toLowerCase().includes("already been reviewed")) {
+        toast("You've already reviewed this appointment.");
+        onAlreadyReviewed(appt.id);
+        onClose();
+        return;
+      }
+      setError(backendError || "Failed to submit review. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h3 className="font-semibold text-foreground text-base">Leave a review</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <LucideX size={18} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            How was your consultation with <span className="font-medium text-foreground">{doctorLabel}</span>?
+          </p>
+
+          <div className="flex justify-center py-1">
+            <StarPicker value={rating} onChange={setRating} />
+          </div>
+
+          <div>
+            <label className="text-xs text-muted-foreground uppercase tracking-wide block mb-2">
+              Comment (optional)
+            </label>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Share details of your experience..."
+              rows={3}
+              className="w-full border border-border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-primary bg-muted/30"
+            />
+          </div>
+
+          {error && (
+            <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-border flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex-1 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
+          >
+            {saving ? "Submitting..." : "Submit review"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppointmentsContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -197,6 +352,11 @@ function AppointmentsContent() {
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
+  const [reviewingAppt, setReviewingAppt] = useState<Appointment | null>(null);
+  // Tracks appointment ids that have a review already, so the button can
+  // hide immediately after a successful submit or an "already reviewed"
+  // response, without needing the list endpoint to return review status.
+  const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
 
   const filter = searchParams.get("filter") ?? "upcoming";
 
@@ -245,6 +405,10 @@ function AppointmentsContent() {
     );
   };
 
+  const markReviewed = (id: string) => {
+    setReviewedIds((prev) => new Set(prev).add(id));
+  };
+
   const tableColumns: DatatableColumnHeader[] = [
     { name: "Doctor", type: "string", key: "name" },
     { name: "Service", type: "string", key: "service_name" },
@@ -266,6 +430,10 @@ function AppointmentsContent() {
     const past = isPastAppointment(appt);
     const terminated = ["cancelled", "completed", "no-show"].includes(appt.status);
     const actionsDisabled = past || terminated;
+    const canReview =
+      appt.status === "completed" &&
+      !!appt.provider_identity_id &&
+      !reviewedIds.has(appt.id);
 
     return {
       id: appt.id,
@@ -306,7 +474,14 @@ function AppointmentsContent() {
       ) : (
         <span className="text-xs text-muted-foreground">In-person</span>
       ),
-      actions: actionsDisabled ? (
+      actions: canReview ? (
+        <button
+          onClick={() => setReviewingAppt(appt)}
+          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors font-medium"
+        >
+          <LucideStar size={12} /> Leave a review
+        </button>
+      ) : actionsDisabled ? (
         <div className="flex gap-1">
           <button
             disabled
@@ -359,6 +534,14 @@ function AppointmentsContent() {
           appt={reschedulingAppt}
           onClose={() => setReschedulingAppt(null)}
           onRescheduled={handleRescheduled}
+        />
+      )}
+      {reviewingAppt && (
+        <ReviewModal
+          appt={reviewingAppt}
+          onClose={() => setReviewingAppt(null)}
+          onSubmitted={markReviewed}
+          onAlreadyReviewed={markReviewed}
         />
       )}
       <div className="mb-4">

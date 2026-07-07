@@ -28,6 +28,20 @@ interface ProviderProfile {
   services: Service[];
 }
 
+interface Review {
+  id: string;
+  patient_first_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+}
+
+interface ReviewsData {
+  average_rating: number | null;
+  review_count: number;
+  reviews: Review[];
+}
+
 const apiUrl =
   process.env.NEXT_PUBLIC_API_URL || "https://veridoctor-backend-1.onrender.com";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://app.veridoctor.com";
@@ -50,6 +64,20 @@ async function getProvider(id: string): Promise<ProviderProfile | null> {
   }
 }
 
+async function getReviews(id: string): Promise<ReviewsData> {
+  try {
+    const res = await fetch(`${apiUrl}/provider/${id}/reviews`, {
+      // Reviews change more often than profile data, so a shorter
+      // revalidate window keeps the average rating reasonably fresh.
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return { average_rating: null, review_count: 0, reviews: [] };
+    return await res.json();
+  } catch {
+    return { average_rating: null, review_count: 0, reviews: [] };
+  }
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -69,7 +97,6 @@ export async function generateMetadata({
   const locationPart = [provider.clinic_name, provider.county]
     .filter(Boolean)
     .join(", ");
-
   const description =
     (provider.bio && provider.bio.slice(0, 155)) ||
     `Book an appointment with ${fullName}, ${provider.speciality || "healthcare provider"}${
@@ -107,7 +134,10 @@ export default async function ProviderProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const provider = await getProvider(id);
+  const [provider, reviewsData] = await Promise.all([
+    getProvider(id),
+    getReviews(id),
+  ]);
 
   const jsonLd = provider
     ? {
@@ -125,6 +155,15 @@ export default async function ProviderProfilePage({
             }
           : {}),
         ...(provider.profile_picture_url ? { image: provider.profile_picture_url } : {}),
+        ...(reviewsData.review_count > 0 && reviewsData.average_rating
+          ? {
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: reviewsData.average_rating,
+                reviewCount: reviewsData.review_count,
+              },
+            }
+          : {}),
         url: `${siteUrl}/book/provider/${id}`,
       }
     : null;
@@ -137,7 +176,11 @@ export default async function ProviderProfilePage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <ProviderProfileClient initialProvider={provider} id={id} />
+      <ProviderProfileClient
+        initialProvider={provider}
+        reviewsData={reviewsData}
+        id={id}
+      />
     </>
   );
 }

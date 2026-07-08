@@ -64,6 +64,14 @@ io.on("connection", (socket) => {
   socket.on("newOffer", (offer) => {
     room.offer = offer;
     room.offererSocketId = socket.id;
+    // FIX: a new offer means a brand-new RTCPeerConnection generation on the
+    // offerer's side (e.g. after a reconnect). ICE candidates buffered from
+    // the previous, now-closed peer connection are stale and irrelevant to
+    // the new one — replaying them was the main driver of the ever-growing
+    // "replayed N buffered candidate(s)" counts seen during reconnects, since
+    // this array was never cleared and just accumulated across every
+    // negotiation attempt for the lifetime of the room.
+    room.candidates.offerer = [];
     console.log(`[${roomName}] offer stored`);
     socket.to(roomName).emit("availableOffer", offer);
   });
@@ -71,6 +79,8 @@ io.on("connection", (socket) => {
   // ── Answerer sends their answer ────────────────────────────────────────────
   socket.on("newAnswer", (answer) => {
     room.answer = answer;
+    // Same reasoning as above, mirrored for the answerer's side.
+    room.candidates.answerer = [];
     console.log(`[${roomName}] answer stored`);
     if (room.offererSocketId) {
       io.to(room.offererSocketId).emit("remoteAnswer", answer);

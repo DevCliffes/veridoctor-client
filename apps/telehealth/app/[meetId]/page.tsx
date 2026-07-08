@@ -25,6 +25,17 @@ interface NavigatorWithWakeLock extends Navigator {
   };
 }
 
+// How long a "disconnected" connectionState is allowed to persist before we
+// treat it as a real failure and trigger a full reconnect. "disconnected" is
+// frequently transient (brief packet loss, a momentary network path change,
+// short-lived NAT/ICE hiccup) and often self-recovers back to "connected"
+// within a couple of seconds without any action needed. Reconnecting
+// immediately on every "disconnected" event was tearing down and rebuilding
+// the peer connection far more often than necessary, which is what produced
+// the repeated offer/answer/ICE-candidate replay cycles (and the buffering/
+// disconnection this was meant to fix) visible in the signaling server logs.
+const DISCONNECT_GRACE_PERIOD_MS = 4000;
+
 function TelehealthInner() {
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
@@ -54,6 +65,11 @@ function TelehealthInner() {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const reconnectingRef = useRef(false);
   const reconnectRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  // Holds the pending "disconnected -> reconnect" timer so it can be
+  // cancelled if the connection recovers on its own within the grace period.
+  const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const TELEHEALTH_BACKEND_URL =
     process.env.NEXT_PUBLIC_TELEHEALTH_BACKEND_URL || "http://localhost:4000";
@@ -216,12 +232,40 @@ function TelehealthInner() {
         toast.success("Call connected");
         setIsReconnecting(false);
         reconnectingRef.current = false;
+        // Connection recovered (or was never lost) — cancel any pending
+        // grace-period reconnect so it doesn't fire after the fact.
+        if (disconnectTimeoutRef.current) {
+          clearTimeout(disconnectTimeoutRef.current);
+          disconnectTimeoutRef.current = null;
+        }
       }
-      if (
-        pc.connectionState === "disconnected" ||
-        pc.connectionState === "failed"
-      ) {
+
+      if (pc.connectionState === "failed") {
+        // "failed" is unambiguous — ICE has given up, reconnect immediately.
+        if (disconnectTimeoutRef.current) {
+          clearTimeout(disconnectTimeoutRef.current);
+          disconnectTimeoutRef.current = null;
+        }
         reconnectRef.current?.();
+      }
+
+      if (pc.connectionState === "disconnected") {
+        // FIX: don't reconnect immediately on "disconnected" — it's often
+        // transient and self-recovers. Wait a grace period; only reconnect
+        // if the state is still disconnected/failed once it elapses, and
+        // bail out entirely if the connection has since recovered.
+        if (disconnectTimeoutRef.current) {
+          clearTimeout(disconnectTimeoutRef.current);
+        }
+        disconnectTimeoutRef.current = setTimeout(() => {
+          disconnectTimeoutRef.current = null;
+          if (
+            pc.connectionState === "disconnected" ||
+            pc.connectionState === "failed"
+          ) {
+            reconnectRef.current?.();
+          }
+        }, DISCONNECT_GRACE_PERIOD_MS);
       }
     });
 
@@ -274,6 +318,17 @@ function TelehealthInner() {
   useEffect(() => {
     reconnectRef.current = reconnect;
   }, [reconnect]);
+
+  // Clear any pending grace-period timer on unmount so it can't fire after
+  // the component (or the whole call) has already gone away.
+  useEffect(() => {
+    return () => {
+      if (disconnectTimeoutRef.current) {
+        clearTimeout(disconnectTimeoutRef.current);
+        disconnectTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasJoined || !isReconnecting || isOffererParam || !offer) return;

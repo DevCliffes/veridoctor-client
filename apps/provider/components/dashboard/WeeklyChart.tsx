@@ -16,9 +16,11 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
   const max = Math.max(...weeklyData.map((d) => d.count), 1);
 
   // viewBox stays in its own coordinate space (unitless, purely for the
-  // path math below) — what matters for zoom consistency is that the
-  // rendered <svg> element itself is sized with a Tailwind class (h-24,
-  // aspect-[5/1]) instead of a fixed px height in style={{}}.
+  // path math below) — what matters for the aspect ratio staying correct
+  // across container widths is that the rendered <svg> element is sized
+  // with an aspect-ratio Tailwind class (aspect-[5/1], matching W:H below)
+  // instead of a fixed height, so preserveAspectRatio="none" never has
+  // a mismatched box to stretch into.
   const W = 400;
   const H = 80;
   const PAD_X = 16;
@@ -48,17 +50,19 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
       </div>
 
       {loading ? (
-        <div className="h-24 bg-gray-100 animate-pulse rounded" />
+        <div className="w-full aspect-[5/1] bg-gray-100 animate-pulse rounded" />
       ) : weeklyData.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-8">No data yet</p>
       ) : (
         <div className="relative">
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            // h-24 (6rem) replaces the old style={{ height: "100px" }} —
-            // matches the WeeklyChart bar-chart's own h-24 container so
-            // both charts scale identically with the rest of the page.
-            className="w-full h-24"
+            // aspect-[5/1] matches W=400, H=80 (400/80 = 5) — keeps the
+            // rendered box's ratio locked to the viewBox's ratio at any
+            // container width, so preserveAspectRatio="none" has nothing
+            // to stretch and the line stays visually consistent whether
+            // the sidebar is expanded or collapsed.
+            className="w-full aspect-[5/1]"
             preserveAspectRatio="none"
           >
             <defs>

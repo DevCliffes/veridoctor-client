@@ -16,7 +16,7 @@ import {
 interface Service {
   id: string;
   name: string;
-  price: number;
+  price: number | null;
   currency: string;
   estimated_duration: number;
   description?: string;
@@ -233,9 +233,13 @@ export default function ProviderProfileClient({
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold text-gray-700">
-                    {s.currency} {Number(s.price).toLocaleString()}
-                  </p>
+                  {s.price != null ? (
+                    <p className="text-sm font-semibold text-gray-700">
+                      {s.currency} {Number(s.price).toLocaleString()}
+                    </p>
+                  ) : (
+                    <p className="text-sm italic text-gray-400">Price negotiable</p>
+                  )}
                   <p className="text-xs text-gray-400">{s.estimated_duration} min</p>
                 </div>
               </div>

@@ -166,7 +166,7 @@ export default function Services() {
   );
 
   return (
-    <div className="p-4 bg-white rounded-lg mx-4">
+    <div className="p-4 bg-white rounded-lg">
       {/* Delete confirmation modal */}
       {deletingService && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

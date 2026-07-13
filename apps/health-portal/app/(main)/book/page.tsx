@@ -585,41 +585,46 @@ function BookingModal({
   const [error, setError] = useState("");
 
   const handleConfirm = async () => {
-    if (!patientEmail) {
-      setError("We couldn't verify your account email. Please refresh and try again.");
-      return;
-    }
-    if (!patientFirst || !patientLast) {
-      setError("Your profile is missing a name. Please update your profile first.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await axiosClient.post(
-        "/provider/" + booking.provider.id + "/appointments",
-        {
-          patient_first_name: patientFirst,
-          patient_last_name: patientLast,
-          patient_email: patientEmail,
-          patient_phone_number: patientPhone,
-          start_time: booking.slot.start_time,
-          end_time: booking.slot.end_time,
-          appointment_type: booking.appointmentType,
-          service: booking.slot.service_id,
-          message,
-          status: "scheduled",
-        }
-      );
+  if (!patientEmail) {
+    setError("We couldn't verify your account email. Please refresh and try again.");
+    return;
+  }
+  if (!patientFirst || !patientLast) {
+    setError("Your profile is missing a name. Please update your profile first.");
+    return;
+  }
+  setSaving(true);
+  setError("");
+  try {
+    await axiosClient.post(
+      "/provider/" + booking.provider.id + "/appointments",
+      {
+        patient_first_name: patientFirst,
+        patient_last_name: patientLast,
+        patient_email: patientEmail,
+        patient_phone_number: patientPhone,
+        start_time: booking.slot.start_time,
+        end_time: booking.slot.end_time,
+        appointment_type: booking.appointmentType,
+        service: booking.slot.service_id,
+        message,
+        status: "scheduled",
+      }
+    );
+    booking._invalidate?.();
+    onConfirmed();
+  } catch (err: any) {
+    const backendError = err?.response?.data?.error;
+    if (err?.response?.status === 409) {
+      setError(backendError || "This time slot was just booked by someone else.");
       booking._invalidate?.();
-      onConfirmed();
-    } catch (err: any) {
-      const backendError = err?.response?.data?.error;
+    } else {
       setError(backendError || "Booking failed. Please try again.");
-      setSaving(false);
     }
-  };
-
+    setSaving(false);
+  }
+};
+  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">

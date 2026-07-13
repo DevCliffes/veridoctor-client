@@ -448,14 +448,10 @@ function ProviderCard({
           {selectedService && (
             <>
               <p className="text-[11px] text-gray-400">{selectedService.name}</p>
-              {selectedService.price != null ? (
+              {selectedService.price != null && (
                 <p className="text-lg font-bold text-gray-900 mt-0.5">
                   {selectedService.currency}{" "}
                   {Number(selectedService.price).toLocaleString()}
-                </p>
-              ) : (
-                <p className="text-sm italic text-gray-400 mt-0.5">
-                  Price negotiable
                 </p>
               )}
             </>

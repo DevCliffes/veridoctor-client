@@ -233,12 +233,10 @@ export default function ProviderProfileClient({
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  {s.price != null ? (
+                  {s.price != null && (
                     <p className="text-sm font-semibold text-gray-700">
                       {s.currency} {Number(s.price).toLocaleString()}
                     </p>
-                  ) : (
-                    <p className="text-sm italic text-gray-400">Price negotiable</p>
                   )}
                   <p className="text-xs text-gray-400">{s.estimated_duration} min</p>
                 </div>

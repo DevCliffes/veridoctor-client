@@ -113,11 +113,18 @@ export default function Dashboard() {
           <TodaySchedule identityId={identityId} />
           <WeeklyChart weeklyData={stats?.weekly_data ?? []} loading={statsLoading} />
         </div>
-        <div className="space-y-4">
-          <PendingActions
-            upcomingCount={stats?.pending_count ?? 0}
-            loading={statsLoading}
-          />
+      <div className="space-y-4">
+  <PendingActions
+    upcomingCount={stats?.pending_count ?? 0}
+    loading={statsLoading}
+  />
+  <NewVsReturning
+    newCount={stats?.new_patients_month ?? 0}
+    returningCount={stats?.returning_patients_month ?? 0}
+    loading={statsLoading}
+  />
+  {/* existing quick actions block stays as-is */}
+</div>
           <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-4 space-y-2">
             <p className="font-bold text-sm text-gray-500 uppercase tracking-wide">
               Quick actions

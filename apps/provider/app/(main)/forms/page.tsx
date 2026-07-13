@@ -29,16 +29,18 @@ export default function FormsPage() {
   }, [userId]);
 
   return (
-    <div className="p-4 bg-white rounded-lg mx-4">
+    <div className="p-4 bg-white rounded-lg">
       <>
-        <div className="flex justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold">Forms</h1>
             <p className="text-gray-600 mt-2">
               Build forms you&apos;ll use to serve your patients.
             </p>
           </div>
-          <Button onClick={() => router.push("forms/new")}>New form</Button>
+          <Button onClick={() => router.push("forms/new")} className="w-full sm:w-auto">
+            New form
+          </Button>
         </div>
         <div className="mt-6">
           {loading ? (

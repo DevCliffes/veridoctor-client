@@ -9,6 +9,9 @@ import { MetricsRow } from "../../../components/dashboard/MetricsRow";
 import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
 import { PendingActions } from "../../../components/dashboard/PendingActions";
 import { NewVsReturning } from "../../../components/dashboard/NewVsReturning";
+import { CompletionRate } from "../../../components/dashboard/CompletionRate";
+import { VirtualVsInPerson } from "../../../components/dashboard/VirtualVsInPerson";
+import { RevenueByService } from "../../../components/dashboard/RevenueByService";
 import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
 
 function getIdentityId(identity: unknown): string {
@@ -39,6 +42,13 @@ export interface DashboardStats {
   weekly_data: { date: string; day: string; count: number }[];
   new_patients_month: number;
   returning_patients_month: number;
+  completed_count: number;
+  no_show_count: number;
+  cancelled_count: number;
+  completion_rate: number;
+  virtual_count: number;
+  physical_count: number;
+  revenue_by_service: { service_name: string; revenue: number }[];
 }
 
 interface ProviderProfile {
@@ -112,6 +122,24 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-4">
           <TodaySchedule identityId={identityId} />
           <WeeklyChart weeklyData={stats?.weekly_data ?? []} loading={statsLoading} />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <CompletionRate
+              completedCount={stats?.completed_count ?? 0}
+              noShowCount={stats?.no_show_count ?? 0}
+              cancelledCount={stats?.cancelled_count ?? 0}
+              completionRate={stats?.completion_rate ?? 0}
+              loading={statsLoading}
+            />
+            <VirtualVsInPerson
+              virtualCount={stats?.virtual_count ?? 0}
+              physicalCount={stats?.physical_count ?? 0}
+              loading={statsLoading}
+            />
+          </div>
+          <RevenueByService
+            data={stats?.revenue_by_service ?? []}
+            loading={statsLoading}
+          />
         </div>
         <div className="space-y-4">
           <PendingActions

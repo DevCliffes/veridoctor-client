@@ -36,6 +36,8 @@ export interface DashboardStats {
   avg_duration_seconds: number;
   revenue_mtd: number;
   weekly_data: { date: string; day: string; count: number }[];
+  new_patients_month: number;
+  returning_patients_month: number;
 }
 
 interface ProviderProfile {

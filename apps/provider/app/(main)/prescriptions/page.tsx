@@ -69,22 +69,22 @@ export default function Prescriptions() {
   };
 
   return (
-    <div className="p-4 mx-4 space-y-4">
+    <div className="p-4 space-y-4">
       {/* Header */}
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">Prescriptions</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {prescriptions.length} prescription{prescriptions.length !== 1 ? "s" : ""} written
-            </p>
-          </div>
-          <button
-            onClick={() => router.push("/forms/prescription")}
-            className="flex items-center justify-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-medium w-full sm:w-auto"
-          >
-            <LucidePlus size={16} /> New prescription
-          </button>
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Prescriptions</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {prescriptions.length} prescription{prescriptions.length !== 1 ? "s" : ""} written
+          </p>
         </div>
+        <button
+          onClick={() => router.push("/forms/prescription")}
+          className="flex items-center justify-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-medium w-full sm:w-auto"
+        >
+          <LucidePlus size={16} /> New prescription
+        </button>
+      </div>
 
       {/* List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -109,7 +109,6 @@ export default function Prescriptions() {
           <div className="space-y-3">
             {prescriptions.map((rx) => (
               <div key={rx.id} className="border border-gray-100 rounded-xl overflow-hidden">
-                {/* Row header */}
                 <div
                   className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
                   onClick={() => setExpanded(expanded === rx.id ? null : rx.id)}
@@ -145,11 +144,8 @@ export default function Prescriptions() {
                   </div>
                 </div>
 
-                {/* Expanded detail */}
                 {expanded === rx.id && (
                   <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-4">
-
-                    {/* Patient info */}
                     <div className="flex flex-wrap gap-4">
                       {rx.patient_name && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -165,7 +161,6 @@ export default function Prescriptions() {
                       )}
                     </div>
 
-                    {/* Diagnosis */}
                     {rx.diagnosis && (
                       <div className="bg-white rounded-lg p-3 border border-gray-100">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
@@ -175,7 +170,6 @@ export default function Prescriptions() {
                       </div>
                     )}
 
-                    {/* Drugs */}
                     {rx.drugs?.length > 0 ? (
                       <div className="space-y-2">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
@@ -207,7 +201,6 @@ export default function Prescriptions() {
                       </p>
                     )}
 
-                    {/* Notes */}
                     {rx.notes && (
                       <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-100">
                         <p className="text-xs font-semibold text-yellow-700 mb-1">Additional notes</p>
@@ -224,4 +217,3 @@ export default function Prescriptions() {
     </div>
   );
 }
-

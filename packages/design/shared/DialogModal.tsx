@@ -58,13 +58,20 @@ function DialogModal({
       <DialogTrigger className="h-fit px-2 py-1 rounded-md flex gap-1 items-center bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 cursor-pointer">
         {trigger}
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        {children}
-        <DialogFooter>
+      <DialogContent className="flex flex-col max-h-[85vh] p-0 gap-0">
+        {/* Scrollable region — header + form content. Capped at 85vh minus
+            the footer's own height, so on mobile (where the dialog is
+            taller than the viewport) users can scroll to reach fields
+            and the Save/Cancel buttons below instead of them being cut
+            off with no way to reach them. */}
+        <div className="overflow-y-auto px-6 pt-6 pb-2 flex-1 min-h-0">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
+          </DialogHeader>
+          {children}
+        </div>
+        <DialogFooter className="px-6 py-4 border-t shrink-0">
           <DialogClose className="bg-secondary px-4 rounded-md text-secondary-foreground shadow-xs hover:bg-secondary/80 cursor-pointer">
             cancel
           </DialogClose>

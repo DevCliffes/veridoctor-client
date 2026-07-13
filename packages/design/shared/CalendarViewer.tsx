@@ -214,50 +214,49 @@ function CalendarViewer({
   return (
     <div className="rounded-lg border bg-white mt-4 relative">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={goBack}
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <h2 className="text-base font-semibold min-w-[200px] text-center">
-            {headerLabel}
-          </h2>
-          <button
-            onClick={goForward}
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-          >
-            <ChevronRight size={16} />
-          </button>
-          <button
-            onClick={goToday}
-            className="ml-2 px-3 py-1 text-xs border rounded-md hover:bg-gray-50 transition-colors"
-          >
-            Today
-          </button>
-        </div>
+<div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
+  <div className="flex items-center gap-2">
+    <button
+      onClick={goBack}
+      className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+    >
+      <ChevronLeft size={16} />
+    </button>
+    <h2 className="text-base font-semibold min-w-[140px] sm:min-w-[200px] text-center">
+      {headerLabel}
+    </h2>
+    <button
+      onClick={goForward}
+      className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+    >
+      <ChevronRight size={16} />
+    </button>
+    <button
+      onClick={goToday}
+      className="ml-2 px-3 py-1 text-xs border rounded-md hover:bg-gray-50 transition-colors"
+    >
+      Today
+    </button>
+  </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm">
-            <span className="capitalize">{view}</span>
-            <ChevronDown size={14} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setView("month")}>
-              Month
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setView("week")}>
-              Week
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setView("day")}>
-              Day
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
+  <DropdownMenu>
+    <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm">
+      <span className="capitalize">{view}</span>
+      <ChevronDown size={14} />
+    </DropdownMenuTrigger>
+    <DropdownMenuContent>
+      <DropdownMenuItem onClick={() => setView("month")}>
+        Month
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setView("week")}>
+        Week
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setView("day")}>
+        Day
+      </DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</div>
       {/* Month view */}
       {view === "month" && (
         <>

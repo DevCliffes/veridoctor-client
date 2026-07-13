@@ -8,6 +8,7 @@ import { LucidePlus } from "@veridoctor/design/icons";
 import { MetricsRow } from "../../../components/dashboard/MetricsRow";
 import { TodaySchedule } from "../../../components/dashboard/TodaySchedule";
 import { PendingActions } from "../../../components/dashboard/PendingActions";
+import { NewVsReturning } from "../../../components/dashboard/NewVsReturning";
 import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
 
 function getIdentityId(identity: unknown): string {

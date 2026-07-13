@@ -71,20 +71,20 @@ export default function Prescriptions() {
   return (
     <div className="p-4 mx-4 space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Prescriptions</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {prescriptions.length} prescription{prescriptions.length !== 1 ? "s" : ""} written
-          </p>
+      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Prescriptions</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {prescriptions.length} prescription{prescriptions.length !== 1 ? "s" : ""} written
+            </p>
+          </div>
+          <button
+            onClick={() => router.push("/forms/prescription")}
+            className="flex items-center justify-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-medium w-full sm:w-auto"
+          >
+            <LucidePlus size={16} /> New prescription
+          </button>
         </div>
-        <button
-          onClick={() => router.push("/forms/prescription")}
-          className="flex items-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
-        >
-          <LucidePlus size={16} /> New prescription
-        </button>
-      </div>
 
       {/* List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">

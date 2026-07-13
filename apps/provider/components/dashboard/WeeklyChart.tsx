@@ -79,6 +79,7 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
               strokeWidth="2.5"
               strokeLinejoin="round"
               strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
             />
             {points.map((p) => {
               const isToday = p.date === today;
@@ -91,6 +92,7 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
                     fill={isToday ? "#185FA5" : "#fff"}
                     stroke="#185FA5"
                     strokeWidth="2"
+                    vectorEffect="non-scaling-stroke"
                   />
                   {p.count > 0 && (
                     <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="9" fill="#6b7280">

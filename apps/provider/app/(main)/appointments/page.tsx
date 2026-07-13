@@ -400,12 +400,12 @@ export default function Appointments() {
         />
       )}
 
-      <div className="flex justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Appointments</h1>
           <p className="text-muted-foreground mt-2">Manage your appointments here.</p>
         </div>
-        <Button onClick={openNewAppointment}>
+        <Button onClick={openNewAppointment} className="w-full sm:w-auto">
           <LucidePlus /> New appointment
         </Button>
       </div>

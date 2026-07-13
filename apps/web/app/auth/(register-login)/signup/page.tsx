@@ -18,19 +18,12 @@ type SignupForm = {
   repeatPass: { value: string; valid: boolean };
 };
 
-// Extract the most useful error message from a DRF error response.
-// DRF can return:
-//   { detail: "..." }                        — top-level message
-//   { email: ["already exists"] }            — field errors (array)
-//   { non_field_errors: ["passwords match"] }
 function extractApiError(data: unknown): string {
   if (!data || typeof data !== "object") return "An error occurred. Please try again.";
   const obj = data as Record<string, unknown>;
 
-  // Top-level detail string
   if (typeof obj.detail === "string") return obj.detail;
 
-  // Collect all field-level messages in a sensible order
   const fieldOrder = ["email", "password", "first_name", "last_name", "non_field_errors"];
   for (const field of fieldOrder) {
     if (Array.isArray(obj[field]) && (obj[field] as unknown[]).length > 0) {
@@ -44,7 +37,6 @@ function extractApiError(data: unknown): string {
     }
   }
 
-  // Fallback: grab first value from any key
   for (const key of Object.keys(obj)) {
     const val = obj[key];
     if (Array.isArray(val) && val.length > 0) return String(val[0]);
@@ -81,7 +73,7 @@ export default function Signup() {
   const handleSignupFormChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     if (!Object.hasOwn(signupForm, name)) return;
-    setApiError(null); // clear API error on any change
+    setApiError(null);
     setSignupForm((prev) => ({
       ...prev,
       [name]: { value, valid: true },
@@ -137,8 +129,20 @@ export default function Signup() {
         password: signupForm.password.value,
       })
       .then((res) => {
-        if (res.status === 201)
+        if (res.status === 201) {
           router.push(`/auth/verify-email/${res.data.id}?prev=signup`);
+          return;
+        }
+        // FIX: an email that already exists but was never verified now
+        // comes back as 200 + requires_verification instead of a 400
+        // error, so we route the user straight to the OTP screen (which
+        // has just sent them a fresh code) instead of dead-ending them
+        // on the signup form.
+        if (res.status === 200 && res.data?.requires_verification) {
+          toast.success("This email was already registered. We've sent a new verification code.");
+          router.push(`/auth/verify-email/${res.data.id}?prev=signup`);
+          return;
+        }
       })
       .catch((err) => {
         const message =
@@ -156,7 +160,6 @@ export default function Signup() {
 
       <form className="flex flex-col gap-2 p-4 rounded-lg max-w-[400px] lg:max-w-[600px] w-full">
 
-        {/* ── API error banner ── */}
         {apiError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-1">
             <span className="mt-0.5 shrink-0">⚠</span>

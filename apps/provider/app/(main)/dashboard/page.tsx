@@ -33,10 +33,6 @@ export interface DashboardStats {
   pending_count: number;
   this_week_appointments: number;
   total_patients_month: number;
-  // Renamed from avg_duration_minutes: the backend now returns whole
-  // seconds instead of pre-rounding to minutes, so short/demo consultations
-  // (a few seconds each) don't collapse down to a misleading "0m" — the
-  // frontend formats this as minutes+seconds instead.
   avg_duration_seconds: number;
   revenue_mtd: number;
   weekly_data: { date: string; day: string; count: number }[];
@@ -71,7 +67,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  // Single fetch for all dashboard stats
   useEffect(() => {
     if (!identityId) return;
     setStatsLoading(true);
@@ -82,7 +77,6 @@ export default function Dashboard() {
       .finally(() => setStatsLoading(false));
   }, [identityId]);
 
-  // Profile fetch is separate — lightweight and only needed for the greeting
   useEffect(() => {
     if (!identityId) return;
     axiosClient
@@ -96,7 +90,7 @@ export default function Dashboard() {
     : "";
 
   return (
-    <div className="p-4 mx-4 space-y-6">
+    <div className="p-4 space-y-6">
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <p className="text-xl font-bold">
@@ -109,12 +103,10 @@ export default function Dashboard() {
         </Button>
       </div>
 
-      {/* All three stat-based components receive pre-fetched data — no extra API calls */}
       <MetricsRow stats={stats} loading={statsLoading} />
 
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
-          {/* TodaySchedule still fetches its own list — it needs appointment details */}
           <TodaySchedule identityId={identityId} />
           <WeeklyChart weeklyData={stats?.weekly_data ?? []} loading={statsLoading} />
         </div>

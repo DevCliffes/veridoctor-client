@@ -774,24 +774,25 @@ export default function Schedule() {
   const selectedService = services.find((s) => s.id === selectedServiceId);
 
   return (
+    <div className="p-4 bg-white rounded-lg mx-4">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-bold">Schedule</h1>
-        <p className="text-gray-600 mt-1">
-          Manage your availability for patient bookings.
-        </p>
-      </div>
-      <DialogModal
-        title="Add to schedule"
-        description="Create a new schedule block"
-        trigger={
-          <>
-            <LucidePlus size={20} />
-            Add to calendar
-          </>
-        }
-        onSave={handleSave}
-  >
+        <div>
+          <h1 className="text-xl font-bold">Schedule</h1>
+          <p className="text-gray-600 mt-1">
+            Manage your availability for patient bookings.
+          </p>
+        </div>
+        <DialogModal
+          title="Add to schedule"
+          description="Create a new schedule block"
+          trigger={
+            <>
+              <LucidePlus size={20} />
+              Add to calendar
+            </>
+          }
+          onSave={handleSave}
+        >
           <div className="flex flex-col gap-4 max-w-lg">
             <div>
               {services.length === 0 ? (

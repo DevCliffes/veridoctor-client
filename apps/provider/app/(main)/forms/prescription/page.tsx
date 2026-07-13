@@ -200,13 +200,13 @@ export default function PrescriptionForm() {
 
   return (
     <div className="p-4 mx-4 max-w-3xl space-y-5">
-      {/* Header */}
-      <div className="flex justify-between items-start">
+     {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
         <div>
           <p className="text-xl font-bold">Write prescription</p>
           <p className="text-gray-500 text-sm">Fill in patient details and medications below</p>
         </div>
-        <Button variant="roundedOutline" onClick={() => router.back()}>Cancel</Button>
+        <Button variant="roundedOutline" onClick={() => router.back()} className="w-full sm:w-auto">Cancel</Button>
       </div>
 
       {/* Patient */}
@@ -382,11 +382,11 @@ export default function PrescriptionForm() {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3 pb-8">
-        <Button variant="roundedOutline" onClick={() => window.print()} className="flex-shrink-0">
+      <div className="flex flex-col sm:flex-row gap-3 pb-8">
+        <Button variant="roundedOutline" onClick={() => window.print()} className="w-full sm:w-auto sm:flex-shrink-0">
           <LucidePrinter className="w-4 h-4" /> Preview & print
         </Button>
-        <Button onClick={handleSubmit} disabled={submitting} className="flex-1">
+        <Button onClick={handleSubmit} disabled={submitting} className="w-full sm:flex-1">
           {submitting ? (
             <span className="flex items-center gap-2 justify-center">
               <LucideCheck className="w-4 h-4 animate-pulse" /> Saving...

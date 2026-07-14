@@ -23,11 +23,6 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
   const innerH = H - PAD_Y * 2;
 
   const points = weeklyData.map((d, i) => ({
-    // xPct/yPct are percentage positions (0-100) derived from the same
-    // math as the SVG coordinates below, so the HTML overlay labels line
-    // up with the SVG dots exactly — but because they're plain HTML
-    // positioned by percentage, their font-size is a real px value that
-    // never scales with the SVG viewBox, unlike an in-SVG <text> element.
     xPct: ((PAD_X + (i / Math.max(weeklyData.length - 1, 1)) * innerW) / W) * 100,
     yPct: ((PAD_Y + (1 - d.count / max) * innerH) / H) * 100,
     x: PAD_X + (i / Math.max(weeklyData.length - 1, 1)) * innerW,
@@ -55,7 +50,9 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
       ) : weeklyData.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-8">No data yet</p>
       ) : (
-        <div className="relative">
+        // pt-4 gives the count labels above the highest point (near y=0%)
+        // headroom so they don't crowd the top edge of the card.
+        <div className="relative pt-4">
           <svg
             viewBox={`0 0 ${W} ${H}`}
             className="w-full aspect-[5/1]"
@@ -94,19 +91,18 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
             })}
           </svg>
 
-          {/* Count labels as an HTML overlay, not SVG <text> — SVG text
-              scales its font-size with the viewBox the same way an
-              un-fixed stroke would, which is what made these numbers
-              balloon on wide screens. HTML text sized in px is immune
-              to that scaling regardless of container width. */}
+          {/* HTML overlay for count labels — sized in real px so they
+              never scale with the SVG viewBox. Bumped up from 10px/500
+              gray to 13px/semibold darker gray so they stay legible at
+              any zoom level, not just 100%. */}
           <div className="absolute inset-0 pointer-events-none">
             {points.map((p) => {
               if (p.count === 0) return null;
               return (
                 <span
                   key={p.date}
-                  className="absolute text-[10px] text-gray-500 -translate-x-1/2 -translate-y-full"
-                  style={{ left: `${p.xPct}%`, top: `${p.yPct}%`, marginTop: "-8px" }}
+                  className="absolute text-[13px] font-semibold text-gray-600 -translate-x-1/2 -translate-y-full whitespace-nowrap"
+                  style={{ left: `${p.xPct}%`, top: `${p.yPct}%`, marginTop: "-6px" }}
                 >
                   {p.count}
                 </span>

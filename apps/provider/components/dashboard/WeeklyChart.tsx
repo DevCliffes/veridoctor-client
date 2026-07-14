@@ -15,12 +15,6 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
   const today = new Date().toISOString().split("T")[0];
   const max = Math.max(...weeklyData.map((d) => d.count), 1);
 
-  // viewBox stays in its own coordinate space (unitless, purely for the
-  // path math below) — what matters for the aspect ratio staying correct
-  // across container widths is that the rendered <svg> element is sized
-  // with an aspect-ratio Tailwind class (aspect-[5/1], matching W:H below)
-  // instead of a fixed height, so preserveAspectRatio="none" never has
-  // a mismatched box to stretch into.
   const W = 400;
   const H = 80;
   const PAD_X = 16;
@@ -29,6 +23,13 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
   const innerH = H - PAD_Y * 2;
 
   const points = weeklyData.map((d, i) => ({
+    // xPct/yPct are percentage positions (0-100) derived from the same
+    // math as the SVG coordinates below, so the HTML overlay labels line
+    // up with the SVG dots exactly — but because they're plain HTML
+    // positioned by percentage, their font-size is a real px value that
+    // never scales with the SVG viewBox, unlike an in-SVG <text> element.
+    xPct: ((PAD_X + (i / Math.max(weeklyData.length - 1, 1)) * innerW) / W) * 100,
+    yPct: ((PAD_Y + (1 - d.count / max) * innerH) / H) * 100,
     x: PAD_X + (i / Math.max(weeklyData.length - 1, 1)) * innerW,
     y: PAD_Y + (1 - d.count / max) * innerH,
     ...d,
@@ -57,11 +58,6 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
         <div className="relative">
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            // aspect-[5/1] matches W=400, H=80 (400/80 = 5) — keeps the
-            // rendered box's ratio locked to the viewBox's ratio at any
-            // container width, so preserveAspectRatio="none" has nothing
-            // to stretch and the line stays visually consistent whether
-            // the sidebar is expanded or collapsed.
             className="w-full aspect-[5/1]"
             preserveAspectRatio="none"
           >
@@ -84,25 +80,40 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
             {points.map((p) => {
               const isToday = p.date === today;
               return (
-                <g key={p.date}>
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={isToday ? 5 : 3.5}
-                    fill={isToday ? "#185FA5" : "#fff"}
-                    stroke="#185FA5"
-                    strokeWidth="2"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  {p.count > 0 && (
-                    <text x={p.x} y={p.y - 8} textAnchor="middle" fontSize="9" fill="#6b7280">
-                      {p.count}
-                    </text>
-                  )}
-                </g>
+                <circle
+                  key={p.date}
+                  cx={p.x}
+                  cy={p.y}
+                  r={isToday ? 5 : 3.5}
+                  fill={isToday ? "#185FA5" : "#fff"}
+                  stroke="#185FA5"
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                />
               );
             })}
           </svg>
+
+          {/* Count labels as an HTML overlay, not SVG <text> — SVG text
+              scales its font-size with the viewBox the same way an
+              un-fixed stroke would, which is what made these numbers
+              balloon on wide screens. HTML text sized in px is immune
+              to that scaling regardless of container width. */}
+          <div className="absolute inset-0 pointer-events-none">
+            {points.map((p) => {
+              if (p.count === 0) return null;
+              return (
+                <span
+                  key={p.date}
+                  className="absolute text-[10px] text-gray-500 -translate-x-1/2 -translate-y-full"
+                  style={{ left: `${p.xPct}%`, top: `${p.yPct}%`, marginTop: "-8px" }}
+                >
+                  {p.count}
+                </span>
+              );
+            })}
+          </div>
+
           <div className="flex justify-between mt-1 px-1">
             {weeklyData.map((d) => {
               const isToday = d.date === today;

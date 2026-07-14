@@ -122,33 +122,31 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-4">
           <TodaySchedule identityId={identityId} />
           <WeeklyChart weeklyData={stats?.weekly_data ?? []} loading={statsLoading} />
-          <div className="grid sm:grid-cols-2 gap-4">
-            <CompletionRate
-              completedCount={stats?.completed_count ?? 0}
-              noShowCount={stats?.no_show_count ?? 0}
-              cancelledCount={stats?.cancelled_count ?? 0}
-              completionRate={stats?.completion_rate ?? 0}
-              loading={statsLoading}
-            />
-            <VirtualVsInPerson
-              virtualCount={stats?.virtual_count ?? 0}
-              physicalCount={stats?.physical_count ?? 0}
-              loading={statsLoading}
-            />
-          </div>
-          <RevenueByService
-            data={stats?.revenue_by_service ?? []}
-            loading={statsLoading}
-          />
         </div>
         <div className="space-y-4">
-          <PendingActions
-            upcomingCount={stats?.pending_count ?? 0}
+          <CompletionRate
+            completedCount={stats?.completed_count ?? 0}
+            noShowCount={stats?.no_show_count ?? 0}
+            cancelledCount={stats?.cancelled_count ?? 0}
+            completionRate={stats?.completion_rate ?? 0}
             loading={statsLoading}
           />
           <NewVsReturning
             newCount={stats?.new_patients_month ?? 0}
             returningCount={stats?.returning_patients_month ?? 0}
+            loading={statsLoading}
+          />
+          <VirtualVsInPerson
+            virtualCount={stats?.virtual_count ?? 0}
+            physicalCount={stats?.physical_count ?? 0}
+            loading={statsLoading}
+          />
+          <RevenueByService
+            data={stats?.revenue_by_service ?? []}
+            loading={statsLoading}
+          />
+          <PendingActions
+            upcomingCount={stats?.pending_count ?? 0}
             loading={statsLoading}
           />
           <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-4 space-y-2">

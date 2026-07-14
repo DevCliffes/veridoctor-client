@@ -73,6 +73,11 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
           start_time: startTime,
           end_time: getEndTime(startTime),
           message: formValues.message,
+          // "Now" bookings are walk-ins / express calls the provider needs
+          // to log immediately, so they're allowed to bypass the normal
+          // slot-overlap check on the backend. "Later" bookings always
+          // go through the standard availability check, unaffected by this.
+          is_instant: appointmentTime === "now",
         })
         .then(() => {
           toast.success("Appointment created");
@@ -81,10 +86,6 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
           resolve();
         })
         .catch((err) => {
-          // Surface the backend's actual reason (e.g. "This time slot was
-          // just booked by someone else...") instead of a generic message,
-          // so a real scheduling conflict is distinguishable from an
-          // actual server/network failure.
           const msg =
             err?.response?.data?.error ||
             "Failed to create appointment. Please try again.";

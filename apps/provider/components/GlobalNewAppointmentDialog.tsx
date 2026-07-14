@@ -26,8 +26,6 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
   const [formValues, setFormValues] = useState<AppointmentFormValues>(emptyForm);
   const [appointmentTime, setAppointmentTime] = useState<"now" | "later">("now");
 
-  // Any component can fire window.dispatchEvent(new CustomEvent("vd:new-appointment"))
-  // to open this dialog from anywhere in the app
   useEffect(() => {
     const handler = () => triggerRef.current?.click();
     window.addEventListener("vd:new-appointment", handler);
@@ -36,8 +34,6 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
 
   const getStartTime = () => {
     if (appointmentTime === "now") return new Date().toISOString();
-    // For "later", the start time comes from the slot the provider picked
-    // in AppointmentForm — no more reconstructing it from raw date/time inputs
     return formValues.start_time || "";
   };
 
@@ -84,8 +80,15 @@ export function GlobalNewAppointmentDialog({ userId }: { userId: string }) {
           router.refresh();
           resolve();
         })
-        .catch(() => {
-          toast.error("Failed to create appointment. Please try again.");
+        .catch((err) => {
+          // Surface the backend's actual reason (e.g. "This time slot was
+          // just booked by someone else...") instead of a generic message,
+          // so a real scheduling conflict is distinguishable from an
+          // actual server/network failure.
+          const msg =
+            err?.response?.data?.error ||
+            "Failed to create appointment. Please try again.";
+          toast.error(msg);
           reject();
         });
     });

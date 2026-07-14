@@ -13,7 +13,10 @@ export function NewVsReturning({ newCount, returningCount, loading }: NewVsRetur
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p className="font-semibold text-gray-700 text-sm mb-3">New vs returning</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="font-semibold text-gray-700 text-sm">New vs returning patients</p>
+        <span className="text-xs text-gray-400">This month</span>
+      </div>
 
       {loading ? (
         <div className="h-2.5 bg-gray-100 rounded-full animate-pulse" />
@@ -22,14 +25,8 @@ export function NewVsReturning({ newCount, returningCount, loading }: NewVsRetur
       ) : (
         <>
           <div className="flex h-2.5 rounded-full overflow-hidden">
-            <div
-              className="bg-blue-700"
-              style={{ width: `${newPct}%` }}
-            />
-            <div
-              className="bg-blue-200"
-              style={{ width: `${returningPct}%` }}
-            />
+            <div className="bg-blue-700" style={{ width: `${newPct}%` }} />
+            <div className="bg-blue-200" style={{ width: `${returningPct}%` }} />
           </div>
           <div className="flex justify-between mt-2 text-xs text-gray-500">
             <span className="flex items-center gap-1.5">

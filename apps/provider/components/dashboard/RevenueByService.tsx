@@ -19,7 +19,10 @@ export function RevenueByService({ data, loading }: RevenueByServiceProps) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <p className="font-semibold text-gray-700 text-sm mb-3">Revenue by service</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="font-semibold text-gray-700 text-sm">Revenue by service</p>
+        <span className="text-xs text-gray-400">This month</span>
+      </div>
 
       {loading ? (
         <div className="space-y-3">

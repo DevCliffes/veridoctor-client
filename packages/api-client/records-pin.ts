@@ -21,7 +21,13 @@ export interface PinErrorResponse {
 // type-check correctly regardless of which branch actually ran.
 export type VerifyPinResponse = VerifyPinSuccess & PinErrorResponse;
 
-const PIN_REQUEST_CONFIG = { validateStatus: (s: number) => s < 500 };
+// Only treat these as "not exceptional" — genuine PIN-domain outcomes.
+// 401/403 must still reject so axiosClient's response interceptor can
+// catch them and redirect to /auth/login instead of being shown as a
+// PIN error.
+const PIN_REQUEST_CONFIG = {
+  validateStatus: (s: number) => s === 200 || s === 400 || s === 423,
+};
 
 export const recordsPinApi = {
   status: () =>

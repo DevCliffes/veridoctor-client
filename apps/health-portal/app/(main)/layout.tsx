@@ -37,8 +37,17 @@ import NotificationBell from "../../components/NotificationBell";
 
 export const dynamic = "force-dynamic";
 
-// ✅ Hardcoded — avoids blank env var issue
-const WEB_APP_URL = "https://veridoctor-client-web.vercel.app";
+// FIX: this was previously hardcoded to
+// "https://veridoctor-client-web.vercel.app" -- a Vercel preview alias,
+// not the production custom domain. Session and pending-redirect cookies
+// are written with Domain=.veridoctor.com, which is NOT visible on a
+// vercel.app domain (it's not a subdomain of veridoctor.com). Sending an
+// unauthenticated/timed-out user there meant the pending-redirect cookie
+// (and any session cookies) were invisible once they landed, breaking the
+// "return to the page you were on after logging in again" flow -- caught
+// via live testing, not code review. Now pinned to the confirmed
+// canonical production domain, matching provider's layout exactly.
+const WEB_APP_URL = "https://www.veridoctor.com";
 
 export default function MainAppLayout({
   children,

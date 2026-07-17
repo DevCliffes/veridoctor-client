@@ -451,10 +451,10 @@ function ConsultationCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full text-left px-5 py-4 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors"
+        className="w-full text-left px-5 py-4 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors rounded-t-2xl"
       >
         <div className="flex gap-3 items-start flex-1 min-w-0">
           <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
@@ -516,7 +516,7 @@ function ConsultationCard({
       )}
 
       {expanded && record.captures && record.captures.length > 0 && (
-        <div className="border-t border-gray-100 px-5 py-4 space-y-5 bg-gray-50">
+        <div className="border-t border-gray-100 px-5 py-4 space-y-5 bg-gray-50 rounded-b-2xl">
           {record.captures.map((cap, i) => (
             <CaptureBlock key={i} capture={cap} />
           ))}

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppSelector } from "../../hooks";
 import { axiosClient, recordsPinApi } from "@veridoctor/api-client";
 import { useRecordsUnlock } from "../../useRecordsUnlock";
@@ -227,7 +227,27 @@ function SensitivityToggle({
 }) {
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const [direction, setDirection] = useState<"up" | "down">("down");
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const config = SENSITIVITY_CONFIG[current];
+
+  // Rough height of the fully-rendered menu (3 options + header). Used only
+  // to decide up vs down — doesn't need to be exact, just in the right ballpark.
+  const ESTIMATED_MENU_HEIGHT = 280;
+
+  const handleToggleOpen = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // Prefer opening downward (natural reading direction); only flip up
+      // if there isn't enough room below but there is enough above.
+      setDirection(
+        spaceBelow < ESTIMATED_MENU_HEIGHT && spaceAbove > spaceBelow ? "up" : "down"
+      );
+    }
+    setOpen((o) => !o);
+  };
 
   const handleSelect = async (val: Sensitivity) => {
     if (val === current) { setOpen(false); return; }
@@ -246,7 +266,8 @@ function SensitivityToggle({
   return (
     <div className="relative">
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        ref={triggerRef}
+        onClick={(e) => { e.stopPropagation(); handleToggleOpen(); }}
         disabled={saving}
         className={
           "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-colors " +
@@ -263,7 +284,12 @@ function SensitivityToggle({
         <>
           {/* backdrop */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 bottom-full mb-2 z-20 bg-white rounded-xl border border-gray-200 shadow-lg w-64 overflow-hidden">
+          <div
+            className={
+              "absolute right-0 z-20 bg-white rounded-xl border border-gray-200 shadow-lg w-64 overflow-hidden " +
+              (direction === "up" ? "bottom-full mb-2" : "top-full mt-2")
+            }
+          >
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 pt-3 pb-1">
               Who can see these records?
             </p>

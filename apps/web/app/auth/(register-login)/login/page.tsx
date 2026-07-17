@@ -1,12 +1,12 @@
 "use client";
 
 import { useAppDispatch } from "@/app/hooks";
-import { axiosClient } from "@veridoctor/api-client";
+import { axiosClient, consumePendingRedirect } from "@veridoctor/api-client";
 import { Button } from "@veridoctor/design/components";
 import { LucideEye, LucideEyeClosed } from "@veridoctor/design/icons";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChangeEvent, useState, Suspense } from "react";
+import { ChangeEvent, useState, useEffect, Suspense } from "react";
 import { Loader2 } from "@veridoctor/design/icons";
 import { toast } from "sonner";
 import { setIsLoggedIn, setUser } from "@veridoctor/store";
@@ -57,6 +57,26 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect") ?? "";
 
+  // FIX: on timeout/involuntary logout, axios-client's response interceptor
+  // and AuthWrapper now send users to the homepage instead of straight to
+  // /auth/login?redirect=<path>, stashing the path in a short-lived cookie
+  // (vd_pending_redirect) instead. If the user then navigates here from the
+  // homepage's own login link/button (which carries no ?redirect= of its
+  // own), we still want to send them back to where they were once they log
+  // in -- so fall back to that cookie when the URL doesn't already specify
+  // one. Explicit ?redirect= in the URL (e.g. a "please log in to view
+  // this" link elsewhere that points straight at /auth/login) still wins.
+  const [pendingRedirect, setPendingRedirectState] = useState("");
+  useEffect(() => {
+    if (!redirectParam) {
+      const stored = consumePendingRedirect();
+      if (stored) setPendingRedirectState(stored);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const effectiveRedirect = redirectParam || pendingRedirect;
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
@@ -102,8 +122,8 @@ function LoginForm() {
           toast.success("Login successful!");
           dispatch(setIsLoggedIn());
           dispatch(setUser(res.data.user));
-          const redirectQuery = redirectParam
-            ? `&redirect=${encodeURIComponent(redirectParam)}`
+          const redirectQuery = effectiveRedirect
+            ? `&redirect=${encodeURIComponent(effectiveRedirect)}`
             : "";
           router.push(
             `/auth/accounts/${res.data.user.id}?auth_tkn=${res.data.auth_code}${redirectQuery}`,

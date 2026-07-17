@@ -263,7 +263,7 @@ function SensitivityToggle({
         <>
           {/* backdrop */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-20 bg-white rounded-xl border border-gray-200 shadow-lg w-64 overflow-hidden">
+          <div className="absolute right-0 bottom-full mb-2 z-20 bg-white rounded-xl border border-gray-200 shadow-lg w-64 overflow-hidden">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 pt-3 pb-1">
               Who can see these records?
             </p>

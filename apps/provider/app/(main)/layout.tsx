@@ -50,6 +50,10 @@ import NotificationBell from "../../components/NotificationBell";
 // the pending-redirect handoff on timeout.
 const WEB_APP_URL = "https://www.veridoctor.com";
 
+// Poll cadence while a provider is waiting on onboarding approval, so they
+// get unlocked automatically without having to log out/in.
+const ONBOARDING_POLL_INTERVAL_MS = 30000;
+
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
     if (!identity) return "";
@@ -68,10 +72,22 @@ function getIdentityId(identity: unknown): string {
   return "";
 }
 
+// Mirrors the derived enum returned by ProviderProfileView.get() on the
+// backend. Kept as a union (not a generic string) so a typo in a
+// comparison anywhere in this file fails at compile time instead of
+// silently never matching.
+type OnboardingStatus =
+  | "incomplete_profile"
+  | "pending_review"
+  | "documents_rejected"
+  | "approved";
+
 interface ProviderProfile {
   first_name: string;
   last_name: string;
   title?: string;
+  profile_complete: boolean;
+  onboarding_status: OnboardingStatus;
 }
 
 export default function MainAppLayout({
@@ -80,6 +96,7 @@ export default function MainAppLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { access_token, identity, auth_code } = useAppSelector(
     (store) => store.auth,
   );
@@ -87,14 +104,67 @@ export default function MainAppLayout({
 
   const identityId = getIdentityId(identity);
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
 
+  // ── Initial profile fetch ───────────────────────────────────────────
   useEffect(() => {
     if (!identityId) return;
+
+    let cancelled = false;
+    setProfileLoading(true);
+
     axiosClient
       .get(`/provider/${identityId}/profile`)
-      .then((res) => setProfile(res.data))
-      .catch(() => {});
+      .then((res) => {
+        if (cancelled) return;
+        setProfile(res.data);
+      })
+      .catch(() => {
+        // Fail open: if the profile fetch itself errors out (network
+        // blip, Render cold start), don't lock the provider out of the
+        // whole app. `profile` stays null, and the render logic below
+        // treats null profile as "let them through, gate inactive."
+        // Only an explicit onboarding_status !== "approved" blocks access.
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [identityId]);
+
+  // ── Poll while not yet approved, so approval unblocks without re-login ──
+  useEffect(() => {
+    if (!identityId) return;
+    if (!profile) return; // wait for the initial load to resolve first
+    if (profile.onboarding_status === "approved") return; // nothing to poll for
+
+    const interval = setInterval(() => {
+      axiosClient
+        .get(`/provider/${identityId}/profile`)
+        .then((res) => setProfile(res.data))
+        .catch(() => {});
+    }, ONBOARDING_POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [identityId, profile?.onboarding_status]);
+
+  const isProfilePage = pathname?.startsWith("/profile") ?? false;
+
+  // ── Redirect gate ────────────────────────────────────────────────────
+  // Gate on onboarding_status !== "approved", not on "first login" — this
+  // also re-blocks a provider if a document gets rejected later, or if
+  // they close the tab mid-onboarding and come back on day 3.
+  useEffect(() => {
+    if (!identityId) return;
+    if (profileLoading) return;
+    if (!profile) return; // fetch failed — fail open, don't gate
+    if (profile.onboarding_status !== "approved" && !isProfilePage) {
+      router.replace("/profile");
+    }
+  }, [identityId, profileLoading, profile, isProfilePage, router]);
 
   const displayName = profile
     ? `${profile.title ?? "Dr."} ${profile.first_name} ${profile.last_name}`
@@ -124,38 +194,98 @@ export default function MainAppLayout({
     dispatch(setIsLoggedIn());
   };
 
+  // While the profile fetch is in flight, or while we're about to redirect
+  // an unapproved provider off a blocked route, render a blank shell
+  // instead of the dashboard — otherwise there's a flash of real content
+  // before the redirect (or the SideNav) kicks in.
+  const awaitingRedirect =
+    !!profile && profile.onboarding_status !== "approved" && !isProfilePage;
+
+  if (identityId && (profileLoading || awaitingRedirect)) {
+    return <LoadingShell />;
+  }
+
+  // Gate is only ever "active" in the render below when the provider is
+  // unapproved AND already on /profile — every other unapproved case was
+  // already redirected above.
+  const gateActive = !!profile && profile.onboarding_status !== "approved";
+
   return (
     <AuthWrapper
       authInfo={authInfo}
       setAuthInfo={(token) => setAuthInfo(token)}
       ensureAccessToken={ensureProviderAccessToken}
     >
-      <GlobalNewAppointmentDialog userId={identityId} />
+      {!gateActive && <GlobalNewAppointmentDialog userId={identityId} />}
 
       <div className="fixed bg-white top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
         <TopNav
           center={<p>{displayName}</p>}
           right={
             <div className="flex items-center gap-2">
-              <NotificationBell identityId={identityId} />
+              {!gateActive && <NotificationBell identityId={identityId} />}
               <ProfileDropdown dispatch={dispatch} />
             </div>
           }
         />
         <div className="flex flex-1 min-h-0">
-          <SideNav navItems={navItems} activePath={pathname} />
+          {!gateActive && <SideNav navItems={navItems} activePath={pathname} />}
           <div className="flex-1 min-h-0 overflow-y-auto bg-white p-1">
             {/* Removed max-w-6xl mx-auto — that capped content at 1152px
                 and left a growing dead-space border around it at lower
                 zoom levels. w-full + px-4 lets the dashboard grid and
                 charts actually use the available width at any zoom. */}
             <div className="w-full px-4 pb-8">
+              {gateActive && profile && (
+                <OnboardingStatusBanner status={profile.onboarding_status} />
+              )}
               {children}
             </div>
           </div>
         </div>
       </div>
     </AuthWrapper>
+  );
+}
+
+function LoadingShell() {
+  return (
+    <div className="fixed bg-white top-0 left-0 h-svh w-full flex items-center justify-center">
+      <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-500 animate-spin" />
+    </div>
+  );
+}
+
+function OnboardingStatusBanner({ status }: { status: OnboardingStatus }) {
+  const config: Record
+    Exclude<OnboardingStatus, "approved">,
+    { className: string; title: string; body: string }
+  > = {
+    incomplete_profile: {
+      className: "bg-amber-50 border-amber-300 text-amber-900",
+      title: "Finish setting up your profile",
+      body: "Please complete all required fields and documents below before you can access the dashboard.",
+    },
+    pending_review: {
+      className: "bg-blue-50 border-blue-300 text-blue-900",
+      title: "Your documents are under review",
+      body: "This usually takes 1–2 business days. You'll be unlocked automatically once approved — no need to log out and back in.",
+    },
+    documents_rejected: {
+      className: "bg-red-50 border-red-300 text-red-900",
+      title: "One or more documents were rejected",
+      body: "Please review the flagged documents below and re-upload them so we can continue the review.",
+    },
+  };
+
+  if (status === "approved") return null;
+  const { className, title, body } = config[status];
+
+  return (
+    <div className={`w-full border rounded-lg px-4 py-3 mb-4 ${className}`}>
+      <p className="font-medium">{title}</p>
+      <p className="text-sm mt-0.5">{body}</p>
+    </div>
   );
 }
 

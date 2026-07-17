@@ -257,7 +257,7 @@ function LoadingShell() {
 }
 
 function OnboardingStatusBanner({ status }: { status: OnboardingStatus }) {
-  const config: Record
+  const config: Record<
     Exclude<OnboardingStatus, "approved">,
     { className: string; title: string; body: string }
   > = {

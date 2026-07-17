@@ -10,6 +10,15 @@ import {
   PROVIDER_REFRESH_TOKEN_KEY,
 } from "./constants";
 
+// Shared across patient + provider apps: where to stash the path a user was
+// on before we bounce them to the homepage on timeout/unauthenticated
+// access, so the login page can send them back after they log in again.
+const PENDING_REDIRECT_KEY = "vd_pending_redirect";
+const PENDING_REDIRECT_MAX_AGE_SECONDS = 600; // 10 minutes -- long enough to
+// cover "got timed out, went and made coffee, came back and logged in",
+// short enough that a stale cookie from a long-abandoned session doesn't
+// resurface and redirect someone somewhere unexpected days later.
+
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
@@ -22,6 +31,38 @@ function setCookie(name: string, value: string): void {
     ? "; domain=.veridoctor.com"
     : "";
   document.cookie = `${name}=${encodeURIComponent(value)};path=/${domain};secure;samesite=lax`;
+}
+
+function setCookieWithMaxAge(name: string, value: string, maxAgeSeconds: number): void {
+  if (typeof document === "undefined") return;
+  const domain = window.location.hostname.includes("veridoctor.com")
+    ? "; domain=.veridoctor.com"
+    : "";
+  document.cookie = `${name}=${encodeURIComponent(value)};path=/${domain};max-age=${maxAgeSeconds};secure;samesite=lax`;
+}
+
+function clearCookie(name: string): void {
+  if (typeof document === "undefined") return;
+  const domain = window.location.hostname.includes("veridoctor.com")
+    ? "; domain=.veridoctor.com"
+    : "";
+  document.cookie = `${name}=;path=/${domain};max-age=0;secure;samesite=lax`;
+}
+
+// Call before redirecting an involuntarily-logged-out user to the homepage,
+// so the login page can send them back to where they were.
+function setPendingRedirect(path: string): void {
+  if (!path || path === "/") return; // nothing worth remembering
+  setCookieWithMaxAge(PENDING_REDIRECT_KEY, path, PENDING_REDIRECT_MAX_AGE_SECONDS);
+}
+
+// Call once, on the login page, to read AND clear the pending redirect so
+// it can't leak into an unrelated later visit. Returns null if there
+// wasn't one (e.g. the user navigated to /auth/login directly).
+function consumePendingRedirect(): string | null {
+  const value = getCookie(PENDING_REDIRECT_KEY);
+  if (value) clearCookie(PENDING_REDIRECT_KEY);
+  return value;
 }
 
 function getSafeLoginUrl(): string {
@@ -268,9 +309,17 @@ axiosClient.interceptors.response.use(
       (error.response?.status === 401 || error.response?.status === 403)
     ) {
       if (typeof window !== "undefined") {
+        // CHANGED: previously redirected straight to
+        // `${loginBase}/auth/login?redirect=<path>`. Now we stash the path
+        // in a short-lived cookie and send the user to the homepage
+        // instead -- the login page picks the pending redirect back up via
+        // consumePendingRedirect() once they log in again. This lets an
+        // involuntary logout (timeout / expired session) land people on
+        // the main site rather than dropping them straight on a bare login
+        // form, while still returning them to what they were doing.
         const loginBase = getSafeLoginUrl();
-        const redirectPath = encodeURIComponent(window.location.pathname);
-        window.location.href = `${loginBase}/auth/login?redirect=${redirectPath}`;
+        setPendingRedirect(window.location.pathname + window.location.search);
+        window.location.href = `${loginBase}/`;
       }
     }
     return Promise.reject(error);
@@ -283,4 +332,6 @@ export {
   ensurePatientAccessToken,
   persistProviderSession,
   ensureProviderAccessToken,
+  setPendingRedirect,
+  consumePendingRedirect,
 };

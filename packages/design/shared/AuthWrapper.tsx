@@ -5,6 +5,27 @@ export type TokenPayload = {
   refresh_token: string;
 };
 
+// Same key/shape as setPendingRedirect()/consumePendingRedirect() in
+// @veridoctor/api-client's axios-client.ts. Duplicated here (rather than
+// importing from api-client) to avoid adding a new cross-package
+// dependency from @veridoctor/design/shared -- this component is already
+// shared between apps/provider and apps/health-portal on its own, and
+// keeping it self-contained matches how the rest of the auth cookie logic
+// in this codebase is already duplicated per-package rather than shared.
+const PENDING_REDIRECT_KEY = "vd_pending_redirect";
+const PENDING_REDIRECT_MAX_AGE_SECONDS = 600; // 10 minutes
+
+function setPendingRedirectCookie(path: string): void {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  if (!path || path === "/") return; // nothing worth remembering
+  const domain = window.location.hostname.includes("veridoctor.com")
+    ? "; domain=.veridoctor.com"
+    : "";
+  document.cookie = `${PENDING_REDIRECT_KEY}=${encodeURIComponent(
+    path
+  )};path=/${domain};max-age=${PENDING_REDIRECT_MAX_AGE_SECONDS};secure;samesite=lax`;
+}
+
 function getSafeLoginUrl(loginUrl?: string): string {
   if (loginUrl && loginUrl.startsWith("https://")) {
     return loginUrl;
@@ -61,7 +82,7 @@ function AuthWrapper({
       return;
     }
     // FIX: this used to fire its own raw POST to /identity/authorise using
-    // whatever auth_code sat in Redux — with no idea whether that code was
+    // whatever auth_code sat in Redux -- with no idea whether that code was
     // already consumed elsewhere (e.g. page.tsx's handoff flow already
     // exchanged it via the cookie-based ensure-fn). A one-time-use
     // auth_code being spent twice always fails the second time, which
@@ -73,7 +94,7 @@ function AuthWrapper({
     // promise instead of racing it with a second, redundant exchange.
     // FIX 2: ensureAccessToken is now passed in as a prop rather than
     // hardcoded to ensurePatientAccessToken, since this component is
-    // shared between apps/provider and apps/health-portal — each app
+    // shared between apps/provider and apps/health-portal -- each app
     // must supply the ensure-fn that matches its own cookie namespace.
     ensureAccessToken()
       .then((token) => {
@@ -88,16 +109,22 @@ function AuthWrapper({
       .finally(() => {
         setChecked(true);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authInfo.isLoggedIn, authInfo.identity, authInfo.auth_code]);
 
   React.useEffect(() => {
     if (!checked || isAuthenticated) return;
     if (typeof window !== "undefined") {
+      // CHANGED: previously redirected straight to
+      // `${loginBase}/auth/login?redirect=<path>`. Now we stash the path
+      // in the same pending-redirect cookie the axios-client response
+      // interceptor uses, and send the user to the homepage instead --
+      // the login page reads it back via consumePendingRedirect() once
+      // they log in again.
       const loginBase = getSafeLoginUrl(authInfo.loginUrl);
-      const redirectPath = encodeURIComponent(window.location.pathname);
+      setPendingRedirectCookie(window.location.pathname + window.location.search);
       const timer = setTimeout(() => {
-        window.location.href = `${loginBase}/auth/login?redirect=${redirectPath}`;
+        window.location.href = `${loginBase}/`;
       }, 300);
       return () => clearTimeout(timer);
     }

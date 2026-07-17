@@ -39,7 +39,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { GlobalNewAppointmentDialog } from "../../components/GlobalNewAppointmentDialog";
 import NotificationBell from "../../components/NotificationBell";
 
-const WEB_APP_URL = "https://veridoctor.com";
+// FIX: this was already "https://veridoctor.com" (no www), while
+// health-portal's equivalent constant was hardcoded to a stale Vercel
+// preview alias ("https://veridoctor-client-web.vercel.app"). Both are now
+// pinned to the confirmed canonical production domain, www.veridoctor.com,
+// which is what actually serves / and /auth/login (per Vercel request
+// logs) and matches the Domain=.veridoctor.com scope that session and
+// pending-redirect cookies are written with. A mismatch here sends the
+// browser to a domain outside that cookie scope, which silently breaks
+// the pending-redirect handoff on timeout.
+const WEB_APP_URL = "https://www.veridoctor.com";
 
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {

@@ -546,7 +546,10 @@ function DocumentImageUpload({
   };
 
   return (
-    <div className="flex flex-col gap-1">
+    // id={fieldName} lets a notification deep link (e.g. /profile#operating_licence_image)
+    // scroll straight to this exact upload control -- see the hash-scroll
+    // effect in ProfilePage below.
+    <div id={fieldName} className="flex flex-col gap-1 rounded-xl scroll-mt-6 transition-shadow duration-300">
       <label className="text-xs text-gray-400 uppercase tracking-wide font-medium">{label}</label>
       <div
         className="border border-dashed border-gray-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-blue-300 transition-colors bg-gray-50"
@@ -602,7 +605,8 @@ function LogoUpload({ currentUrl, identityId, onUploaded, review }: {
   };
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    // Same id-for-deep-link treatment as DocumentImageUpload above.
+    <div id="clinic_logo_url" className="flex flex-col items-center gap-1 rounded-xl scroll-mt-6 transition-shadow duration-300">
       <div className="relative shrink-0">
         <div
           className="w-16 h-16 rounded-xl border-2 border-gray-200 bg-gray-100 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-300 transition-colors"
@@ -758,6 +762,33 @@ export default function ProfilePage() {
       })
       .catch(() => {});
   }, [identityId]);
+
+  // ─────────────────────────────────────────────────────────────────
+  // Deep-link scroll + highlight
+  // A rejection notification's `link` points at /profile#<field_name>
+  // (see admin.py's _notify_provider_of_review). Once the page has
+  // finished its initial load, jump straight to that field and flash
+  // a red ring around it for a few seconds so the doctor doesn't have
+  // to hunt through the whole form for the one badge that changed.
+  // Runs once loading flips to false; harmless no-op if there's no hash.
+  // ─────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (loading) return;
+    const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
+    if (!hash) return;
+    // Wait a tick for the DOM to paint after the loading spinner clears.
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(hash);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-red-400");
+      const t = setTimeout(() => {
+        el.classList.remove("ring-2", "ring-red-400");
+      }, 3000);
+      return () => clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [loading]);
 
   const set = (field: keyof ProviderProfile, value: string) =>
     setProfile((prev) => ({ ...prev, [field]: value }));

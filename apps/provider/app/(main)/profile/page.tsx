@@ -11,7 +11,6 @@ import {
   LucideCamera,
   LucideLoader2,
   LucideCheck,
-  LucidePencil,
   LucideUpload,
   LucideFileText,
   LucidePlus,
@@ -20,6 +19,7 @@ import {
   LucideZoomIn,
   LucideZoomOut,
   LucideX,
+  LucideAlertTriangle,
 } from "@veridoctor/design/icons";
 
 interface ExtraCredential {
@@ -62,6 +62,18 @@ interface ProviderProfile {
   extra_credentials: ExtraCredential[];
 }
 
+interface DocumentReview {
+  field_name: string;
+  field_label: string;
+  status: "pending" | "approved" | "rejected";
+  status_label: string;
+  document_url: string;
+  rejection_category: string;
+  rejection_category_label: string;
+  rejection_reason: string;
+  reviewed_at: string | null;
+}
+
 const KENYAN_COUNTIES = [
   "Nairobi","Mombasa","Kisumu","Nakuru","Eldoret","Thika","Malindi","Kitale",
   "Garissa","Kakamega","Nyeri","Machakos","Meru","Kisii","Kilifi","Kericho",
@@ -91,6 +103,63 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const CROP_ASPECT_W = 4;
 const CROP_ASPECT_H = 3;
 
+// Mirrors HealthcareProvider.REQUIRED_TEXT_FIELDS / REQUIRED_IMAGE_FIELDS
+// on the backend (provider/models.py) so the "Submit for Review" button
+// can be disabled client-side the moment the profile looks complete,
+// without waiting for a round trip. The backend re-checks the same list
+// on submit regardless -- see ProviderProfileView.patch -- this copy is
+// purely for responsive UX, not the actual gate.
+const REQUIRED_TEXT_FIELDS: (keyof ProviderProfile)[] = [
+  "phone_number", "licence_number", "licence_type", "speciality", "clinic_name",
+  "address", "county", "country", "bio", "national_id_number",
+  "business_reg_number", "operating_licence", "kra_pin", "valid_licence_number",
+];
+const REQUIRED_IMAGE_FIELDS: (keyof ProviderProfile)[] = [
+  "profile_picture_url", "national_id_image", "clinic_logo_url",
+  "business_reg_image", "operating_licence_image", "kra_pin_image",
+  "cr12_image", "valid_licence_image",
+];
+
+const FIELD_LABELS: Record<string, string> = {
+  phone_number: "Phone number",
+  licence_number: "Licence number",
+  licence_type: "Licence type",
+  speciality: "Speciality",
+  clinic_name: "Clinic name",
+  address: "Address",
+  county: "County",
+  country: "Country",
+  bio: "Bio / About",
+  national_id_number: "National ID / Passport number",
+  business_reg_number: "Business registration number",
+  operating_licence: "Operating licence number",
+  kra_pin: "KRA PIN",
+  valid_licence_number: "Valid operating licence number",
+  profile_picture_url: "Profile photo",
+  national_id_image: "National ID / Passport image",
+  clinic_logo_url: "Clinic logo",
+  business_reg_image: "Business registration certificate",
+  operating_licence_image: "Operating licence image",
+  kra_pin_image: "KRA PIN certificate",
+  cr12_image: "CR12",
+  valid_licence_image: "Valid operating licence image",
+  first_name: "First name",
+  last_name: "Last name",
+};
+
+function computeMissingFields(profile: ProviderProfile): string[] {
+  const missing: string[] = [];
+  [...REQUIRED_TEXT_FIELDS, ...REQUIRED_IMAGE_FIELDS].forEach((field) => {
+    const value = profile[field] as unknown;
+    if (!value || (typeof value === "string" && value.trim() === "")) {
+      missing.push(field as string);
+    }
+  });
+  if (!profile.first_name?.trim()) missing.push("first_name");
+  if (!profile.last_name?.trim()) missing.push("last_name");
+  return missing;
+}
+
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
     if (!identity) return "";
@@ -113,9 +182,9 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
     return () => clearTimeout(t);
   }, [onClose]);
   return (
-    <div className={"fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium flex items-center gap-2 " + (type === "success" ? "bg-green-600" : "bg-red-600")}>
-      {type === "success" ? <LucideCheck size={16} /> : null}
-      {message}
+    <div className={"fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium flex items-center gap-2 max-w-md " + (type === "success" ? "bg-green-600" : "bg-red-600")}>
+      {type === "success" ? <LucideCheck size={16} className="shrink-0" /> : <LucideAlertTriangle size={16} className="shrink-0" />}
+      <span>{message}</span>
     </div>
   );
 }
@@ -143,6 +212,43 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputClass = "border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-gray-50 w-full";
 const selectClass = inputClass;
+
+// ─────────────────────────────────────────────────────────────────
+// Document review status badge
+// Shown underneath each document upload control so a doctor can see
+// at a glance whether it's pending, approved, or rejected -- and if
+// rejected, exactly why, so they know what to fix before re-uploading.
+// ─────────────────────────────────────────────────────────────────
+function DocumentReviewBadge({ review }: { review?: DocumentReview }) {
+  if (!review) return null;
+
+  if (review.status === "approved") {
+    return (
+      <p className="text-xs text-green-600 font-medium mt-1.5 flex items-center gap-1">
+        <LucideCheck size={12} /> Approved
+      </p>
+    );
+  }
+
+  if (review.status === "rejected") {
+    return (
+      <div className="mt-1.5 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-2">
+        <p className="font-semibold flex items-center gap-1">
+          <LucideAlertTriangle size={12} />
+          Rejected{review.rejection_category_label ? " — " + review.rejection_category_label : ""}
+        </p>
+        {review.rejection_reason && (
+          <p className="text-red-500 mt-1">{review.rejection_reason}</p>
+        )}
+        <p className="text-red-400 mt-1">Please re-upload a corrected document above.</p>
+      </div>
+    );
+  }
+
+  return (
+    <p className="text-xs text-amber-600 font-medium mt-1.5">Pending review</p>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Photo crop modal
@@ -413,9 +519,10 @@ function PhotoCropModal({
 }
 
 function DocumentImageUpload({
-  label, fieldName, currentUrl, identityId, onUploaded,
+  label, fieldName, currentUrl, identityId, onUploaded, review,
 }: {
   label: string; fieldName: string; currentUrl: string; identityId: string; onUploaded: (url: string) => void;
+  review?: DocumentReview;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -464,12 +571,14 @@ function DocumentImageUpload({
         }
       </div>
       <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleChange} />
+      <DocumentReviewBadge review={review} />
     </div>
   );
 }
 
-function LogoUpload({ currentUrl, identityId, onUploaded }: {
+function LogoUpload({ currentUrl, identityId, onUploaded, review }: {
   currentUrl: string; identityId: string; onUploaded: (url: string) => void;
+  review?: DocumentReview;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -493,26 +602,29 @@ function LogoUpload({ currentUrl, identityId, onUploaded }: {
   };
 
   return (
-    <div className="relative shrink-0">
-      <div
-        className="w-16 h-16 rounded-xl border-2 border-gray-200 bg-gray-100 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-300 transition-colors"
-        onClick={() => fileRef.current?.click()}
-      >
-        {uploading
-          ? <LucideLoader2 size={18} className="animate-spin text-blue-500" />
-          : currentUrl
-          ? <img src={currentUrl} className="w-full h-full object-cover" alt="Clinic logo" />
-          : <LucideBuilding size={22} className="text-gray-400" />
-        }
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative shrink-0">
+        <div
+          className="w-16 h-16 rounded-xl border-2 border-gray-200 bg-gray-100 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-300 transition-colors"
+          onClick={() => fileRef.current?.click()}
+        >
+          {uploading
+            ? <LucideLoader2 size={18} className="animate-spin text-blue-500" />
+            : currentUrl
+            ? <img src={currentUrl} className="w-full h-full object-cover" alt="Clinic logo" />
+            : <LucideBuilding size={22} className="text-gray-400" />
+          }
+        </div>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow text-blue-600 hover:bg-blue-50"
+        >
+          <LucideCamera size={12} />
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleChange} />
       </div>
-      <button
-        type="button"
-        onClick={() => fileRef.current?.click()}
-        className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow text-blue-600 hover:bg-blue-50"
-      >
-        <LucideCamera size={12} />
-      </button>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleChange} />
+      <div className="w-full"><DocumentReviewBadge review={review} /></div>
     </div>
   );
 }
@@ -606,6 +718,7 @@ export default function ProfilePage() {
   const [insuranceInput, setInsuranceInput] = useState("");
   const [languageInput, setLanguageInput] = useState("");
   const [subspecialtyInput, setSubspecialtyInput] = useState("");
+  const [documentReviews, setDocumentReviews] = useState<Record<string, DocumentReview>>({});
 
   // Crop modal state
   const [cropSrc, setCropSrc] = useState<string | null>(null); // object URL of selected file
@@ -625,6 +738,25 @@ export default function ProfilePage() {
       )
       .catch(() => {})
       .finally(() => setLoading(false));
+  }, [identityId]);
+
+  // Fetches the per-document review status (pending/approved/rejected +
+  // rejection reason) so it can be shown right next to each upload
+  // control below, instead of the doctor only seeing a generic
+  // "documents under review" banner with no way to tell which document
+  // is the problem.
+  useEffect(() => {
+    if (!identityId) return;
+    axiosClient
+      .get("/provider/" + identityId + "/document-reviews")
+      .then((res) => {
+        const map: Record<string, DocumentReview> = {};
+        (res.data || []).forEach((r: DocumentReview) => {
+          map[r.field_name] = r;
+        });
+        setDocumentReviews(map);
+      })
+      .catch(() => {});
   }, [identityId]);
 
   const set = (field: keyof ProviderProfile, value: string) =>
@@ -741,11 +873,17 @@ export default function ProfilePage() {
     pendingFileRef.current = null;
   };
 
+  // Recomputed on every render from current form state -- cheap, and
+  // means the Submit button's disabled state updates live as the doctor
+  // fills things in, rather than only after a save round trip.
+  const missingFields = computeMissingFields(profile);
+  const canSubmit = missingFields.length === 0;
+
   const handleSave = async () => {
     if (!identityId) return;
     setSaving(true);
     try {
-      await axiosClient.patch("/provider/" + identityId + "/profile", {
+      const res = await axiosClient.patch("/provider/" + identityId + "/profile", {
         first_name: profile.first_name,
         last_name: profile.last_name,
         title: profile.title,
@@ -767,10 +905,20 @@ export default function ProfilePage() {
         kra_pin: profile.kra_pin,
         valid_licence_number: profile.valid_licence_number,
         extra_credentials: profile.extra_credentials,
+        submit: true,
       });
-      setToast({ message: "Profile updated successfully!", type: "success" });
-    } catch {
-      setToast({ message: "Failed to save profile.", type: "error" });
+      if (res.data?.submitted) {
+        setToast({ message: "Profile submitted for review!", type: "success" });
+      } else {
+        setToast({ message: "Profile updated successfully!", type: "success" });
+      }
+    } catch (err: any) {
+      const labels: string[] | undefined = err?.response?.data?.missing_field_labels;
+      if (labels && labels.length) {
+        setToast({ message: "Missing before you can submit: " + labels.join(", "), type: "error" });
+      } else {
+        setToast({ message: "Failed to save profile.", type: "error" });
+      }
     } finally {
       setSaving(false);
     }
@@ -797,6 +945,21 @@ export default function ProfilePage() {
           onCancel={handleCropCancel}
           onConfirm={handleCropConfirm}
         />
+      )}
+
+      {/* Incomplete-profile notice — tells the doctor exactly what's
+          missing before they even try to submit, rather than only
+          finding out after a rejected submit attempt. */}
+      {!canSubmit && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-2xl p-4 flex items-start gap-2">
+          <LucideAlertTriangle size={16} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Your profile isn't ready to submit yet.</p>
+            <p className="mt-1">
+              Missing: {missingFields.map((f) => FIELD_LABELS[f] || f).join(", ")}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Header */}
@@ -827,11 +990,12 @@ export default function ProfilePage() {
         </div>
         <button
           onClick={handleSave}
-          disabled={saving}
-          className="ml-auto flex items-center gap-2 bg-white text-blue-600 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-50 disabled:opacity-60"
+          disabled={saving || !canSubmit}
+          title={!canSubmit ? "Missing: " + missingFields.map((f) => FIELD_LABELS[f] || f).join(", ") : undefined}
+          className="ml-auto flex items-center gap-2 bg-white text-blue-600 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-50 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {saving ? <LucideLoader2 size={14} className="animate-spin" /> : <LucidePencil size={14} />}
-          {saving ? "Saving..." : "Save Changes"}
+          {saving ? <LucideLoader2 size={14} className="animate-spin" /> : <LucideCheck size={14} />}
+          {saving ? "Submitting..." : "Submit for Review"}
         </button>
       </div>
 
@@ -902,14 +1066,26 @@ export default function ProfilePage() {
           <Field label="National ID / Passport Number">
             <input value={profile.national_id_number} onChange={(e) => set("national_id_number", e.target.value)} className={inputClass} placeholder="e.g. 12345678 or A1234567" />
           </Field>
-          <DocumentImageUpload label="National ID / Passport Image" fieldName="national_id_image" currentUrl={profile.national_id_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, national_id_image: url }))} />
+          <DocumentImageUpload
+            label="National ID / Passport Image"
+            fieldName="national_id_image"
+            currentUrl={profile.national_id_image}
+            identityId={identityId}
+            onUploaded={(url) => setProfile((prev) => ({ ...prev, national_id_image: url }))}
+            review={documentReviews["national_id_image"]}
+          />
         </div>
       </Section>
 
       {/* Practice & Location */}
       <Section title="Practice & Location" icon={<LucideMapPin size={18} />}>
         <div className="flex items-center gap-4 mb-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-          <LogoUpload currentUrl={profile.clinic_logo_url} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, clinic_logo_url: url }))} />
+          <LogoUpload
+            currentUrl={profile.clinic_logo_url}
+            identityId={identityId}
+            onUploaded={(url) => setProfile((prev) => ({ ...prev, clinic_logo_url: url }))}
+            review={documentReviews["clinic_logo_url"]}
+          />
           <div className="flex-1">
             <label className="text-xs text-gray-400 uppercase tracking-wide font-medium block mb-1">Clinic / Hospital Name</label>
             <input value={profile.clinic_name} onChange={(e) => set("clinic_name", e.target.value)} className={inputClass} placeholder="e.g. Nairobi Women's Hospital" />
@@ -936,16 +1112,44 @@ export default function ProfilePage() {
             <Field label="Business Registration Number">
               <input value={profile.business_reg_number} onChange={(e) => set("business_reg_number", e.target.value)} className={inputClass} placeholder="e.g. BN/2024/12345" />
             </Field>
-            <DocumentImageUpload label="Business Registration Certificate" fieldName="business_reg_image" currentUrl={profile.business_reg_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, business_reg_image: url }))} />
+            <DocumentImageUpload
+              label="Business Registration Certificate"
+              fieldName="business_reg_image"
+              currentUrl={profile.business_reg_image}
+              identityId={identityId}
+              onUploaded={(url) => setProfile((prev) => ({ ...prev, business_reg_image: url }))}
+              review={documentReviews["business_reg_image"]}
+            />
             <Field label="Operating Licence Number">
               <input value={profile.operating_licence} onChange={(e) => set("operating_licence", e.target.value)} className={inputClass} placeholder="Licence number" />
             </Field>
-            <DocumentImageUpload label="Operating Licence" fieldName="operating_licence_image" currentUrl={profile.operating_licence_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, operating_licence_image: url }))} />
+            <DocumentImageUpload
+              label="Operating Licence"
+              fieldName="operating_licence_image"
+              currentUrl={profile.operating_licence_image}
+              identityId={identityId}
+              onUploaded={(url) => setProfile((prev) => ({ ...prev, operating_licence_image: url }))}
+              review={documentReviews["operating_licence_image"]}
+            />
             <Field label="KRA PIN">
               <input value={profile.kra_pin} onChange={(e) => set("kra_pin", e.target.value)} className={inputClass} placeholder="e.g. A000000000B" />
             </Field>
-            <DocumentImageUpload label="KRA PIN Certificate" fieldName="kra_pin_image" currentUrl={profile.kra_pin_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, kra_pin_image: url }))} />
-            <DocumentImageUpload label="CR12" fieldName="cr12_image" currentUrl={profile.cr12_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, cr12_image: url }))} />
+            <DocumentImageUpload
+              label="KRA PIN Certificate"
+              fieldName="kra_pin_image"
+              currentUrl={profile.kra_pin_image}
+              identityId={identityId}
+              onUploaded={(url) => setProfile((prev) => ({ ...prev, kra_pin_image: url }))}
+              review={documentReviews["kra_pin_image"]}
+            />
+            <DocumentImageUpload
+              label="CR12"
+              fieldName="cr12_image"
+              currentUrl={profile.cr12_image}
+              identityId={identityId}
+              onUploaded={(url) => setProfile((prev) => ({ ...prev, cr12_image: url }))}
+              review={documentReviews["cr12_image"]}
+            />
           </div>
         </div>
       </Section>
@@ -967,7 +1171,14 @@ export default function ProfilePage() {
           <Field label="Valid Operating Licence Number">
             <input value={profile.valid_licence_number} onChange={(e) => set("valid_licence_number", e.target.value)} className={inputClass} placeholder="Valid licence number" />
           </Field>
-          <DocumentImageUpload label="Valid Operating Licence" fieldName="valid_licence_image" currentUrl={profile.valid_licence_image} identityId={identityId} onUploaded={(url) => setProfile((prev) => ({ ...prev, valid_licence_image: url }))} />
+          <DocumentImageUpload
+            label="Valid Operating Licence"
+            fieldName="valid_licence_image"
+            currentUrl={profile.valid_licence_image}
+            identityId={identityId}
+            onUploaded={(url) => setProfile((prev) => ({ ...prev, valid_licence_image: url }))}
+            review={documentReviews["valid_licence_image"]}
+          />
         </div>
         {profile.extra_credentials.length > 0 && (
           <div className="mt-5 space-y-3">

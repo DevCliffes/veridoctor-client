@@ -223,7 +223,12 @@ export default function MainAppLayout({
           center={<p>{displayName}</p>}
           right={
             <div className="flex items-center gap-2">
-              {!gateActive && <NotificationBell identityId={identityId} />}
+              {/* Bell now renders regardless of approval status — a
+                  provider with a rejected document is exactly who needs
+                  to see it. Only SideNav and the new-appointment dialog
+                  stay behind the gate, since those genuinely require an
+                  approved profile to be usable. */}
+              <NotificationBell identityId={identityId} />
               <ProfileDropdown dispatch={dispatch} />
             </div>
           }

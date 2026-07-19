@@ -178,6 +178,19 @@ const STATUS_STYLES: Record<string, string> = {
 
 const SNAPSHOT_KEY = "__form_snapshot__";
 
+// Same 30-minute grace window the backend enforces in
+// ProviderGrantedRecordsView (GRACE_PERIOD) — kept in sync here so the
+// frontend can proactively hide expired-consultation sections instead of
+// waiting for a failed fetch to discover it.
+const CONSULTATION_GRACE_MS = 30 * 60 * 1000;
+const TERMINAL_STATUSES = ["cancelled", "completed", "no-show"];
+
+function isConsultationOver(appointment: Appointment | null): boolean {
+  if (!appointment) return false;
+  if (TERMINAL_STATUSES.includes(appointment.status)) return true;
+  return Date.now() > new Date(appointment.end_time).getTime() + CONSULTATION_GRACE_MS;
+}
+
 function getInsuranceLabel(ins: Insurance): string {
   if (typeof ins === "string") return ins;
   return ins.provider;
@@ -578,7 +591,7 @@ export default function AppointmentDetailPage() {
       )}
 
       {activeTab === "records" && (
-        <PatientRecordPanel appointmentId={id} userId={String(userId ?? "")} />
+        <PatientRecordPanel appointmentId={id} userId={String(userId ?? "")} appointment={appointment} />
       )}
     </div>
   );
@@ -795,7 +808,15 @@ function InsuranceCard({ ins }: { ins: Insurance }) {
   );
 }
 
-function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; userId: string }) {
+function PatientRecordPanel({
+  appointmentId,
+  userId,
+  appointment,
+}: {
+  appointmentId: string;
+  userId: string;
+  appointment: Appointment;
+}) {
   const [summary, setSummary] = useState<PatientSummary | null>(null);
   const [ownRecords, setOwnRecords] = useState<OwnRecord[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(true);
@@ -807,6 +828,13 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
   const [categoryStatus, setCategoryStatus] = useState<Record<string, CategoryPanelStatus>>({});
   const [categoryRecords, setCategoryRecords] = useState<Record<string, GrantedRecord[]>>({});
   const [categoryErrorMsg, setCategoryErrorMsg] = useState<Record<string, string>>({});
+
+  // Once the consultation itself is over (terminal status, or past the
+  // same 30-min grace window the backend enforces), consent-gated access
+  // is no longer meaningful for THIS consultation — hide those sections
+  // entirely rather than show a stale "Approved" badge that would just
+  // fail on click anyway.
+  const consultationOver = isConsultationOver(appointment);
 
   const fetchSummary = () => {
     axiosClient
@@ -1028,7 +1056,12 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         }
       </div>
 
-      {record_categories.length > 0 && (
+      {/* Both of these sections are consultation-scoped by design (grants
+          are tied to a specific appointment) — once the consultation is
+          over, there's nothing meaningful left for the provider to act on
+          here, so hide them entirely rather than show a stale, no-longer-
+          actionable "Approved" state. */}
+      {!consultationOver && record_categories.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Record categories — consent required</p>
           <div className="space-y-2">
@@ -1114,23 +1147,25 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Access granted this consultation</p>
-        {access_granted.length === 0
-          ? <p className="text-xs text-gray-400 flex items-center gap-1.5"><LucideLock size={12} /> No records shared yet.</p>
-          : (
-            <div className="space-y-2">
-              {access_granted.map((g) => (
-                <div key={g.id} className="flex items-center gap-2 text-sm text-gray-700">
-                  <LucideShieldCheck size={14} className="text-green-500 shrink-0" />
-                  <span className="font-medium">{g.requested_category}</span>
-                  <span className="text-xs text-gray-400">— access approved</span>
-                </div>
-              ))}
-            </div>
-          )
-        }
-      </div>
+      {!consultationOver && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Access granted this consultation</p>
+          {access_granted.length === 0
+            ? <p className="text-xs text-gray-400 flex items-center gap-1.5"><LucideLock size={12} /> No records shared yet.</p>
+            : (
+              <div className="space-y-2">
+                {access_granted.map((g) => (
+                  <div key={g.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <LucideShieldCheck size={14} className="text-green-500 shrink-0" />
+                    <span className="font-medium">{g.requested_category}</span>
+                    <span className="text-xs text-gray-400">— access approved</span>
+                  </div>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      )}
     </div>
   );
 }

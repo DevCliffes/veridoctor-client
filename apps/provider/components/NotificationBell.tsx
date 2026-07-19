@@ -29,6 +29,33 @@ interface NotificationItem {
 
 type PushPermissionState = NotificationPermission | "unsupported";
 
+// ─────────────────────────────────────────────────────────────────
+// Known in-app route prefixes a notification is allowed to send the
+// provider to. Anything that doesn't start with one of these is either
+// a stale value from before a route was renamed/removed (e.g. the old
+// hardcoded "/provider/documents", which never existed as a page) or a
+// bad value from some other source -- rather than letting router.push
+// take the provider to a 404, fall back to /profile, which is always a
+// safe, valid destination and is where document-related notifications
+// specifically are meant to land anyway.
+// ─────────────────────────────────────────────────────────────────
+const KNOWN_LINK_PREFIXES = [
+  "/profile",
+  "/dashboard",
+  "/appointments",
+  "/patients",
+  "/schedule",
+  "/services",
+  "/prescriptions",
+  "/forms",
+];
+
+function resolveLink(link: string): string {
+  if (!link) return "/profile";
+  const isKnown = KNOWN_LINK_PREFIXES.some((prefix) => link.startsWith(prefix));
+  return isKnown ? link : "/profile";
+}
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -140,9 +167,7 @@ export default function NotificationBell({
         .catch(() => {});
     }
     setOpen(false);
-    if (notification.link) {
-      router.push(notification.link);
-    }
+    router.push(resolveLink(notification.link));
   };
 
   const handleMarkAllRead = () => {

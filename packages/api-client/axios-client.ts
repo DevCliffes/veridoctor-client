@@ -286,6 +286,22 @@ function isPublicPath(url?: string): boolean {
   return PUBLIC_PATHS.some((p) => url.includes(p));
 }
 
+// Endpoints where a 403 is an expected, non-auth business response (e.g.
+// "no approved access grant for this category" or "grant has expired")
+// rather than a sign the practitioner's own session/token is invalid.
+// Without this, the global response interceptor below can't tell the two
+// cases apart and force-logs the practitioner out just for clicking an
+// approved-record category whose grant happens to be expired or missing --
+// a 403 there is a normal, anticipated outcome, not an auth failure.
+const EXPECTED_FORBIDDEN_PATH_PATTERNS = [
+  "/granted-records/",
+];
+
+function isExpectedForbidden(url?: string): boolean {
+  if (!url) return false;
+  return EXPECTED_FORBIDDEN_PATH_PATTERNS.some((p) => url.includes(p));
+}
+
 axiosClient.interceptors.request.use(async (config) => {
   if (isPublicPath(config.url)) {
     return config;
@@ -304,10 +320,17 @@ axiosClient.interceptors.response.use(
   (error) => {
     const requestUrl = error.config?.url as string | undefined;
     const isPublic = isPublicPath(requestUrl);
-    if (
+    const status = error.response?.status;
+
+    // A 401 always means the practitioner's own token is bad -- always log
+    // out. A 403 means "not allowed to do this specific thing", which is
+    // sometimes an auth problem and sometimes just an expected business
+    // rule (see isExpectedForbidden above) -- only log out for the former.
+    const shouldLogout =
       !isPublic &&
-      (error.response?.status === 401 || error.response?.status === 403)
-    ) {
+      (status === 401 || (status === 403 && !isExpectedForbidden(requestUrl)));
+
+    if (shouldLogout) {
       if (typeof window !== "undefined") {
         // CHANGED: previously redirected straight to
         // `${loginBase}/auth/login?redirect=<path>`. Now we stash the path

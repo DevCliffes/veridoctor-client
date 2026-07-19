@@ -93,6 +93,43 @@ type RecordCategory = {
   grant_id: string | null;
 };
 
+// ── Granted-record types (records unlocked via an approved consent request) ──
+type GrantedCapture = {
+  form_name: string;
+  form_snapshot: unknown[];
+  values: Record<string, unknown>;
+  captured_at: string;
+};
+
+type GrantedDrug = {
+  drug_name: string;
+  dosage?: string;
+  frequency: string;
+  duration: string;
+  instructions?: string;
+};
+
+type GrantedRecord = {
+  id: string;
+  record_type: "consultation" | "prescription";
+  date: string;
+  provider_name: string;
+  speciality: string;
+  facility_name: string;
+  // consultation-only
+  appointment_type?: string;
+  status?: string;
+  service_name?: string | null;
+  captures?: GrantedCapture[];
+  has_clinical_notes?: boolean;
+  // prescription-only
+  diagnosis?: string;
+  notes?: string;
+  drugs?: GrantedDrug[];
+};
+
+type CategoryPanelStatus = "idle" | "loading" | "loaded" | "expired" | "error";
+
 type PatientSummary = {
   patient: {
     uid: string | null;
@@ -324,9 +361,6 @@ export default function AppointmentDetailPage() {
   const isFuture = startTime > now;
   const isTerminal = ["cancelled", "completed", "no-show"].includes(appointment.status);
 
-  // Same 30-minutes-before-start to 30-minutes-after-end window used on
-  // the appointments list page. A terminal status (completed/cancelled/
-  // no-show) always shows "Call has ended" regardless of timing.
   const CALL_WINDOW_MS = 30 * 60 * 1000;
   const isWithinCallWindow = (startIso: string, endIso: string) => {
     const nowMs = Date.now();
@@ -659,6 +693,82 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
   );
 }
 
+// ── Renders one record fetched from an approved consent grant. Records
+// arrive already flattened (no nested form_snapshot label-mapping needed
+// beyond what the consultation capture itself carries), so this stays a
+// single-level card — no further expand/collapse inside it, since it's
+// already living inside the category's expand panel.
+function GrantedRecordEntry({ record }: { record: GrantedRecord }) {
+  if (record.record_type === "prescription") {
+    return (
+      <div className="bg-white border border-gray-100 rounded-lg p-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-xs font-semibold text-gray-700">Prescription</p>
+          <span className="text-xs text-gray-400">
+            {new Date(record.date).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+        </div>
+        <p className="text-xs text-gray-400 mb-2">{record.provider_name}</p>
+        {renderPrescription({ diagnosis: record.diagnosis, drugs: record.drugs, notes: record.notes })}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-lg p-3">
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <p className="text-xs font-semibold text-gray-700">{record.service_name ?? "Consultation"}</p>
+        {record.appointment_type && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium capitalize">
+            {record.appointment_type}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 mb-2">
+        {record.provider_name} · {new Date(record.date).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
+      </p>
+      {record.captures && record.captures.length > 0 ? (
+        <div className="space-y-3 mt-2">
+          {record.captures.map((cap, i) => {
+            const smuggled = cap.values?.[SNAPSHOT_KEY];
+            const snapshot = (Array.isArray(smuggled) ? smuggled : null) ?? cap.form_snapshot ?? [];
+            const labelMap = buildLabelMap(snapshot as { title?: string; fields?: { id: string; label?: string; name?: string }[] }[]);
+            const displayValues = Object.fromEntries(
+              Object.entries(cap.values ?? {}).filter(([k]) => k !== SNAPSHOT_KEY)
+            );
+            return (
+              <div key={i}>
+                <p className="text-xs font-medium text-gray-500 mb-1.5">{cap.form_name || "Clinical notes"}</p>
+                <div className="space-y-1.5">
+                  {Object.entries(displayValues).map(([key, val]) => {
+                    const label = labelMap[key] ?? key.replace(/_/g, " ");
+                    if (isPrescriptionValue(val)) {
+                      return (
+                        <div key={key} className="flex flex-col gap-1 text-xs">
+                          <span className="text-gray-400 capitalize font-medium">{label}</span>
+                          {renderPrescription(val)}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={key} className="flex gap-2 text-xs">
+                        <span className="text-gray-400 shrink-0 min-w-[110px] capitalize">{label}</span>
+                        <span className="text-gray-700 font-medium">{renderValue(val)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-300 italic">No clinical notes on this consultation.</p>
+      )}
+    </div>
+  );
+}
+
 function InsuranceCard({ ins }: { ins: Insurance }) {
   if (typeof ins === "string") {
     return (
@@ -691,6 +801,12 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [loadingOwn, setLoadingOwn] = useState(true);
   const [requesting, setRequesting] = useState<string | null>(null);
+
+  // ── Granted-category expand state, keyed by category (speciality) name ──
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [categoryStatus, setCategoryStatus] = useState<Record<string, CategoryPanelStatus>>({});
+  const [categoryRecords, setCategoryRecords] = useState<Record<string, GrantedRecord[]>>({});
+  const [categoryErrorMsg, setCategoryErrorMsg] = useState<Record<string, string>>({});
 
   const fetchSummary = () => {
     axiosClient
@@ -729,6 +845,44 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
       toast.error("Could not send access request");
     } finally {
       setRequesting(null);
+    }
+  };
+
+  const fetchGrantedRecords = (category: string) => {
+    setCategoryStatus((prev) => ({ ...prev, [category]: "loading" }));
+    axiosClient
+      .get(`/records/provider/${userId}/appointment/${appointmentId}/granted-records/${encodeURIComponent(category)}`)
+      .then((res) => {
+        setCategoryRecords((prev) => ({ ...prev, [category]: res.data.records ?? [] }));
+        setCategoryStatus((prev) => ({ ...prev, [category]: "loaded" }));
+      })
+      .catch((err) => {
+        const message: string = err?.response?.data?.error ?? "";
+        if (err?.response?.status === 403 && message.toLowerCase().includes("expired")) {
+          setCategoryStatus((prev) => ({ ...prev, [category]: "expired" }));
+        } else {
+          setCategoryStatus((prev) => ({ ...prev, [category]: "error" }));
+          setCategoryErrorMsg((prev) => ({ ...prev, [category]: message || "Could not load records" }));
+          toast.error("Could not load records for this category");
+        }
+      });
+  };
+
+  const handleToggleCategory = (cat: RecordCategory) => {
+    if (cat.access_status !== "approved") return;
+
+    if (expandedCategory === cat.speciality) {
+      setExpandedCategory(null);
+      return;
+    }
+
+    setExpandedCategory(cat.speciality);
+    const status = categoryStatus[cat.speciality];
+    // Only fetch on first open, or if a prior attempt errored — an
+    // already-loaded or already-expired category doesn't need refetching,
+    // since expiry is a one-way transition for a consultation that's over.
+    if (!status || status === "error") {
+      fetchGrantedRecords(cat.speciality);
     }
   };
 
@@ -878,38 +1032,84 @@ function PatientRecordPanel({ appointmentId, userId }: { appointmentId: string; 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Record categories — consent required</p>
           <div className="space-y-2">
-            {record_categories.map((cat) => (
-              <div key={cat.speciality + cat.facility_name} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                    <LucideFileText size={14} />
+            {record_categories.map((cat) => {
+              const isExpanded = expandedCategory === cat.speciality;
+              const panelStatus = categoryStatus[cat.speciality] ?? "idle";
+              const isExpired = panelStatus === "expired";
+              const records = categoryRecords[cat.speciality] ?? [];
+
+              return (
+                <div key={cat.speciality + cat.facility_name} className="rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 p-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                        <LucideFileText size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{cat.speciality}</p>
+                        <p className="text-xs text-gray-400">
+                          {[cat.facility_name, cat.record_count > 0 ? `${cat.record_count} records` : null, cat.last_record_at ? timeAgo(cat.last_record_at) : null].filter(Boolean).join(" · ")}
+                        </p>
+                      </div>
+                    </div>
+
+                    {cat.access_status === "approved" ? (
+                      <button
+                        onClick={() => handleToggleCategory(cat)}
+                        className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium shrink-0 border transition-colors ${
+                          isExpired
+                            ? "text-gray-500 bg-gray-100 border-gray-200 hover:bg-gray-200"
+                            : "text-green-700 bg-green-50 border-green-200 hover:bg-green-100"
+                        }`}
+                      >
+                        {isExpired ? <LucideLock size={12} /> : <LucideShieldCheck size={12} />}
+                        {isExpired ? "Expired" : "Approved"}
+                        {isExpanded ? <LucideChevronUp size={12} /> : <LucideChevronDown size={12} />}
+                      </button>
+                    ) : cat.access_status === "pending" ? (
+                      <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-medium shrink-0">Pending…</span>
+                    ) : cat.access_status === "denied" ? (
+                      <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full font-medium shrink-0">Denied</span>
+                    ) : (
+                      <button
+                        onClick={() => handleRequest(cat.speciality)}
+                        disabled={requesting === cat.speciality}
+                        className="flex items-center gap-1.5 text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 shrink-0 font-medium"
+                      >
+                        <LucideLock size={11} />
+                        {requesting === cat.speciality ? "Sending…" : "Request"}
+                      </button>
+                    )}
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">{cat.speciality}</p>
-                    <p className="text-xs text-gray-400">
-                      {[cat.facility_name, cat.record_count > 0 ? `${cat.record_count} records` : null, cat.last_record_at ? timeAgo(cat.last_record_at) : null].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
+
+                  {isExpanded && cat.access_status === "approved" && (
+                    <div className="border-t border-gray-100 bg-white px-3 py-3 space-y-2">
+                      {panelStatus === "loading" && (
+                        <div className="flex justify-center py-3">
+                          <LucideLoader2 size={16} className="animate-spin text-blue-400" />
+                        </div>
+                      )}
+                      {panelStatus === "expired" && (
+                        <p className="text-xs text-gray-400 flex items-center gap-1.5 py-1">
+                          <LucideLock size={12} /> Access window for this consultation has closed.
+                        </p>
+                      )}
+                      {panelStatus === "error" && (
+                        <p className="text-xs text-red-500 py-1">{categoryErrorMsg[cat.speciality] ?? "Could not load records."}</p>
+                      )}
+                      {panelStatus === "loaded" && records.length === 0 && (
+                        <p className="text-xs text-gray-400 py-1">No records found for this category.</p>
+                      )}
+                      {panelStatus === "loaded" && records.length > 0 && (
+                        <div className="space-y-2">
+                          {records.map((rec) => <GrantedRecordEntry key={rec.id} record={rec} />)}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {cat.access_status === "approved"
-                  ? <span className="flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full font-medium shrink-0"><LucideShieldCheck size={12} /> Approved</span>
-                  : cat.access_status === "pending"
-                  ? <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full font-medium shrink-0">Pending…</span>
-                  : cat.access_status === "denied"
-                  ? <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full font-medium shrink-0">Denied</span>
-                  : (
-                    <button
-                      onClick={() => handleRequest(cat.speciality)}
-                      disabled={requesting === cat.speciality}
-                      className="flex items-center gap-1.5 text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 shrink-0 font-medium"
-                    >
-                      <LucideLock size={11} />
-                      {requesting === cat.speciality ? "Sending…" : "Request"}
-                    </button>
-                  )
-                }
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

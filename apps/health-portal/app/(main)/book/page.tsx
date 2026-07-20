@@ -480,7 +480,7 @@ function ProviderCard({
                     : "border-gray-200 text-gray-600 hover:border-gray-300")
                 }
               >
-                {s.name} · {s.estimated_duration}m
+                {s.name} · {s.estimated_duration} mins
               </button>
             ))}
           </div>

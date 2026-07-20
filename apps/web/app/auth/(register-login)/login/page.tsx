@@ -125,9 +125,20 @@ function LoginForm() {
           const redirectQuery = effectiveRedirect
             ? `&redirect=${encodeURIComponent(effectiveRedirect)}`
             : "";
-          router.push(
-            `/auth/accounts/${res.data.user.id}?auth_tkn=${res.data.auth_code}${redirectQuery}`,
-          );
+          // FIX: this used to be `router.push(...)`, a client-side (soft)
+          // navigation. The accounts page at that route is a Server
+          // Component that, for a single-account user, calls Next's
+          // `redirect()` to an external absolute URL (the target app's
+          // domain). When that redirect fires during a soft navigation,
+          // the App Router's client-side router has to hand off to a real
+          // browser navigation for the external origin -- and that
+          // handoff was unreliable, sometimes just silently staying on
+          // the last resolved client route (this marketing site) instead
+          // of leaving. A full browser navigation via window.location.href
+          // hits the accounts page as a real HTTP request every time, so
+          // its redirect() always executes as a proper server-side HTTP
+          // redirect regardless of single- or multi-account outcome.
+          window.location.href = `/auth/accounts/${res.data.user.id}?auth_tkn=${res.data.auth_code}${redirectQuery}`;
         }
       })
       .catch((err) => {

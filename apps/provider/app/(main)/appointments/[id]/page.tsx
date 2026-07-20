@@ -23,6 +23,11 @@ import {
   LucideLoader2,
   LucideStethoscope,
   LucideShield,
+  LucideActivity,
+  LucideHeartPulse,
+  LucideThermometer,
+  LucideWeight,
+  LucideRuler,
 } from "@veridoctor/design/icons";
 
 type InsuranceEntry = {
@@ -129,6 +134,27 @@ type GrantedRecord = {
 };
 
 type CategoryPanelStatus = "idle" | "loading" | "loaded" | "expired" | "error";
+
+// ── Vitals — deliberately NOT consent-gated (policy decision: vitals are
+// low-sensitivity enough not to require an access grant), so this reuses
+// the exact same patient-facing /records/patient/<id>/vitals endpoint the
+// health-portal dashboard uses, across ALL of the patient's providers.
+type Vital = {
+  key: string;
+  label: string;
+  value: string;
+  unit: string | null;
+  recorded_at: string;
+  provider_name: string | null;
+};
+
+const VITAL_ICONS: Record<string, typeof LucideActivity> = {
+  blood_pressure: LucideActivity,
+  pulse: LucideHeartPulse,
+  temperature: LucideThermometer,
+  weight: LucideWeight,
+  height: LucideRuler,
+};
 
 type PatientSummary = {
   patient: {
@@ -808,6 +834,57 @@ function InsuranceCard({ ins }: { ins: Insurance }) {
   );
 }
 
+function VitalsCard({ patientIdentityId }: { patientIdentityId: string }) {
+  const [vitals, setVitals] = useState<Vital[]>([]);
+  const [loadingVitals, setLoadingVitals] = useState(true);
+
+  useEffect(() => {
+    if (!patientIdentityId) { setLoadingVitals(false); return; }
+    axiosClient
+      .get(`/records/patient/${patientIdentityId}/vitals`)
+      .then((res) => setVitals(res.data?.vitals ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingVitals(false));
+  }, [patientIdentityId]);
+
+  if (loadingVitals) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex justify-center py-6">
+        <LucideLoader2 size={18} className="animate-spin text-blue-400" />
+      </div>
+    );
+  }
+
+  if (vitals.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Recent Vitals</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {vitals.map((v) => {
+          const Icon = VITAL_ICONS[v.key] ?? LucideActivity;
+          return (
+            <div key={v.key} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Icon size={13} className="text-blue-500 shrink-0" />
+                <p className="text-xs text-gray-400">{v.label}</p>
+              </div>
+              <p className="text-base font-bold text-gray-800">
+                {v.value}
+                {v.unit && <span className="text-xs font-normal text-gray-400 ml-1">{v.unit}</span>}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {timeAgo(v.recorded_at)}
+                {v.provider_name && <span> · {v.provider_name}</span>}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PatientRecordPanel({
   appointmentId,
   userId,
@@ -1035,6 +1112,8 @@ function PatientRecordPanel({
           <span className="text-xs px-2 py-0.5 rounded-full border border-green-200 text-green-700 shrink-0">Always shown</span>
         </div>
       </div>
+
+      <VitalsCard patientIdentityId={patient.identity_id} />
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
         <div className="flex items-center justify-between mb-3">

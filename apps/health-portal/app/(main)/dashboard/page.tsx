@@ -8,6 +8,11 @@ import {
   LucideMapPin,
   LucideLoader2,
   LucideChevronRight,
+  LucideActivity,
+  LucideHeartPulse,
+  LucideThermometer,
+  LucideWeight,
+  LucideRuler,
 } from "@veridoctor/design/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,6 +31,15 @@ interface Appointment {
   provider_id?: string;
   provider_identity_id?: string;
   service_name?: string | null;
+}
+
+interface Vital {
+  key: string;
+  label: string;
+  value: string;
+  unit: string | null;
+  recorded_at: string;
+  provider_name: string | null;
 }
 
 function getIdentityId(identity: unknown): string {
@@ -89,6 +103,24 @@ function getDoctorProfileId(appt: Appointment): string | null {
   return appt.provider_identity_id || appt.provider_id || null;
 }
 
+function timeAgo(isoDate: string) {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return "today";
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} mo ago`;
+  return `${Math.floor(months / 12)} yr ago`;
+}
+
+const VITAL_ICONS: Record<string, typeof LucideActivity> = {
+  blood_pressure: LucideActivity,
+  pulse: LucideHeartPulse,
+  temperature: LucideThermometer,
+  weight: LucideWeight,
+  height: LucideRuler,
+};
+
 const TELEHEALTH_URL = "https://telehealth.veridoctor.com";
 
 export default function Dashboard() {
@@ -97,6 +129,8 @@ export default function Dashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [firstName, setFirstName] = useState("there");
+  const [vitals, setVitals] = useState<Vital[]>([]);
+  const [loadingVitals, setLoadingVitals] = useState(true);
 
   const identityId = getIdentityId(identity);
   const patientEmail = user?.email ?? "";
@@ -121,6 +155,15 @@ export default function Dashboard() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [patientEmail]);
+
+  useEffect(() => {
+    if (!identityId) { setLoadingVitals(false); return; }
+    axiosClient
+      .get(`/records/patient/${identityId}/vitals`)
+      .then((res) => setVitals(res.data?.vitals ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingVitals(false));
+  }, [identityId]);
 
   const nextAppt = appointments[0];
   const minsUntilNext = nextAppt ? minutesUntil(nextAppt.start_time) : null;
@@ -160,9 +203,38 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {!loadingVitals && vitals.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-gray-700">Recent Vitals</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {vitals.map((v) => {
+              const Icon = VITAL_ICONS[v.key] ?? LucideActivity;
+              return (
+                <div key={v.key} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Icon size={13} className="text-blue-500 shrink-0" />
+                    <p className="text-xs text-gray-400">{v.label}</p>
+                  </div>
+                  <p className="text-base font-bold text-gray-800">
+                    {v.value}
+                    {v.unit && <span className="text-xs font-normal text-gray-400 ml-1">{v.unit}</span>}
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {timeAgo(v.recorded_at)}
+                    {v.provider_name && <span> · {v.provider_name}</span>}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-700">Upcoming</h2>
+          <h2 className="font-semibold text-gray-700">Upcoming Appointments</h2>
           <Link href="/appointments" className="text-xs text-blue-600 flex items-center gap-0.5 hover:underline">
             See all <LucideChevronRight size={12} />
           </Link>
@@ -229,4 +301,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

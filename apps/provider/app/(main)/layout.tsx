@@ -82,6 +82,19 @@ type OnboardingStatus =
   | "documents_rejected"
   | "approved";
 
+// FIX: pulled out of OnboardingStatusBanner as its own named type. The
+// previous inline object type nested inside Record<Exclude<...>, {...}>
+// (semicolon-separated fields on one line) tripped up this Next.js/
+// Turbopack version's parser with "Expected ',', got ';'" at build time,
+// even though it's valid TypeScript. A named alias used as the plain
+// second generic argument avoids the inline-object-in-generic parse path
+// entirely -- no behavior change, purely a syntax workaround.
+type OnboardingBannerConfig = {
+  className: string;
+  title: string;
+  body: string;
+};
+
 interface ProviderProfile {
   first_name: string;
   last_name: string;
@@ -264,10 +277,7 @@ function LoadingShell() {
 }
 
 function OnboardingStatusBanner({ status }: { status: OnboardingStatus }) {
-  const config: Record
-    Exclude<OnboardingStatus, "approved">,
-    { className: string; title: string; body: string }
-  > = {
+  const config: Record<Exclude<OnboardingStatus, "approved">, OnboardingBannerConfig> = {
     incomplete_profile: {
       className: "bg-amber-50 border-amber-300 text-amber-900",
       title: "Finish setting up your profile",

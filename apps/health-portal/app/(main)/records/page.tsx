@@ -94,6 +94,19 @@ interface AccessRequest {
   responded_at: string | null;
 }
 
+// FIX: the /records/patient/<id>/access-requests endpoint now returns a
+// paginated envelope ({count, next, previous, results}) instead of a bare
+// array, so this panel's own state and fetch logic need the same shape --
+// separate from AccessRequestsPage's PaginatedResponse type, since this
+// panel only ever shows page 1 (no pagination UI here; the "View all" link
+// is what routes to the full paginated page for anything beyond that).
+interface AccessRequestsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AccessRequest[];
+}
+
 const TYPE_TABS = [
   { key: "", label: "All Records" },
   { key: "consultation", label: "Consultations" },
@@ -334,8 +347,14 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
 
   const fetchRequests = () => {
     axiosClient
-      .get(`/records/patient/${identityId}/access-requests`)
-      .then((res) => setRequests(res.data ?? []))
+      .get<AccessRequestsResponse>(`/records/patient/${identityId}/access-requests`)
+      // FIX: the endpoint now returns a paginated envelope
+      // ({count, next, previous, results}) instead of a bare array. Reading
+      // res.data directly (as before) set `requests` to that object, and
+      // the .filter() calls below then threw "r.filter is not a function"
+      // since an object has no .filter method -- this crashed the whole
+      // /records page. res.data.results is the actual array.
+      .then((res) => setRequests(res.data?.results ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   };

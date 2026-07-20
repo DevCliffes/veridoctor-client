@@ -178,12 +178,14 @@ export default function MainAppLayout({
   };
 
   // ── Calls and Settings removed from nav (hidden from UI, pages still exist)
+  // Reordered per request: Dashboard, Appointments, Services, Schedule,
+  // Patients, then the rest unchanged (Prescriptions, Form studio).
   const navItems: navITem[] = [
     { linkTo: "/dashboard", name: "Dashboard", icon: <LayoutDashboard /> },
     { linkTo: "/appointments", icon: <LucideCalendarCheck />, name: "Appointments" },
-    { linkTo: "/patients", icon: <LucideUsers />, name: "Patients" },
-    { linkTo: "/schedule", icon: <LucideClipboardClock />, name: "Schedule" },
     { linkTo: "/services", icon: <LucideStethoscope />, name: "Services" },
+    { linkTo: "/schedule", icon: <LucideClipboardClock />, name: "Schedule" },
+    { linkTo: "/patients", icon: <LucideUsers />, name: "Patients" },
     { linkTo: "/prescriptions", icon: <LucideFileText />, name: "Prescriptions" },
     { linkTo: "/forms", icon: <LucideClipboardPen />, name: "Form studio" },
   ];
@@ -262,7 +264,7 @@ function LoadingShell() {
 }
 
 function OnboardingStatusBanner({ status }: { status: OnboardingStatus }) {
-  const config: Record<
+  const config: Record
     Exclude<OnboardingStatus, "approved">,
     { className: string; title: string; body: string }
   > = {

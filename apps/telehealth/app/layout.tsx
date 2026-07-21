@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "@veridoctor/design/styles/globals.css";
 import StoreProvider from "./components/StoreProvider";
+import { ThemeProvider } from "@veridoctor/design";
 
 export const metadata: Metadata = {
   title: "Veridoctor telehealth",
@@ -13,9 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <StoreProvider>{children}</StoreProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <StoreProvider>{children}</StoreProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

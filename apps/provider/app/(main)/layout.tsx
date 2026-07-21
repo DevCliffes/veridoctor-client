@@ -28,6 +28,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  ThemeToggle,
 } from "@veridoctor/design/components";
 import { axiosClient, ensureProviderAccessToken } from "@veridoctor/api-client";
 import {
@@ -238,6 +239,7 @@ export default function MainAppLayout({
           center={<p>{displayName}</p>}
           right={
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               {/* Bell now renders regardless of approval status — a
                   provider with a rejected document is exactly who needs
                   to see it. Only SideNav and the new-appointment dialog

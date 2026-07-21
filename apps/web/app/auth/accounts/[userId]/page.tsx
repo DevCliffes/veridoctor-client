@@ -91,7 +91,18 @@ export default async function AccountsPage({
   let accountsData: AccountsResponse | null = null;
 
   try {
-    const res = await axiosServer.get(`identity/${pathParams.userId}/accounts`);
+    // FIX: previously called with no auth at all -- authCode was parsed
+    // from the URL above but never actually sent anywhere on this
+    // request. That was harmless while IdentityAccountsView had no
+    // permission check, but once that view started requiring proof of
+    // ownership, every single call here failed (this page runs BEFORE
+    // any access token/cookie exists -- the auth_code from LoginView is
+    // the only credential available at this point in the flow). Passed
+    // as a query param so the backend can validate it against the
+    // pending AuthCode row without consuming it.
+    const res = await axiosServer.get(`identity/${pathParams.userId}/accounts`, {
+      params: { auth_tkn: authCode },
+    });
     accountsData = res.data;
   } catch (err) {
     console.error(err);

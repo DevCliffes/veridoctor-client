@@ -283,7 +283,9 @@ const PUBLIC_PATHS = [
 
 function isPublicPath(url?: string): boolean {
   if (!url) return false;
-  return PUBLIC_PATHS.some((p) => url.includes(p));
+  let path = url.split("?")[0];
+  if (!path.startsWith("/")) path = "/" + path;
+  return PUBLIC_PATHS.includes(path);
 }
 
 // Endpoints where a 403 is an expected, non-auth business response (e.g.

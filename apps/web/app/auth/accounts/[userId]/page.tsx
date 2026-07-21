@@ -153,7 +153,12 @@ export default async function AccountsPage({
             ) : (
               <>
                 <p>You have no accounts.</p>
-                <Link href={`/auth/create-account/${pathParams.userId}`}>
+                {/* FIX: this link previously dropped auth_tkn entirely, so
+                    RegisterAccount (and everything under it -- ProviderForm,
+                    FacilityForm) had no credential to send on account
+                    creation and every POST /identity/<id>/accounts call
+                    403'd. Carrying the same auth_tkn through here. */}
+                <Link href={`/auth/create-account/${pathParams.userId}?auth_tkn=${authCode}`}>
                   <Button>Create one</Button>
                 </Link>
               </>

@@ -149,8 +149,8 @@ export default function Dashboard() {
             upcomingCount={stats?.pending_count ?? 0}
             loading={statsLoading}
           />
-          <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-4 space-y-2">
-            <p className="font-bold text-sm text-gray-500 uppercase tracking-wide">
+          <div className="bg-background text-foreground shadow-sm rounded-xl border border-border p-4 space-y-2">
+            <p className="font-bold text-sm text-muted-foreground uppercase tracking-wide">
               Quick actions
             </p>
             {[
@@ -162,10 +162,10 @@ export default function Dashboard() {
               <button
                 key={item.path + item.label}
                 onClick={() => router.push(item.path)}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 transition-colors flex justify-between items-center"
+                className="w-full text-left px-3 py-2 rounded-lg text-sm border border-border hover:bg-accent transition-colors flex justify-between items-center"
               >
                 {item.label}
-                <span className="text-gray-400">→</span>
+                <span className="text-muted-foreground">→</span>
               </button>
             ))}
           </div>

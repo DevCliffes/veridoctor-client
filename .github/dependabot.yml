@@ -1,0 +1,24 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # JS/TS dependencies across the pnpm workspace (apps/* and packages/*).
+  # Dependabot's "npm" ecosystem type auto-detects pnpm-lock.yaml, so this
+  # single root-level entry covers the whole monorepo -- no need for a
+  # separate entry per app or package.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # GitHub Actions workflow versions (e.g. actions/checkout, actions/setup-node),
+  # if/when this repo adds any under .github/workflows/. Harmless to include
+  # now even if that folder is empty -- Dependabot just finds nothing to update.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

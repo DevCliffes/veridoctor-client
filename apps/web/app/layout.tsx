@@ -3,7 +3,6 @@ import "@veridoctor/design/styles/globals.css";
 import { Toaster } from "sonner";
 import Script from "next/script";
 import StoreProvider from "./StoreProvider";
-import { ThemeProvider } from "@veridoctor/design";
 
 export const metadata: Metadata = {
   title: {
@@ -34,28 +33,26 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <StoreProvider>
         <body className="antialiased font-sans">
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            {/* Google Analytics (GA4) — gtag.js loads after the page becomes
-                interactive so it doesn't block/delay first paint or hydration.
-                Stream: "Veri Doctor", measurement ID G-KHXK82ZFFX. */}
-            <Script
-              src="https://www.googletagmanager.com/gtag/js?id=G-KHXK82ZFFX"
-              strategy="afterInteractive"
-            />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', 'G-KHXK82ZFFX');
-              `}
-            </Script>
-            <Toaster richColors position="top-center" />
-            {children}
-          </ThemeProvider>
+          {/* Google Analytics (GA4) — gtag.js loads after the page becomes
+              interactive so it doesn't block/delay first paint or hydration.
+              Stream: "Veri Doctor", measurement ID G-KHXK82ZFFX. */}
+          <Script
+            src="https://www.googletagmanager.com/gtag/js?id=G-KHXK82ZFFX"
+            strategy="afterInteractive"
+          />
+          <Script id="google-analytics" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-KHXK82ZFFX');
+            `}
+          </Script>
+          <Toaster richColors position="top-center" />
+          {children}
         </body>
       </StoreProvider>
     </html>

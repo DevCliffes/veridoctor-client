@@ -40,19 +40,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { GlobalNewAppointmentDialog } from "../../components/GlobalNewAppointmentDialog";
 import NotificationBell from "../../components/NotificationBell";
 
-// FIX: this was already "https://veridoctor.com" (no www), while
-// health-portal's equivalent constant was hardcoded to a stale Vercel
-// preview alias ("https://veridoctor-client-web.vercel.app"). Both are now
-// pinned to the confirmed canonical production domain, www.veridoctor.com,
-// which is what actually serves / and /auth/login (per Vercel request
-// logs) and matches the Domain=.veridoctor.com scope that session and
-// pending-redirect cookies are written with. A mismatch here sends the
-// browser to a domain outside that cookie scope, which silently breaks
-// the pending-redirect handoff on timeout.
 const WEB_APP_URL = "https://www.veridoctor.com";
-
-// Poll cadence while a provider is waiting on onboarding approval, so they
-// get unlocked automatically without having to log out/in.
 const ONBOARDING_POLL_INTERVAL_MS = 30000;
 
 function getIdentityId(identity: unknown): string {
@@ -73,23 +61,12 @@ function getIdentityId(identity: unknown): string {
   return "";
 }
 
-// Mirrors the derived enum returned by ProviderProfileView.get() on the
-// backend. Kept as a union (not a generic string) so a typo in a
-// comparison anywhere in this file fails at compile time instead of
-// silently never matching.
 type OnboardingStatus =
   | "incomplete_profile"
   | "pending_review"
   | "documents_rejected"
   | "approved";
 
-// FIX: pulled out of OnboardingStatusBanner as its own named type. The
-// previous inline object type nested inside Record<Exclude<...>, {...}>
-// (semicolon-separated fields on one line) tripped up this Next.js/
-// Turbopack version's parser with "Expected ',', got ';'" at build time,
-// even though it's valid TypeScript. A named alias used as the plain
-// second generic argument avoids the inline-object-in-generic parse path
-// entirely -- no behavior change, purely a syntax workaround.
 type OnboardingBannerConfig = {
   className: string;
   title: string;
@@ -120,7 +97,6 @@ export default function MainAppLayout({
   const [profile, setProfile] = useState<ProviderProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
-  // ── Initial profile fetch ───────────────────────────────────────────
   useEffect(() => {
     if (!identityId) return;
 
@@ -133,13 +109,7 @@ export default function MainAppLayout({
         if (cancelled) return;
         setProfile(res.data);
       })
-      .catch(() => {
-        // Fail open: if the profile fetch itself errors out (network
-        // blip, Render cold start), don't lock the provider out of the
-        // whole app. `profile` stays null, and the render logic below
-        // treats null profile as "let them through, gate inactive."
-        // Only an explicit onboarding_status !== "approved" blocks access.
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setProfileLoading(false);
       });
@@ -149,11 +119,10 @@ export default function MainAppLayout({
     };
   }, [identityId]);
 
-  // ── Poll while not yet approved, so approval unblocks without re-login ──
   useEffect(() => {
     if (!identityId) return;
-    if (!profile) return; // wait for the initial load to resolve first
-    if (profile.onboarding_status === "approved") return; // nothing to poll for
+    if (!profile) return;
+    if (profile.onboarding_status === "approved") return;
 
     const interval = setInterval(() => {
       axiosClient
@@ -167,14 +136,10 @@ export default function MainAppLayout({
 
   const isProfilePage = pathname?.startsWith("/profile") ?? false;
 
-  // ── Redirect gate ────────────────────────────────────────────────────
-  // Gate on onboarding_status !== "approved", not on "first login" — this
-  // also re-blocks a provider if a document gets rejected later, or if
-  // they close the tab mid-onboarding and come back on day 3.
   useEffect(() => {
     if (!identityId) return;
     if (profileLoading) return;
-    if (!profile) return; // fetch failed — fail open, don't gate
+    if (!profile) return;
     if (profile.onboarding_status !== "approved" && !isProfilePage) {
       router.replace("/profile");
     }
@@ -191,9 +156,6 @@ export default function MainAppLayout({
     loginUrl: WEB_APP_URL,
   };
 
-  // ── Calls and Settings removed from nav (hidden from UI, pages still exist)
-  // Reordered per request: Dashboard, Appointments, Services, Schedule,
-  // Patients, then the rest unchanged (Prescriptions, Form studio).
   const navItems: navITem[] = [
     { linkTo: "/dashboard", name: "Dashboard", icon: <LayoutDashboard /> },
     { linkTo: "/appointments", icon: <LucideCalendarCheck />, name: "Appointments" },
@@ -210,10 +172,6 @@ export default function MainAppLayout({
     dispatch(setIsLoggedIn());
   };
 
-  // While the profile fetch is in flight, or while we're about to redirect
-  // an unapproved provider off a blocked route, render a blank shell
-  // instead of the dashboard — otherwise there's a flash of real content
-  // before the redirect (or the SideNav) kicks in.
   const awaitingRedirect =
     !!profile && profile.onboarding_status !== "approved" && !isProfilePage;
 
@@ -221,9 +179,6 @@ export default function MainAppLayout({
     return <LoadingShell />;
   }
 
-  // Gate is only ever "active" in the render below when the provider is
-  // unapproved AND already on /profile — every other unapproved case was
-  // already redirected above.
   const gateActive = !!profile && profile.onboarding_status !== "approved";
 
   return (
@@ -234,17 +189,12 @@ export default function MainAppLayout({
     >
       {!gateActive && <GlobalNewAppointmentDialog userId={identityId} />}
 
-      <div className="fixed bg-white top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
+      <div className="fixed bg-background text-foreground top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
         <TopNav
           center={<p>{displayName}</p>}
           right={
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              {/* Bell now renders regardless of approval status — a
-                  provider with a rejected document is exactly who needs
-                  to see it. Only SideNav and the new-appointment dialog
-                  stay behind the gate, since those genuinely require an
-                  approved profile to be usable. */}
               <NotificationBell identityId={identityId} />
               <ProfileDropdown dispatch={dispatch} />
             </div>
@@ -252,11 +202,7 @@ export default function MainAppLayout({
         />
         <div className="flex flex-1 min-h-0">
           {!gateActive && <SideNav navItems={navItems} activePath={pathname} />}
-          <div className="flex-1 min-h-0 overflow-y-auto bg-white p-1">
-            {/* Removed max-w-6xl mx-auto — that capped content at 1152px
-                and left a growing dead-space border around it at lower
-                zoom levels. w-full + px-4 lets the dashboard grid and
-                charts actually use the available width at any zoom. */}
+          <div className="flex-1 min-h-0 overflow-y-auto bg-background p-1">
             <div className="w-full px-4 pb-8">
               {gateActive && profile && (
                 <OnboardingStatusBanner status={profile.onboarding_status} />
@@ -272,7 +218,7 @@ export default function MainAppLayout({
 
 function LoadingShell() {
   return (
-    <div className="fixed bg-white top-0 left-0 h-svh w-full flex items-center justify-center">
+    <div className="fixed bg-background top-0 left-0 h-svh w-full flex items-center justify-center">
       <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-500 animate-spin" />
     </div>
   );

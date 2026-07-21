@@ -276,7 +276,7 @@ const PUBLIC_PATHS = [
   "/identity/authorise",
   "/identity/register",
   "/identity/reset-password",
-  "/identity/confirm-reset-password",
+  "/identity/reset-password/confirm",   // corrected — was "/identity/confirm-reset-password"
   "/identity/send-otp",
   "/identity/verify-otp",
 ];

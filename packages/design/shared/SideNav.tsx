@@ -1,5 +1,6 @@
 "use client";
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
 export type navITem = {
@@ -112,9 +113,17 @@ function SideNav({
             </div>
             <div className="flex flex-col m-auto px-4 mt-10">
               {navItems.map((navItem, index) => (
-                <a href={navItem.linkTo} key={index}>
+                // FIX: was a raw <a href>, which forces a full document
+                // reload on every sidebar click — re-downloading every JS
+                // chunk/font and re-running every page's mount-time
+                // fetches from scratch. next/link does a client-side
+                // transition instead.
+                <Link
+                  href={navItem.linkTo}
+                  key={index}
+                  onClick={closeMobileDropdown}
+                >
                   <div
-                    onClick={closeMobileDropdown}
                     className={`flex gap-2 items-center py-4 px-2 ${
                       isActive(navItem.linkTo) ? "bg-primary/70" : ""
                     }`}
@@ -122,7 +131,7 @@ function SideNav({
                     {navItem.icon}
                     <p className="text-sm">{navItem.name}</p>
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
           </div>
@@ -157,7 +166,10 @@ function NavItem({
   }
 
   return (
-    <a href={navItem.linkTo}>
+    // FIX: was a raw <a href> — same full-reload issue as the mobile item
+    // above, except this is the desktop sidebar, meaning it fired on
+    // essentially every navigation in the app.
+    <Link href={navItem.linkTo}>
       <div
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -168,7 +180,7 @@ function NavItem({
         {navItem.icon}
         {sidebarOpen && <p className="text-sm">{navItem.name}</p>}
       </div>
-    </a>
+    </Link>
   );
 }
 

@@ -30,6 +30,21 @@ type Appointment = {
   message: string;
 };
 
+// DRF returns `next` as a full absolute URL built from the request's Host
+// header. Passing that straight to axios makes it bypass baseURL entirely
+// and hit whatever host DRF thinks it is -- which can differ from what the
+// frontend/proxy expects. Stripping it back down to a relative path keeps
+// every page of the loop going through the same baseURL as every other
+// request in the app.
+function toRelativeApiPath(url: string): string {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.pathname + parsed.search;
+  } catch {
+    return url;
+  }
+}
+
 export default function PatientPortal({
   params,
 }: {
@@ -42,29 +57,32 @@ export default function PatientPortal({
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(() => {
-  if (!userId) return;
-  setLoading(true);
-  axiosClient
-    .get(`provider/${userId}/appointments/${params.id}`)
-    .then(async (res) => {
-      const appt: Appointment = res.data;
-      setAppointment(appt);
+    if (!userId) return;
+    setLoading(true);
+    axiosClient
+      .get(`provider/${userId}/appointments/${params.id}`)
+      .then(async (res) => {
+        const appt: Appointment = res.data;
+        setAppointment(appt);
 
-      // Needs every appointment for this provider, across all pages, to
-      // find every appointment belonging to this specific patient --
-      // filter=all returns paginated results now, so loop on `next`.
-      let url: string | null = `provider/${userId}/appointments?filter=all&page_size=100`;
-      let results: Appointment[] = [];
-      while (url) {
-        const page = await axiosClient.get(url);
-        results = results.concat(page.data?.results ?? []);
-        url = page.data?.next ?? null;
-      }
-      setAllAppointments(results);
-    })
-    .catch(() => toast.error("Could not load patient data"))
-    .finally(() => setLoading(false));
-}, [userId, params.id]);
+        // Needs every appointment for this provider, across all pages, to
+        // find every appointment belonging to this specific patient --
+        // filter=all returns paginated results now, so loop on `next`
+        // (normalized to a relative path).
+        let url: string | null = `provider/${userId}/appointments?filter=all&page_size=100`;
+        let results: Appointment[] = [];
+        let guard = 0;
+        while (url && guard < 50) { // safety cap against a runaway loop
+          const page = await axiosClient.get(url);
+          results = results.concat(page.data?.results ?? []);
+          url = page.data?.next ? toRelativeApiPath(page.data.next) : null;
+          guard++;
+        }
+        setAllAppointments(results);
+      })
+      .catch(() => toast.error("Could not load patient data"))
+      .finally(() => setLoading(false));
+  }, [userId, params.id]);
 
   useEffect(() => {
     fetchData();

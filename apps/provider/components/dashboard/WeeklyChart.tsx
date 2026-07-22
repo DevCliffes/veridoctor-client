@@ -39,19 +39,17 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
       : "";
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+    <div className="bg-card rounded-xl shadow-sm border border-border p-4 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-gray-700">Weekly Appointments</h2>
-        <span className="text-xs text-gray-400">Last 7 days</span>
+        <h2 className="font-semibold text-foreground">Weekly Appointments</h2>
+        <span className="text-xs text-muted-foreground">Last 7 days</span>
       </div>
 
       {loading ? (
-        <div className="w-full aspect-[5/1] bg-gray-100 animate-pulse rounded" />
+        <div className="w-full aspect-[5/1] bg-muted animate-pulse rounded" />
       ) : weeklyData.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">No data yet</p>
+        <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
       ) : (
-        // pt-4 gives the count labels above the highest point (near y=0%)
-        // headroom so they don't crowd the top edge of the card.
         <div className="relative pt-4">
           <svg
             viewBox={`0 0 ${W} ${H}`}
@@ -91,17 +89,13 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
             })}
           </svg>
 
-          {/* HTML overlay for count labels — sized in real px so they
-              never scale with the SVG viewBox. Bumped up from 10px/500
-              gray to 13px/semibold darker gray so they stay legible at
-              any zoom level, not just 100%. */}
           <div className="absolute inset-0 pointer-events-none">
             {points.map((p) => {
               if (p.count === 0) return null;
               return (
                 <span
                   key={p.date}
-                  className="absolute text-[13px] font-semibold text-gray-600 -translate-x-1/2 -translate-y-full whitespace-nowrap"
+                  className="absolute text-[13px] font-semibold text-foreground -translate-x-1/2 -translate-y-full whitespace-nowrap"
                   style={{ left: `${p.xPct}%`, top: `${p.yPct}%`, marginTop: "-6px" }}
                 >
                   {p.count}
@@ -116,7 +110,7 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
               return (
                 <span
                   key={d.date}
-                  className={`text-xs ${isToday ? "text-blue-600 font-bold" : "text-gray-400"}`}
+                  className={`text-xs ${isToday ? "text-blue-600 font-bold" : "text-muted-foreground"}`}
                 >
                   {d.day}
                 </span>
@@ -126,14 +120,14 @@ export function WeeklyChart({ weeklyData, loading }: WeeklyChartProps) {
         </div>
       )}
 
-      <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100">
+      <div className="flex gap-4 mt-3 pt-3 border-t border-border">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full bg-blue-700" />
-          <span className="text-xs text-gray-500">Today</span>
+          <span className="text-xs text-muted-foreground">Today</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-full border-2 border-blue-700 bg-white" />
-          <span className="text-xs text-gray-500">Other days</span>
+          <div className="w-3 h-3 rounded-full border-2 border-blue-700 bg-card" />
+          <span className="text-xs text-muted-foreground">Other days</span>
         </div>
       </div>
     </div>

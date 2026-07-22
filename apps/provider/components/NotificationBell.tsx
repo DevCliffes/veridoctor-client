@@ -185,7 +185,7 @@ export default function NotificationBell({
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         onClick={unlockNotificationAudio}
-        className="relative flex items-center justify-center p-2 rounded-full hover:bg-black/5 cursor-pointer"
+        className="relative flex items-center justify-center p-2 rounded-full hover:bg-accent cursor-pointer"
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -194,9 +194,9 @@ export default function NotificationBell({
           </span>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between px-3 py-2 border-b">
-          <span className="text-sm font-semibold text-gray-800">
+      <DropdownMenuContent align="end" className="w-80 p-0 bg-popover text-popover-foreground">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+          <span className="text-sm font-semibold text-foreground">
             Notifications
           </span>
           {unreadCount > 0 && (
@@ -213,7 +213,7 @@ export default function NotificationBell({
           <button
             onClick={handleEnablePush}
             disabled={pushLoading}
-            className="w-full flex items-center gap-2 px-3 py-2.5 border-b text-xs text-blue-600 hover:bg-blue-50/60 disabled:opacity-50"
+            className="w-full flex items-center gap-2 px-3 py-2.5 border-b border-border text-xs text-blue-600 hover:bg-accent disabled:opacity-50"
           >
             <BellRing size={14} />
             {pushLoading ? "Enabling…" : "Enable push notifications"}
@@ -222,7 +222,7 @@ export default function NotificationBell({
 
         <div className="max-h-96 overflow-y-auto">
           {notifications.length === 0 ? (
-            <div className="px-3 py-8 text-center text-sm text-gray-400">
+            <div className="px-3 py-8 text-center text-sm text-muted-foreground">
               No notifications yet
             </div>
           ) : (
@@ -231,19 +231,19 @@ export default function NotificationBell({
                 key={n.id}
                 onClick={() => handleNotificationClick(n)}
                 className={
-                  "w-full text-left px-3 py-2.5 border-b last:border-b-0 hover:bg-gray-50 transition-colors flex gap-2 " +
-                  (n.is_read ? "" : "bg-blue-50/60")
+                  "w-full text-left px-3 py-2.5 border-b border-border last:border-b-0 hover:bg-accent transition-colors flex gap-2 " +
+                  (n.is_read ? "" : "bg-accent/50")
                 }
               >
                 {!n.is_read && (
                   <span className="mt-1.5 w-2 h-2 rounded-full bg-blue-600 shrink-0" />
                 )}
                 <div className={n.is_read ? "pl-4" : ""}>
-                  <p className="text-sm font-medium text-gray-800">
+                  <p className="text-sm font-medium text-foreground">
                     {n.title}
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
-                  <p className="text-[11px] text-gray-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
                     {timeAgo(n.created_at)}
                   </p>
                 </div>

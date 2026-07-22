@@ -42,23 +42,29 @@ export default function PatientPortal({
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(() => {
-    if (!userId) return;
-    setLoading(true);
+  if (!userId) return;
+  setLoading(true);
+  axiosClient
+    .get(`provider/${userId}/appointments/${params.id}`)
+    .then(async (res) => {
+      const appt: Appointment = res.data;
+      setAppointment(appt);
 
-    axiosClient
-      .get(`provider/${userId}/appointments/${params.id}`)
-      .then((res) => {
-        const appt: Appointment = res.data;
-        setAppointment(appt);
-        // ← filter=all so past appointments are included in history
-        return axiosClient.get(`provider/${userId}/appointments?filter=all`);
-      })
-      .then((res) => {
-        setAllAppointments(res.data ?? []);
-      })
-      .catch(() => toast.error("Could not load patient data"))
-      .finally(() => setLoading(false));
-  }, [userId, params.id]);
+      // Needs every appointment for this provider, across all pages, to
+      // find every appointment belonging to this specific patient --
+      // filter=all returns paginated results now, so loop on `next`.
+      let url: string | null = `provider/${userId}/appointments?filter=all&page_size=100`;
+      let results: Appointment[] = [];
+      while (url) {
+        const page = await axiosClient.get(url);
+        results = results.concat(page.data?.results ?? []);
+        url = page.data?.next ?? null;
+      }
+      setAllAppointments(results);
+    })
+    .catch(() => toast.error("Could not load patient data"))
+    .finally(() => setLoading(false));
+}, [userId, params.id]);
 
   useEffect(() => {
     fetchData();

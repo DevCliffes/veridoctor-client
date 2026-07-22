@@ -297,6 +297,7 @@ function isPublicPath(url?: string): boolean {
 // a 403 there is a normal, anticipated outcome, not an auth failure.
 const EXPECTED_FORBIDDEN_PATH_PATTERNS = [
   "/granted-records/",
+  "/records/patient/",
 ];
 
 function isExpectedForbidden(url?: string): boolean {

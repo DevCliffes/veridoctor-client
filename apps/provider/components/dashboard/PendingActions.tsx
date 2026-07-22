@@ -1,56 +1,62 @@
 "use client";
-import { useRouter } from "next/navigation";
+
 interface PendingActionsProps {
-  upcomingCount: number;
-  loading: boolean;
+  onNavigate: (path: string) => void;
 }
-export function PendingActions({ upcomingCount, loading }: PendingActionsProps) {
-  const router = useRouter();
-  const items = [
-    {
-      label: "Upcoming appointments",
-      count: upcomingCount,
-      urgency: upcomingCount > 0 ? "bg-yellow-100 text-yellow-700" : "bg-muted text-muted-foreground",
-      href: "/appointments?filter=upcoming",
-    },
-    {
-      label: "Prescriptions to sign",
-      count: 0,
-      urgency: "bg-muted text-muted-foreground",
-      href: "/prescriptions",
-    },
-    {
-      label: "Unread messages",
-      count: 0,
-      urgency: "bg-muted text-muted-foreground",
-      href: "/calls",
-    },
-  ];
+
+const actions = [
+  {
+    icon: "🧪",
+    title: "Lab results ready",
+    sub: "2 patients · review needed",
+    badge: "Urgent",
+    badgeStyle: "bg-red-100 text-red-800",
+    path: "/services",
+  },
+  {
+    icon: "💊",
+    title: "Prescription renewals",
+    sub: "1 expiring today",
+    badge: "Today",
+    badgeStyle: "bg-amber-100 text-amber-800",
+    path: "/patients",
+  },
+  {
+    icon: "💬",
+    title: "Patient messages",
+    sub: "3 unread",
+    badge: "New",
+    badgeStyle: "bg-blue-100 text-blue-800",
+    path: "/patients",
+  },
+];
+
+export function PendingActions({ onNavigate }: PendingActionsProps) {
   return (
-    <div className="bg-card rounded-xl shadow-sm border border-border p-4 mb-6">
-      <h2 className="font-semibold text-foreground mb-3">Pending Actions</h2>
-      {loading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 bg-muted rounded-lg animate-pulse" />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <button
-              key={item.label}
-              onClick={() => router.push(item.href)}
-              className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-accent transition-colors text-left"
+    <div className="bg-card shadow-md rounded-lg p-4 border border-border">
+      <p className="font-bold text-foreground mb-3">Pending actions</p>
+      <div className="divide-y divide-border">
+        {actions.map((item) => (
+          <button
+            key={item.title}
+            onClick={() => onNavigate(item.path)}
+            className="w-full flex items-start gap-3 py-3 first:pt-0 last:pb-0 hover:bg-accent -mx-1 px-1 rounded transition-colors text-left"
+          >
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-base flex-shrink-0">
+              {item.icon}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">{item.title}</p>
+              <p className="text-xs text-muted-foreground">{item.sub}</p>
+            </div>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 mt-0.5 ${item.badgeStyle}`}
             >
-              <span className="text-sm text-foreground">{item.label}</span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${item.urgency}`}>
-                {item.count}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+              {item.badge}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

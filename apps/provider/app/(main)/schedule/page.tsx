@@ -849,7 +849,7 @@ export default function Schedule() {
             </div>
 
             {selectedService && (
-              <p className="text-xs text-blue-500 -mt-2 pl-6">
+              <p className="text-xs text-muted-foreground -mt-2 pl-6">
                 End time auto-filled from &quot;{selectedService.name}&quot; duration ({selectedService.estimated_duration} mins) — you can adjust manually.
               </p>
             )}

@@ -17,6 +17,21 @@ type Patient = {
   start_time: string;
 };
 
+// DRF returns `next` as a full absolute URL built from the request's Host
+// header. Passing that straight to axios makes it bypass baseURL entirely
+// and hit whatever host DRF thinks it is -- which can differ from what the
+// frontend/proxy expects. Stripping it back down to a relative path keeps
+// every page of the loop going through the same baseURL as every other
+// request in the app.
+function toRelativeApiPath(url: string): string {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.pathname + parsed.search;
+  } catch {
+    return url;
+  }
+}
+
 export default function Patients() {
   const router = useRouter();
   const userId = useSelector((state: RootState) => state.auth.identity);
@@ -31,14 +46,16 @@ export default function Patients() {
     // Needs every appointment ever, across all pages, to correctly dedupe
     // patients -- a single-page fetch would silently undercount any
     // provider with more history than one page holds. Loops on `next`
-    // (a full URL from DRF's paginator) until exhausted.
+    // (normalized to a relative path) until exhausted.
     const fetchAllAppointments = async (): Promise<Patient[]> => {
       let url: string | null = `provider/${userId}/appointments?filter=all&page_size=100`;
       let results: Patient[] = [];
-      while (url) {
-        const res = await axiosClient.get(url);
-        results = results.concat(res.data?.results ?? []);
-        url = res.data?.next ?? null;
+      let guard = 0;
+      while (url && guard < 50) { // safety cap -- shouldn't ever hit this,
+        const res = await axiosClient.get(url);         // just stops a runaway loop if the backend's
+        results = results.concat(res.data?.results ?? []); // pagination ever misbehaves
+        url = res.data?.next ? toRelativeApiPath(res.data.next) : null;
+        guard++;
       }
       return results;
     };

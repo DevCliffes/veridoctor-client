@@ -373,21 +373,21 @@ function EditScheduleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+      <div className="bg-card text-foreground rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <LucideCalendarCheck size={18} className="text-blue-600" />
-            <h2 className="font-semibold text-gray-800">Edit schedule</h2>
+            <h2 className="font-semibold text-foreground">Edit schedule</h2>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors"
             >
               <LucideTrash2 size={16} />
             </button>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground">
               <LucideX size={18} />
             </button>
           </div>
@@ -422,7 +422,7 @@ function EditScheduleModal({
           <select
             value={serviceId}
             onChange={(e) => handleServiceChange(e.target.value)}
-            className="w-full text-base font-medium border-b border-gray-200 pb-2 focus:outline-none focus:border-blue-400 bg-transparent"
+            className="w-full text-base font-medium border-b border-border pb-2 focus:outline-none focus:border-blue-400 bg-transparent text-foreground"
           >
             <option value="">Select a service</option>
             {services.map((s) => (
@@ -431,7 +431,7 @@ function EditScheduleModal({
           </select>
 
           <div className="flex items-start gap-2">
-            <LucideClock size={16} className="text-gray-400 mt-2 shrink-0" />
+            <LucideClock size={16} className="text-muted-foreground mt-2 shrink-0" />
             <div className="flex flex-wrap items-center gap-2 flex-1">
               {/* NEW: dates locked when editing a single occurrence — moving a date
                   is out of scope here; "This event" only edits time/service/location */}
@@ -444,20 +444,20 @@ function EditScheduleModal({
                   if (new Date(e.target.value) > new Date(endDate))
                     setEndDate(e.target.value);
                 }}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50 disabled:opacity-50"
+                className="border border-border rounded-lg px-2 py-1.5 text-sm bg-muted text-foreground disabled:opacity-50"
               />
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => handleStartTimeChange(e.target.value)}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50"
+                className="border border-border rounded-lg px-2 py-1.5 text-sm bg-muted text-foreground"
               />
-              <span className="text-gray-400">–</span>
+              <span className="text-muted-foreground">–</span>
               <input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50"
+                className="border border-border rounded-lg px-2 py-1.5 text-sm bg-muted text-foreground"
               />
               <input
                 type="date"
@@ -465,13 +465,13 @@ function EditScheduleModal({
                 disabled={isRecurring && scope === "this"}
                 onChange={(e) => setEndDate(e.target.value)}
                 min={startDate}
-                className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-gray-50 disabled:opacity-50"
+                className="border border-border rounded-lg px-2 py-1.5 text-sm bg-muted text-foreground disabled:opacity-50"
               />
             </div>
           </div>
 
           {serviceId && (
-            <p className="text-xs text-gray-400 -mt-2 pl-6">
+            <p className="text-xs text-muted-foreground -mt-2 pl-6">
               End time auto-filled from service duration
               {services.find(s => s.id === serviceId)
                 ? ` (${services.find(s => s.id === serviceId)!.estimated_duration} mins)`
@@ -483,12 +483,12 @@ function EditScheduleModal({
           {/* Recurrence editing only makes sense in "all events" scope */}
           {(!isRecurring || scope === "all") && (
             <div className="flex items-start gap-2">
-              <LucideRepeat size={16} className="text-gray-400 mt-2 shrink-0" />
+              <LucideRepeat size={16} className="text-muted-foreground mt-2 shrink-0" />
               <div className="flex-1 space-y-3">
                 <select
                   value={repeat}
                   onChange={(e) => setRepeat(e.target.value as RepeatType)}
-                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-gray-50 w-full"
+                  className="border border-border rounded-lg px-3 py-1.5 text-sm bg-muted text-foreground w-full"
                 >
                   <option value="none">Does not repeat</option>
                   <option value="daily">Daily</option>
@@ -508,7 +508,7 @@ function EditScheduleModal({
                           "w-8 h-8 rounded-full text-xs font-medium border transition-colors " +
                           (repeatDays.includes(d)
                             ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-white text-gray-600 border-gray-200")
+                            : "bg-card text-muted-foreground border-border")
                         }
                       >
                         {d[0]}
@@ -519,12 +519,12 @@ function EditScheduleModal({
 
                 {repeat !== "none" && (
                   <div className="space-y-2 pl-1">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Ends</p>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Ends</p>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <input type="radio" checked={endType === "never"} onChange={() => setEndType("never")} />
                       Never
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <input type="radio" checked={endType === "on_date"} onChange={() => setEndType("on_date")} />
                       On
                       <input
@@ -533,10 +533,10 @@ function EditScheduleModal({
                         value={endAfterDate}
                         onChange={(e) => setEndAfterDate(e.target.value)}
                         min={startDate}
-                        className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                        className="border border-border rounded-lg px-2 py-1 text-sm bg-muted text-foreground disabled:opacity-50"
                       />
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <input type="radio" checked={endType === "after"} onChange={() => setEndType("after")} />
                       After
                       <input
@@ -545,7 +545,7 @@ function EditScheduleModal({
                         disabled={endType !== "after"}
                         value={endAfterCount}
                         onChange={(e) => setEndAfterCount(Number(e.target.value))}
-                        className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                        className="w-14 border border-border rounded-lg px-2 py-1 text-sm bg-muted text-foreground disabled:opacity-50"
                       />
                       occurrence(s)
                     </label>
@@ -556,7 +556,7 @@ function EditScheduleModal({
           )}
 
           <div className="flex items-start gap-2">
-            <LucideMapPin size={16} className="text-gray-400 mt-2 shrink-0" />
+            <LucideMapPin size={16} className="text-muted-foreground mt-2 shrink-0" />
             <div className="flex gap-2 flex-wrap">
               {locationOptions.map((opt) => (
                 <button
@@ -567,7 +567,7 @@ function EditScheduleModal({
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors " +
                     (locationType === opt.key
                       ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
-                      : "bg-white border-gray-200 text-gray-600")
+                      : "bg-card border-border text-muted-foreground")
                   }
                 >
                   {opt.icon}
@@ -578,10 +578,10 @@ function EditScheduleModal({
           </div>
         </div>
 
-        <div className="px-5 py-3 border-t flex justify-end gap-2">
+        <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+            className="px-4 py-2 text-sm text-muted-foreground hover:bg-accent rounded-lg"
           >
             Cancel
           </button>
@@ -774,11 +774,11 @@ export default function Schedule() {
   const selectedService = services.find((s) => s.id === selectedServiceId);
 
   return (
-    <div className="p-4 bg-white rounded-lg mx-4">
+    <div className="p-4 bg-card rounded-lg mx-4">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">Schedule</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-xl font-bold text-foreground">Schedule</h1>
+          <p className="text-muted-foreground mt-1">
             Manage your availability for patient bookings.
           </p>
         </div>
@@ -796,7 +796,7 @@ export default function Schedule() {
           <div className="flex flex-col gap-4 max-w-lg">
             <div>
               {services.length === 0 ? (
-                <p className="text-sm text-gray-400 italic">
+                <p className="text-sm text-muted-foreground italic">
                   No services found.{" "}
                   <a href="/services" className="text-blue-600 hover:underline">
                     Add a service first →
@@ -806,7 +806,7 @@ export default function Schedule() {
                 <select
                   value={selectedServiceId}
                   onChange={(e) => handleServiceChange(e.target.value)}
-                  className="w-full text-lg font-medium border-b border-gray-200 pb-2 focus:outline-none focus:border-blue-400 bg-transparent"
+                  className="w-full text-lg font-medium border-b border-border pb-2 focus:outline-none focus:border-blue-400 bg-transparent text-foreground"
                 >
                   <option value="">Add title — select a service</option>
                   {services.map((s) => (
@@ -817,33 +817,33 @@ export default function Schedule() {
             </div>
 
             <div className="flex items-start gap-2">
-              <LucideClock size={18} className="text-gray-400 mt-2 shrink-0" />
+              <LucideClock size={18} className="text-muted-foreground mt-2 shrink-0" />
               <div className="flex flex-wrap items-center gap-2 flex-1">
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => handleStartDateChange(e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-muted text-foreground"
                 />
                 <input
                   type="time"
                   value={startTime}
                   onChange={(e) => handleStartTimeChange(e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-muted text-foreground"
                 />
-                <span className="text-gray-400">–</span>
+                <span className="text-muted-foreground">–</span>
                 <input
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-muted text-foreground"
                 />
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-muted text-foreground"
                 />
               </div>
             </div>
@@ -855,12 +855,12 @@ export default function Schedule() {
             )}
 
             <div className="flex items-start gap-2">
-              <LucideRepeat size={18} className="text-gray-400 mt-2 shrink-0" />
+              <LucideRepeat size={18} className="text-muted-foreground mt-2 shrink-0" />
               <div className="flex-1 space-y-3">
                 <select
                   value={repeat}
                   onChange={(e) => setRepeat(e.target.value as RepeatType)}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50"
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-muted text-foreground"
                 >
                   <option value="none">Does not repeat</option>
                   <option value="daily">Daily</option>
@@ -879,7 +879,7 @@ export default function Schedule() {
                           "w-9 h-9 rounded-full text-xs font-medium border transition-colors " +
                           (repeatDays.includes(d)
                             ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-white text-gray-600 border-gray-200")
+                            : "bg-card text-muted-foreground border-border")
                         }
                       >
                         {d[0]}
@@ -889,12 +889,12 @@ export default function Schedule() {
                 )}
                 {repeat !== "none" && (
                   <div className="space-y-2 pl-1">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Ends</p>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Ends</p>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <input type="radio" checked={endType === "never"} onChange={() => setEndType("never")} />
                       Never
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <input type="radio" checked={endType === "on_date"} onChange={() => setEndType("on_date")} />
                       On
                       <input
@@ -903,10 +903,10 @@ export default function Schedule() {
                         value={endAfterDate}
                         onChange={(e) => setEndAfterDate(e.target.value)}
                         min={startDate}
-                        className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                        className="border border-border rounded-lg px-2 py-1 text-sm bg-muted text-foreground disabled:opacity-50"
                       />
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
                       <input type="radio" checked={endType === "after"} onChange={() => setEndType("after")} />
                       After
                       <input
@@ -915,7 +915,7 @@ export default function Schedule() {
                         disabled={endType !== "after"}
                         value={endAfterCount}
                         onChange={(e) => setEndAfterCount(Number(e.target.value))}
-                        className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-sm bg-gray-50 disabled:opacity-50"
+                        className="w-16 border border-border rounded-lg px-2 py-1 text-sm bg-muted text-foreground disabled:opacity-50"
                       />
                       occurrence(s)
                     </label>
@@ -925,9 +925,9 @@ export default function Schedule() {
             </div>
 
             <div className="flex items-start gap-2">
-              <LucideMapPin size={18} className="text-gray-400 mt-2 shrink-0" />
+              <LucideMapPin size={18} className="text-muted-foreground mt-2 shrink-0" />
               <div className="flex-1">
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">Location</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">Location</p>
                 <div className="flex gap-2">
                   {locationOptions.map((opt) => (
                     <button
@@ -938,7 +938,7 @@ export default function Schedule() {
                         "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors " +
                         (locationType === opt.key
                           ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
-                          : "bg-white border-gray-200 text-gray-600")
+                          : "bg-card border-border text-muted-foreground")
                       }
                     >
                       {opt.icon}

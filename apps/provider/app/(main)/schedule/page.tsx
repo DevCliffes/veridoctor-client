@@ -634,9 +634,26 @@ export default function Schedule() {
 
   const fetchBookedAppts = useCallback(() => {
     if (!userId) return;
+
+    // Match the same window the calendar actually renders (see
+    // EXPAND_DAYS_BEFORE / EXPAND_DAYS_AFTER above), so this isn't pulling
+    // the provider's entire appointment history just to draw ~67 days of
+    // calendar. Also unwraps the new paginated {count, results} shape
+    // from the backend.
+    const start = new Date();
+    start.setDate(start.getDate() - EXPAND_DAYS_BEFORE);
+    const end = new Date();
+    end.setDate(end.getDate() + EXPAND_DAYS_AFTER);
+
+    const params = new URLSearchParams();
+    params.set("filter", "all");
+    params.set("start", dateKey(start));
+    params.set("end", dateKey(end));
+    params.set("page_size", "100");
+
     axiosClient
-      .get("provider/" + userId + "/appointments?filter=all")
-      .then((res) => setBookedAppts(res.data ?? []))
+      .get(`provider/${userId}/appointments?${params.toString()}`)
+      .then((res) => setBookedAppts(res.data?.results ?? []))
       .catch(() => {});
   }, [userId]);
 

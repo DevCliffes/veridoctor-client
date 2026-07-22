@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store";
 import { axiosClient } from "@veridoctor/api-client";
@@ -601,6 +603,7 @@ function EditScheduleModal({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Schedule() {
+  const router = useRouter();
   const userId = useSelector((state: RootState) => state.auth.identity);
   const [services, setServices] = useState<Service[]>([]);
   const [schedules, setSchedules] = useState<ScheduleBlock[]>([]);
@@ -714,7 +717,11 @@ export default function Schedule() {
         setEditingOccurrenceDate((appt.meta?.occurrenceDate as string) ?? block.start_date);
       }
     } else if (appt.meta?.type === "booked" && appt.meta?.appointmentId) {
-      window.location.href = "/appointments/" + appt.meta.appointmentId;
+      // FIX: was window.location.href, which forces a full document reload —
+      // re-downloading every JS chunk/font and re-running every page's
+      // mount-time fetches from scratch. router.push does an in-app
+      // client-side transition instead.
+      router.push("/appointments/" + appt.meta.appointmentId);
     }
   };
 
@@ -798,9 +805,9 @@ export default function Schedule() {
               {services.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">
                   No services found.{" "}
-                  <a href="/services" className="text-blue-600 hover:underline">
+                  <Link href="/services" className="text-blue-600 hover:underline">
                     Add a service first →
-                  </a>
+                  </Link>
                 </p>
               ) : (
                 <select

@@ -93,7 +93,7 @@ export function TodaySchedule({ identityId }: TodayScheduleProps) {
     if (!identityId) return;
     axiosClient
       .get(`/provider/${identityId}/appointments?filter=today`)
-      .then((res) => setAppointments(res.data ?? []))
+      .then((res) => setAppointments(res.data?.results ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [identityId]);

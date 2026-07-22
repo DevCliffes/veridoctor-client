@@ -82,7 +82,7 @@ export default function CaptureViewPage() {
   if (!capture) {
     return (
       <div className="p-6 mx-4">
-        <p className="text-gray-500">Capture not found.</p>
+        <p className="text-muted-foreground">Capture not found.</p>
         <button
           onClick={() => router.back()}
           className="mt-3 text-blue-600 text-sm hover:underline"
@@ -114,20 +114,20 @@ export default function CaptureViewPage() {
     section.title?.toLowerCase().includes("treatment");
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen bg-background pb-12">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10 flex items-center gap-3">
+      <div className="bg-card border-b border-border px-4 py-3 sticky top-0 z-10 flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="text-gray-500 hover:text-gray-700"
+          className="text-muted-foreground hover:text-foreground"
         >
           ←
         </button>
         <div>
-          <p className="text-sm font-semibold text-gray-800">
+          <p className="text-sm font-semibold text-foreground">
             {capture.form_name || "Capture"}
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted-foreground">
             Saved {new Date(capture.created_at).toLocaleString("en-KE")}
           </p>
         </div>
@@ -138,10 +138,10 @@ export default function CaptureViewPage() {
           sections.map((section) => (
             <div
               key={section.id}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden"
+              className="bg-card rounded-xl border border-border shadow-sm overflow-hidden"
             >
-              <div className="bg-gray-50 border-b border-gray-100 px-5 py-3">
-                <h2 className="font-semibold text-gray-800 text-sm">
+              <div className="bg-muted/40 border-b border-border px-5 py-3">
+                <h2 className="font-semibold text-foreground text-sm">
                   {section.title}
                 </h2>
               </div>
@@ -157,13 +157,13 @@ export default function CaptureViewPage() {
                       val === undefined || val === "" || val === false || val === null;
                     return (
                       <div key={field.id} className="flex flex-col gap-1">
-                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                           {field.label}
                           {field.required && (
                             <span className="text-red-400 ml-1">*</span>
                           )}
                         </p>
-                        <p className={`text-sm ${isEmpty ? "text-gray-300 italic" : "text-gray-700"}`}>
+                        <p className={`text-sm ${isEmpty ? "text-muted-foreground/60 italic" : "text-foreground"}`}>
                           {isEmpty
                             ? "Not filled"
                             : field.type === "checkbox"
@@ -179,9 +179,9 @@ export default function CaptureViewPage() {
           ))
         ) : (
           // Legacy fallback for captures with no snapshot saved at all
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-700">Captured Data</h2>
+              <h2 className="font-semibold text-foreground">Captured Data</h2>
               <span className="text-xs text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
                 Legacy capture — field labels unavailable
               </span>
@@ -202,15 +202,15 @@ export default function CaptureViewPage() {
                     ("drugs" in (innerVal as object) || "diagnosis" in (innerVal as object));
                   return (
                     <div key={key} className="flex flex-col gap-1">
-                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                         {label}
                       </p>
                       {isPrescObj ? (
                         <PrescriptionView value={innerVal as PrescriptionValue} />
                       ) : (
-                        <p className="text-sm text-gray-700">
+                        <p className="text-sm text-foreground">
                           {innerVal === undefined || innerVal === "" || innerVal === null
-                            ? <span className="italic text-gray-300">Not filled</span>
+                            ? <span className="italic text-muted-foreground/60">Not filled</span>
                             : String(innerVal)}
                         </p>
                       )}
@@ -226,7 +226,7 @@ export default function CaptureViewPage() {
                 if (isPrescObj) {
                   return (
                     <div key={key} className="flex flex-col gap-1">
-                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                         Prescription
                       </p>
                       <PrescriptionView value={val as PrescriptionValue} />
@@ -236,10 +236,10 @@ export default function CaptureViewPage() {
 
                 return (
                   <div key={key} className="flex flex-col gap-0.5">
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">{key}</p>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">{key}</p>
+                    <p className="text-sm text-foreground">
                       {val === undefined || val === "" || val === null
-                        ? <span className="italic text-gray-300">Not filled</span>
+                        ? <span className="italic text-muted-foreground/60">Not filled</span>
                         : String(val)}
                     </p>
                   </div>
@@ -258,38 +258,38 @@ function PrescriptionView({ value }: { value: PrescriptionValue | undefined }) {
     !value ||
     (!value.diagnosis && !value.notes && (!value.drugs || value.drugs.length === 0))
   ) {
-    return <p className="text-sm text-gray-300 italic">Not filled</p>;
+    return <p className="text-sm text-muted-foreground/60 italic">Not filled</p>;
   }
 
   return (
     <div className="flex flex-col gap-4">
       {value.diagnosis && (
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Diagnosis / Indication
           </p>
-          <p className="text-sm text-gray-700">{value.diagnosis}</p>
+          <p className="text-sm text-foreground">{value.diagnosis}</p>
         </div>
       )}
       {value.drugs && value.drugs.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
             Medications
           </p>
           <div className="flex flex-col gap-2">
             {value.drugs.map((drug, idx) => (
               <div
                 key={drug.id ?? idx}
-                className="border border-gray-100 rounded-lg p-3 bg-gray-50"
+                className="border border-border rounded-lg p-3 bg-muted/40"
               >
-                <p className="text-sm font-semibold text-gray-800">
+                <p className="text-sm font-semibold text-foreground">
                   {drug.drug_name || "—"}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {[drug.frequency, drug.duration].filter(Boolean).join(" · ")}
                 </p>
                 {drug.instructions && (
-                  <p className="text-xs text-gray-400 mt-0.5 italic">
+                  <p className="text-xs text-muted-foreground/70 mt-0.5 italic">
                     {drug.instructions}
                   </p>
                 )}
@@ -300,10 +300,10 @@ function PrescriptionView({ value }: { value: PrescriptionValue | undefined }) {
       )}
       {value.notes && (
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
             Additional Notes
           </p>
-          <p className="text-sm text-gray-700">{value.notes}</p>
+          <p className="text-sm text-foreground">{value.notes}</p>
         </div>
       )}
     </div>

@@ -204,7 +204,7 @@ export default function Prescriptions() {
                     {rx.notes && (
                       <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-100">
                         <p className="text-xs font-semibold text-yellow-700 mb-1">Additional notes</p>
-                        <p className="text-sm text-gray-700">{rx.notes}</p>
+                        <p className="text-sm text-foreground">{rx.notes}</p>
                       </div>
                     )}
                   </div>

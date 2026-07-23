@@ -17,7 +17,7 @@
     "@types/react-dom": "19.1.1",
     "@veridoctor/eslint-config": "workspace:*",
     "@veridoctor/typescript-config": "workspace:*",
-    "eslint": "^9.34.0",
+    "eslint": "^10.7.0",
     "tailwindcss": "^4",
     "typescript": "5.9.2"
   },

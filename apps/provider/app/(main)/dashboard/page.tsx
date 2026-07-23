@@ -12,7 +12,7 @@ import { NewVsReturning } from "../../../components/dashboard/NewVsReturning";
 import { CompletionRate } from "../../../components/dashboard/CompletionRate";
 import { VirtualVsInPerson } from "../../../components/dashboard/VirtualVsInPerson";
 import { RevenueByService } from "../../../components/dashboard/RevenueByService";
-import { WeeklyChart } from "../../../components/dashboard/WeeklyChart";
+import { AppointmentTrendCharts } from "../../../components/dashboard/AppointmentTrendCharts";
 
 function getIdentityId(identity: unknown): string {
   if (typeof identity === "string") {
@@ -121,7 +121,7 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           <TodaySchedule identityId={identityId} />
-          <WeeklyChart weeklyData={stats?.weekly_data ?? []} loading={statsLoading} />
+          <AppointmentTrendCharts identityId={identityId} />
         </div>
         <div className="space-y-4">
           <CompletionRate
@@ -145,12 +145,6 @@ export default function Dashboard() {
             data={stats?.revenue_by_service ?? []}
             loading={statsLoading}
           />
-          {/* FIX: previously showed 3 hardcoded, fake items (lab results,
-              prescription renewals, patient messages) referencing features
-              that don't exist in this system at all. Rebuilt to surface a
-              real, existing workflow instead -- appointments that happened
-              but whose capture form/notes were never completed. Each item
-              links straight to that appointment's detail page. */}
           <PendingActions identityId={identityId} />
           <div className="bg-background text-foreground shadow-sm rounded-xl border border-border p-4 space-y-2">
             <p className="font-bold text-sm text-muted-foreground uppercase tracking-wide">

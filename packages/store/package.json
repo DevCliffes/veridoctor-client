@@ -13,8 +13,8 @@
   "license": "ISC",
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",
-    "js-cookie": "^3.0.5",
-    "react-redux": "^9.3.0"
+    "js-cookie": "^3.0.7",
+    "react-redux": "^9.2.0"
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6"

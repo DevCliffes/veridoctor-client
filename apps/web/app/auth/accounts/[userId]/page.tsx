@@ -19,6 +19,25 @@ type AccountsResponse = {
   accounts: [{ account_type: AccountType; id: string; name: string }];
 };
 
+// FIX (post-login redirect loop / 404 on e.g. /records?identity=...):
+// previously this appended redirectPath directly onto safeBase BEFORE the
+// query string (e.g. `${safeBase}${redirectPath}?identity=...&auth_tkn=...`).
+// That sent the browser straight to an arbitrary app page (e.g.
+// /records?identity=<old-id>) carrying raw identity/auth_tkn query params
+// which that page has no idea how to consume -- only the handoff route at
+// the app's root (Home/page.tsx in apps/provider and apps/health-portal)
+// knows to call persistProviderSession()/persistPatientSession() and write
+// the actual auth cookies. It also meant redirectPath's own query string
+// (e.g. "?identity=<record-id>") collided with our own identity/auth_tkn
+// params in one flat query string, silently corrupting both -- which is
+// why the identity you'd see on the final URL was sometimes the stashed
+// record id instead of the fresh user id.
+//
+// Fix: always land on the app's root (the handoff route), and always pass
+// the intended final destination through as a `redirect` param instead of
+// appending it to the path directly. The handoff route persists the
+// session first, then does its own clean client-side navigation to
+// `redirect` with no tokens attached.
 function buildDestination(
   appBaseUrl: string,
   userId: string,
@@ -28,16 +47,19 @@ function buildDestination(
   const safeBase =
     appBaseUrl && appBaseUrl.startsWith("https://") ? appBaseUrl : null;
 
-  if (!safeBase) {
-    return `/?identity=${userId}&auth_tkn=${authCode}`;
+  const params = new URLSearchParams({ identity: userId, auth_tkn: authCode });
+  if (redirectPath && redirectPath !== "/") {
+    params.set("redirect", redirectPath);
   }
 
-  const landing =
-    redirectPath && redirectPath !== "/" && redirectPath !== "%2F"
-      ? redirectPath
-      : "";
+  if (!safeBase) {
+    // Local/relative fallback (e.g. no app-specific base URL configured)
+    // must also route through the handoff route at "/", not straight to
+    // redirectPath.
+    return `/?${params.toString()}`;
+  }
 
-  return `${safeBase}${landing}?identity=${userId}&auth_tkn=${authCode}`;
+  return `${safeBase}?${params.toString()}`;
 }
 
 export default async function AccountsPage({

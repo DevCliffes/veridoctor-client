@@ -4,6 +4,12 @@ interface PendingActionsProps {
   onNavigate: (path: string) => void;
 }
 
+// NOTE: verify these two paths against your actual route names --
+// I don't have visibility into where "lab results" and "patient messages"
+// actually live in this app, so these are best-guess placeholders.
+// "/prescriptions?filter=expiring" mirrors the existing Quick Actions
+// pattern (e.g. "/appointments?filter=past" for Patient records), so
+// that one should be correct as-is.
 const actions = [
   {
     icon: "🧪",
@@ -11,7 +17,7 @@ const actions = [
     sub: "2 patients · review needed",
     badge: "Urgent",
     badgeStyle: "bg-red-100 text-red-800",
-    path: "/services",
+    path: "/lab-results?status=ready", // TODO: confirm real route
   },
   {
     icon: "💊",
@@ -19,7 +25,7 @@ const actions = [
     sub: "1 expiring today",
     badge: "Today",
     badgeStyle: "bg-amber-100 text-amber-800",
-    path: "/patients",
+    path: "/prescriptions?filter=expiring",
   },
   {
     icon: "💬",
@@ -27,7 +33,7 @@ const actions = [
     sub: "3 unread",
     badge: "New",
     badgeStyle: "bg-blue-100 text-blue-800",
-    path: "/patients",
+    path: "/messages?filter=unread", // TODO: confirm real route
   },
 ];
 

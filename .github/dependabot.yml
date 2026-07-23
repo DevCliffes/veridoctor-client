@@ -2,7 +2,6 @@
 # package ecosystems to update and where the package manifests are located.
 # Please see the documentation for all configuration options:
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
 version: 2
 updates:
   # JS/TS dependencies across the pnpm workspace (apps/* and packages/*).
@@ -14,7 +13,13 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
-
+    ignore:
+      # Next.js's next.config.ts loader depends on TypeScript's old JS
+      # Compiler API, which TypeScript 7's Go-based rewrite dropped.
+      # Block major bumps so Dependabot can't repeat the 5.9 -> 7.0 jump
+      # that broke the build; patch/minor 5.x bumps are still allowed.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   # GitHub Actions workflow versions (e.g. actions/checkout, actions/setup-node),
   # if/when this repo adds any under .github/workflows/. Harmless to include
   # now even if that folder is empty -- Dependabot just finds nothing to update.

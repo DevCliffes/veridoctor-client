@@ -22,7 +22,7 @@ importers:
     dependencies:
       '@reduxjs/toolkit':
         specifier: ^2.11.2
-        version: 2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
+        version: 2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
       '@veridoctor/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -42,8 +42,8 @@ importers:
         specifier: 19.1.0
         version: 19.1.0(react@19.1.0)
       react-redux:
-        specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
+        specifier: ^9.3.0
+        version: 9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -80,7 +80,7 @@ importers:
     dependencies:
       '@reduxjs/toolkit':
         specifier: ^2.11.2
-        version: 2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1))(react@19.2.3)
+        version: 2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1))(react@19.2.3)
       '@veridoctor/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -135,7 +135,7 @@ importers:
     dependencies:
       '@reduxjs/toolkit':
         specifier: ^2.11.2
-        version: 2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
+        version: 2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
       '@veridoctor/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -158,8 +158,8 @@ importers:
         specifier: 19.1.0
         version: 19.1.0(react@19.1.0)
       react-redux:
-        specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
+        specifier: ^9.3.0
+        version: 9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -202,7 +202,7 @@ importers:
     dependencies:
       '@reduxjs/toolkit':
         specifier: ^2.11.2
-        version: 2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
+        version: 2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
       '@veridoctor/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -222,8 +222,8 @@ importers:
         specifier: 19.1.0
         version: 19.1.0(react@19.1.0)
       react-redux:
-        specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
+        specifier: ^9.3.0
+        version: 9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
       socket.io-client:
         specifier: ^4.8.3
         version: 4.8.3
@@ -263,7 +263,7 @@ importers:
     dependencies:
       '@reduxjs/toolkit':
         specifier: ^2.11.2
-        version: 2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
+        version: 2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)
       '@veridoctor/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -283,8 +283,8 @@ importers:
         specifier: 19.1.0
         version: 19.1.0(react@19.1.0)
       react-redux:
-        specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
+        specifier: ^9.3.0
+        version: 9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -396,8 +396,8 @@ importers:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       tailwind-merge:
-        specifier: ^3.3.1
-        version: 3.3.1
+        specifier: ^3.6.0
+        version: 3.6.0
       tailwindcss:
         specifier: ^4.1.13
         version: 4.1.13
@@ -470,13 +470,13 @@ importers:
     dependencies:
       '@reduxjs/toolkit':
         specifier: ^2.11.2
-        version: 2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1))(react@19.2.3)
+        version: 2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1))(react@19.2.3)
       js-cookie:
         specifier: ^3.0.5
         version: 3.0.5
       react-redux:
-        specifier: ^9.2.0
-        version: 9.2.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1)
+        specifier: ^9.3.0
+        version: 9.3.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1)
     devDependencies:
       '@types/js-cookie':
         specifier: ^3.0.6
@@ -3485,8 +3485,8 @@ packages:
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
-  react-redux@9.2.0:
-    resolution: {integrity: sha512-ROY9fvHhwOD9ySfrF0wmvu//bKCQ6AeZZq1nJNtbDC+kk5DuSuNX/n6YWYF/SYy7bSba4D4FSz8DJeKY/S/r+g==}
+  react-redux@9.3.0:
+    resolution: {integrity: sha512-KQopgqFo/p/fgmAs5qz6p5RWaNAzq40WAu7fJIXnQpYxFPbJYtsJPWvGeF2rOBaY/kEuV77AVsX8TsQzKm+A/g==}
     peerDependencies:
       '@types/react': ^18.2.25 || ^19
       react: ^18.0 || ^19
@@ -3767,8 +3767,8 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
-  tailwind-merge@3.3.1:
-    resolution: {integrity: sha512-gBXpgUm/3rp1lMZZrM/w7D8GKqshif0zAymAhbCyIt8KMe+0v9DQ7cdYLR4FHH/cKpdTXb+A/tKKU3eolfsI+g==}
+  tailwind-merge@3.6.0:
+    resolution: {integrity: sha512-uxL7qAVQriqRQPAyK3pj66VqskWqoZ37PW94jwOTwNfq/z9oyu1V+eqrZqtR2+fCiXdYOZe/Modt8GtvqNzu+w==}
 
   tailwindcss@4.1.13:
     resolution: {integrity: sha512-i+zidfmTqtwquj4hMEwdjshYYgMbOrPzb9a0M3ZgNa0JMoZeFC6bxZvO8yr8ozS6ix2SDz0+mvryPeBs2TFE+w==}
@@ -5221,7 +5221,7 @@ snapshots:
 
   '@radix-ui/rect@1.1.1': {}
 
-  '@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)':
+  '@reduxjs/toolkit@2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1))(react@19.1.0)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@standard-schema/utils': 0.3.0
@@ -5231,9 +5231,9 @@ snapshots:
       reselect: 5.1.1
     optionalDependencies:
       react: 19.1.0
-      react-redux: 9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
+      react-redux: 9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1)
 
-  '@reduxjs/toolkit@2.11.2(react-redux@9.2.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1))(react@19.2.3)':
+  '@reduxjs/toolkit@2.11.2(react-redux@9.3.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1))(react@19.2.3)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@standard-schema/utils': 0.3.0
@@ -5243,7 +5243,7 @@ snapshots:
       reselect: 5.1.1
     optionalDependencies:
       react: 19.2.3
-      react-redux: 9.2.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1)
+      react-redux: 9.3.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1)
 
   '@rtsao/scc@1.1.0': {}
 
@@ -7198,7 +7198,7 @@ snapshots:
 
   react-is@16.13.1: {}
 
-  react-redux@9.2.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1):
+  react-redux@9.3.0(@types/react@19.1.0)(react@19.1.0)(redux@5.0.1):
     dependencies:
       '@types/use-sync-external-store': 0.0.6
       react: 19.1.0
@@ -7207,7 +7207,7 @@ snapshots:
       '@types/react': 19.1.0
       redux: 5.0.1
 
-  react-redux@9.2.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1):
+  react-redux@9.3.0(@types/react@19.1.0)(react@19.2.3)(redux@5.0.1):
     dependencies:
       '@types/use-sync-external-store': 0.0.6
       react: 19.2.3
@@ -7580,7 +7580,7 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  tailwind-merge@3.3.1: {}
+  tailwind-merge@3.6.0: {}
 
   tailwindcss@4.1.13: {}
 

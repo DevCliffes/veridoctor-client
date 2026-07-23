@@ -17,6 +17,21 @@ type Patient = {
   start_time: string;
 };
 
+// DRF returns `next` as a full absolute URL built from the request's Host
+// header. Passing that straight to axios makes it bypass baseURL entirely
+// and hit whatever host DRF thinks it is -- which can differ from what the
+// frontend/proxy expects. Stripping it back down to a relative path keeps
+// every page of the loop going through the same baseURL as every other
+// request in the app.
+function toRelativeApiPath(url: string): string {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.pathname + parsed.search;
+  } catch {
+    return url;
+  }
+}
+
 export default function Patients() {
   const router = useRouter();
   const userId = useSelector((state: RootState) => state.auth.identity);
@@ -26,10 +41,27 @@ export default function Patients() {
 
   useEffect(() => {
     if (!userId) return;
-    axiosClient
-      .get(`provider/${userId}/appointments?filter=all`)
-      .then((res) => {
-        const all: Patient[] = res.data ?? [];
+    setLoading(true);
+
+    // Needs every appointment ever, across all pages, to correctly dedupe
+    // patients -- a single-page fetch would silently undercount any
+    // provider with more history than one page holds. Loops on `next`
+    // (normalized to a relative path) until exhausted.
+    const fetchAllAppointments = async (): Promise<Patient[]> => {
+      let url: string | null = `provider/${userId}/appointments?filter=all&page_size=100`;
+      let results: Patient[] = [];
+      let guard = 0;
+      while (url && guard < 50) { // safety cap -- shouldn't ever hit this,
+        const res = await axiosClient.get(url);         // just stops a runaway loop if the backend's
+        results = results.concat(res.data?.results ?? []); // pagination ever misbehaves
+        url = res.data?.next ? toRelativeApiPath(res.data.next) : null;
+        guard++;
+      }
+      return results;
+    };
+
+    fetchAllAppointments()
+      .then((all) => {
         all.sort(
           (a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
         );
@@ -42,7 +74,9 @@ export default function Patients() {
         });
         setPatients(unique);
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error("Failed to load patients", err);
+      })
       .finally(() => setLoading(false));
   }, [userId]);
 
@@ -60,63 +94,63 @@ export default function Patients() {
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+      <div className="bg-card rounded-xl p-5 shadow-sm border border-border flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Patient Records</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold text-foreground">Patient Records</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {patients.length} unique patients
           </p>
         </div>
       </div>
 
       {/* Search */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex items-center gap-2">
-        <LucideSearch size={16} className="text-gray-400 shrink-0" />
+      <div className="bg-card rounded-xl shadow-sm border border-border p-3 flex items-center gap-2">
+        <LucideSearch size={16} className="text-muted-foreground shrink-0" />
         <input
           type="text"
           placeholder="Search by name, email or phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full text-sm outline-none text-gray-700 placeholder-gray-400"
+          className="w-full text-sm outline-none bg-transparent text-foreground placeholder-muted-foreground"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         {loading ? (
           <div className="space-y-3 p-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />
+              <div key={i} className="h-14 bg-muted rounded-lg animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
-            <LucideUser size={32} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-gray-400 text-sm">
+            <LucideUser size={32} className="mx-auto text-muted-foreground/50 mb-2" />
+            <p className="text-muted-foreground text-sm">
               {search ? "No patients match your search." : "No patients yet."}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[640px]">
-              <thead className="bg-gray-50 border-b border-gray-100">
+              <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Patient</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Contact</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Last Visit</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Type</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Patient</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Contact</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Last Visit</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Type</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border">
                 {filtered.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={p.id} className="hover:bg-accent transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
                           {p.patient_first_name?.[0]}{p.patient_last_name?.[0]}
                         </div>
-                        <p className="font-medium text-gray-800 whitespace-nowrap">
+                        <p className="font-medium text-foreground whitespace-nowrap">
                           {p.patient_first_name} {p.patient_last_name}
                         </p>
                       </div>
@@ -124,20 +158,20 @@ export default function Patients() {
                     <td className="px-4 py-3">
                       <div className="space-y-0.5">
                         {p.patient_email && (
-                          <div className="flex items-center gap-1 text-gray-500">
+                          <div className="flex items-center gap-1 text-muted-foreground">
                             <LucideMail size={12} />
                             <span className="text-xs whitespace-nowrap">{p.patient_email}</span>
                           </div>
                         )}
                         {p.patient_phone_number && (
-                          <div className="flex items-center gap-1 text-gray-500">
+                          <div className="flex items-center gap-1 text-muted-foreground">
                             <LucidePhone size={12} />
                             <span className="text-xs whitespace-nowrap">{p.patient_phone_number}</span>
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
                       {new Date(p.start_time).toLocaleDateString("en-KE", {
                         day: "numeric",
                         month: "short",

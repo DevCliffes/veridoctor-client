@@ -1,11 +1,10 @@
 "use client";
-
 import { axiosClient } from "@veridoctor/api-client";
 import { Button, Checkbox } from "@veridoctor/design/components";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-export default function FacilityForm() {
+export default function FacilityForm({ authTkn }: { authTkn: string }) {
   const router = useRouter();
   const pathParams: { userId: string } = useParams();
 
@@ -14,7 +13,11 @@ export default function FacilityForm() {
    */
   const createFacilityAccount = () => {
     axiosClient
-      .post(`identity/${pathParams.userId}/accounts`, { account_type: "facility_manager" })
+      .post(
+        `identity/${pathParams.userId}/accounts`,
+        { account_type: "facility_manager" },
+        { params: { auth_tkn: authTkn } },
+      )
       .then((res) => {
         if (res.status === 201) {
           toast.success("Healthcare facility account created successfully");
@@ -31,6 +34,7 @@ export default function FacilityForm() {
         });
       });
   };
+
   return (
     <div className="flex flex-col gap-2 p-4 w-full max-w-[400px] lg:max-w-[600px]">
       <p>

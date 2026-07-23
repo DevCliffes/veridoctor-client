@@ -1,9 +1,12 @@
-"use client";
-
-import AppLayout from "@/components/AppLayout";
+import type { Metadata } from "next";
 import "@veridoctor/design/styles/globals.css";
-import { Toaster } from "sonner";
-import StoreProvider from "./StoreProvider";
+import StoreProvider from "./components/StoreProvider";
+import { ThemeProvider } from "@veridoctor/design";
+
+export const metadata: Metadata = {
+  title: "Veridoctor telehealth",
+  description: "Veridoctor telehealth application",
+};
 
 export default function RootLayout({
   children,
@@ -11,12 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased font-sans">
-        <StoreProvider>
-          <Toaster richColors position="top-center" />
-          <AppLayout>{children}</AppLayout>
-        </StoreProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <StoreProvider>{children}</StoreProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,18 +1,17 @@
 // import { getFullyear } from "../../../utils/helpers";
 import Link from "next/link";
 import { ReactNode } from "react";
-// TODO: replace all deprecated icons with their svg variants
-import {
-  Facebook,
-  Instagram,
-  Linkedin,
-} from "@veridoctor/design/icons";
 import Image from "next/image";
 
-// Lucide doesn't ship a WhatsApp icon (it's a brand/logo mark, not a
-// generic UI icon), so this is a small inline SVG sized to match the
-// other icons in socialItems (24x24 default, currentColor fill so it
-// picks up the same text-blue-500 color as the Lucide icons around it).
+// FIX: lucide-react has been progressively dropping brand/logo icons
+// (Facebook, Instagram, LinkedIn, the old Twitter bird) in favor of
+// staying a purely generic UI icon set -- as of lucide-react 1.25.0 these
+// three are no longer exported at all, which breaks the build the moment
+// that version is installed. Replaced with self-contained inline SVGs
+// (same pattern already used for WhatsAppIcon/XIcon below) so this file
+// no longer depends on lucide-react for any brand marks, and the
+// lucide-react version bump PR can be merged safely going forward.
+
 function WhatsAppIcon({ size = 24 }: { size?: number }) {
   return (
     <svg
@@ -28,9 +27,6 @@ function WhatsAppIcon({ size = 24 }: { size?: number }) {
   );
 }
 
-// X (formerly Twitter) rebranded its logo in 2023 — Lucide's TwitterIcon
-// is the old bird mark, so this is the current "X" wordmark as an inline
-// SVG, same pattern as WhatsAppIcon above.
 function XIcon({ size = 24 }: { size?: number }) {
   return (
     <svg
@@ -45,6 +41,54 @@ function XIcon({ size = 24 }: { size?: number }) {
   );
 }
 
+function FacebookIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M22 12.06C22 6.505 17.523 2 12 2S2 6.505 2 12.06c0 5.02 3.657 9.184 8.438 9.94v-7.03H7.898v-2.91h2.54V9.845c0-2.508 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562v1.878h2.773l-.443 2.91h-2.33V22c4.78-.756 8.437-4.92 8.437-9.94z" />
+    </svg>
+  );
+}
+
+function InstagramIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37a4 4 0 11-7.914 1.174A4 4 0 0116 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
+function LinkedinIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+    </svg>
+  );
+}
+
 const socialItems: { name: string; href: string; icon: ReactNode }[] = [
   {
     name: "WhatsApp",
@@ -54,12 +98,12 @@ const socialItems: { name: string; href: string; icon: ReactNode }[] = [
   {
     name: "instagram",
     href: "https://www.instagram.com/veri_doctor/",
-    icon: <Instagram />,
+    icon: <InstagramIcon />,
   },
   {
     name: "facebook",
     href: "https://www.facebook.com/people/Veri-Doctor/100066543586030/",
-    icon: <Facebook />,
+    icon: <FacebookIcon />,
   },
   {
     name: "x",
@@ -69,7 +113,7 @@ const socialItems: { name: string; href: string; icon: ReactNode }[] = [
   {
     name: "linkedin",
     href: "https://www.linkedin.com/company/veridoctor-ke/",
-    icon: <Linkedin />,
+    icon: <LinkedinIcon />,
   },
 ];
 

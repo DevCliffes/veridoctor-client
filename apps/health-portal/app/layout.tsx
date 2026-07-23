@@ -4,6 +4,7 @@ import "@veridoctor/design/styles/globals.css";
 import StoreProvider from "./StoreProvider";
 import { Toaster } from "sonner";
 import { RecordsUnlockProvider } from "./useRecordsUnlock";
+import { ThemeProvider } from "@veridoctor/design";
 
 export const metadata: Metadata = {
   title: {
@@ -28,13 +29,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <StoreProvider>
         <body className="antialiased font-sans">
-          <RecordsUnlockProvider>
-            <div>{children}</div>
-          </RecordsUnlockProvider>
-          <Toaster richColors position="top-right" />
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <RecordsUnlockProvider>
+              <div>{children}</div>
+            </RecordsUnlockProvider>
+            <Toaster richColors position="top-right" />
+          </ThemeProvider>
         </body>
       </StoreProvider>
     </html>

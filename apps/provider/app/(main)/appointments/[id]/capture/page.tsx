@@ -43,7 +43,7 @@ type Drug = {
   drug_name: string;
   frequency: string;
   duration: string;
-  instructions: string;
+  instructions?: string;
 };
 
 type PrescriptionValue = {
@@ -317,7 +317,7 @@ export default function CapturePage() {
   if (!form) {
     return (
       <div className="p-6">
-        <p className="text-gray-500">Form not found.</p>
+        <p className="text-muted-foreground">Form not found.</p>
         <button onClick={() => router.back()} className="mt-3 text-blue-600 text-sm hover:underline">← Go back</button>
       </div>
     );
@@ -341,21 +341,21 @@ export default function CapturePage() {
     }).replace(",", " at");
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-background pb-24">
       {/* Sticky header — NO submit button here, only status indicator */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-20 flex items-center justify-between gap-3">
+      <div className="bg-card border-b border-border px-4 py-3 sticky top-0 z-20 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={() => router.back()} className="text-gray-500 hover:text-gray-700 shrink-0">←</button>
+          <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground shrink-0">←</button>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-800 truncate">{form.name}</p>
-            <p className="text-xs text-gray-400">{completedFields}/{totalFields} fields filled</p>
+            <p className="text-sm font-semibold text-foreground truncate">{form.name}</p>
+            <p className="text-xs text-muted-foreground">{completedFields}/{totalFields} fields filled</p>
           </div>
         </div>
 
         {/* Draft save status only — no submit button */}
         <div className="flex items-center gap-2 shrink-0 text-xs">
           {saveStatus === "saving" && (
-            <span className="text-gray-400 flex items-center gap-1">
+            <span className="text-muted-foreground flex items-center gap-1">
               <LucideLoader2 size={12} className="animate-spin" /> Saving…
             </span>
           )}
@@ -374,7 +374,7 @@ export default function CapturePage() {
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-gray-200">
+      <div className="h-1 bg-muted">
         <div className="h-1 bg-blue-500 transition-all duration-500" style={{ width: `${progressPct}%` }} />
       </div>
 
@@ -394,13 +394,13 @@ export default function CapturePage() {
                   document.getElementById(`section-${section.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
                 className={`text-left text-sm px-3 py-2 rounded-lg transition-colors ${
-                  isActive ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-600 hover:bg-gray-100"
+                  isActive ? "bg-blue-50 text-blue-700 font-medium" : "text-muted-foreground hover:bg-accent"
                 }`}
               >
                 <span className="flex items-center justify-between">
                   <span className="truncate">{idx + 1}. {section.title}</span>
                   {!section.isPrescription && filledInSection > 0 && (
-                    <span className="text-xs text-gray-400 ml-1">{filledInSection}/{section.fields.length}</span>
+                    <span className="text-xs text-muted-foreground ml-1">{filledInSection}/{section.fields.length}</span>
                   )}
                 </span>
               </button>
@@ -414,12 +414,12 @@ export default function CapturePage() {
             <div
               key={section.id}
               id={`section-${section.id}`}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden scroll-mt-24"
+              className="bg-card rounded-xl border border-border shadow-sm overflow-hidden scroll-mt-24"
             >
-              <div className="bg-gray-50 border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 className="font-semibold text-gray-800 text-sm">{section.title}</h2>
+              <div className="bg-muted/40 border-b border-border px-5 py-3 flex items-center justify-between">
+                <h2 className="font-semibold text-foreground text-sm">{section.title}</h2>
                 {!section.isPrescription && (
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted-foreground">
                     {section.fields.filter((f) => !!values[f.id]).length}/{section.fields.length}
                   </span>
                 )}
@@ -456,7 +456,7 @@ export default function CapturePage() {
             disabled={saving || alreadySubmitted}
             className={`w-full py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
               alreadySubmitted
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                ? "bg-muted text-muted-foreground cursor-not-allowed border border-border"
                 : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
             }`}
           >
@@ -495,12 +495,12 @@ function PrescriptionSection({
   const updateDrug = (id: string, updates: Partial<Drug>) =>
     onChange({ ...value, drugs: value.drugs.map((d) => (d.id === id ? { ...d, ...updates } : d)) });
 
-  const inputCls = "w-full p-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50 focus:bg-white transition-colors";
+  const inputCls = "w-full p-2.5 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-200 bg-muted/40 focus:bg-card transition-colors";
 
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <label className="text-sm font-medium text-gray-700 block mb-1.5">Diagnosis / Indication</label>
+        <label className="text-sm font-medium text-foreground block mb-1.5">Diagnosis / Indication</label>
         <input
           type="text"
           value={value.diagnosis}
@@ -512,26 +512,26 @@ function PrescriptionSection({
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-800">Medications</h3>
+          <h3 className="text-sm font-semibold text-foreground">Medications</h3>
           <button onClick={addDrug} className="text-sm text-blue-600 font-medium hover:text-blue-700">
             + Add medication
           </button>
         </div>
         <div className="flex flex-col gap-3">
           {value.drugs.length === 0 && (
-            <div className="border border-dashed border-gray-200 rounded-lg p-4 text-center text-sm text-gray-400">
+            <div className="border border-dashed border-border rounded-lg p-4 text-center text-sm text-muted-foreground">
               No medications added yet. Click &quot;+ Add medication&quot; to start.
             </div>
           )}
           {value.drugs.map((drug, idx) => (
-            <div key={drug.id} className="border border-gray-200 rounded-lg p-4">
+            <div key={drug.id} className="border border-border rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm text-gray-400">Medication {idx + 1}</p>
+                <p className="text-sm text-muted-foreground">Medication {idx + 1}</p>
                 <button onClick={() => removeDrug(drug.id)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
               </div>
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Drug name &amp; strength</label>
+                  <label className="text-xs text-muted-foreground block mb-1">Drug name &amp; strength</label>
                   <input
                     type="text"
                     value={drug.drug_name}
@@ -542,14 +542,14 @@ function PrescriptionSection({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">Frequency</label>
+                    <label className="text-xs text-muted-foreground block mb-1">Frequency</label>
                     <select value={drug.frequency} onChange={(e) => updateDrug(drug.id, { frequency: e.target.value })} className={inputCls}>
                       <option value="">Select…</option>
                       {FREQUENCY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">Duration</label>
+                    <label className="text-xs text-muted-foreground block mb-1">Duration</label>
                     <select value={drug.duration} onChange={(e) => updateDrug(drug.id, { duration: e.target.value })} className={inputCls}>
                       <option value="">Select…</option>
                       {DURATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -557,7 +557,7 @@ function PrescriptionSection({
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Special instructions (optional)</label>
+                  <label className="text-xs text-muted-foreground block mb-1">Special instructions (optional)</label>
                   <input
                     type="text"
                     value={drug.instructions}
@@ -573,7 +573,7 @@ function PrescriptionSection({
       </div>
 
       <div>
-        <label className="text-sm font-medium text-gray-700 block mb-1.5">Additional notes</label>
+        <label className="text-sm font-medium text-foreground block mb-1.5">Additional notes</label>
         <textarea
           value={value.notes}
           onChange={(e) => onChange({ ...value, notes: e.target.value })}
@@ -599,12 +599,12 @@ function FieldInput({
   onChange: (val: string | boolean) => void;
   readOnly?: boolean;
 }) {
-  const base = "w-full p-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 bg-gray-50 focus:bg-white transition-colors";
-  const readOnlyCls = "w-full p-2.5 border border-gray-100 rounded-lg text-sm text-gray-600 bg-gray-50 cursor-default select-none";
+  const base = "w-full p-2.5 border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-200 bg-muted/40 focus:bg-card transition-colors";
+  const readOnlyCls = "w-full p-2.5 border border-border rounded-lg text-sm text-muted-foreground bg-muted/40 cursor-default select-none";
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+      <label className="text-sm font-medium text-foreground flex items-center gap-2">
         {field.label}
         {field.required && <span className="text-red-500">*</span>}
         {readOnly && (
@@ -632,7 +632,7 @@ function FieldInput({
           {field.type === "checkbox" && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={(value as boolean) ?? false} onChange={(e) => onChange(e.target.checked)} />
-              <span className="text-sm text-gray-600">Yes</span>
+              <span className="text-sm text-muted-foreground">Yes</span>
             </label>
           )}
           {field.type === "select" && (
@@ -646,4 +646,3 @@ function FieldInput({
     </div>
   );
 }
-

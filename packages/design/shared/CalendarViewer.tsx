@@ -130,12 +130,12 @@ function CalendarViewer({
   function TimeGrid({ days }: { days: Date[] }) {
     return (
       <div className="flex overflow-auto" style={{ maxHeight: "600px" }}>
-        <div className="w-14 shrink-0 border-r">
-          <div className="h-10 border-b" />
+        <div className="w-14 shrink-0 border-r border-border">
+          <div className="h-10 border-b border-border" />
           {hours.map((h) => (
             <div
               key={h}
-              className="border-b text-right pr-2 text-xs text-gray-400"
+              className="border-b border-border text-right pr-2 text-xs text-muted-foreground"
               style={{ height: HOUR_HEIGHT }}
             >
               <span className="-translate-y-2 inline-block">
@@ -151,22 +151,22 @@ function CalendarViewer({
           return (
             <div
               key={day.toString()}
-              className="flex-1 min-w-0 border-r last:border-r-0"
+              className="flex-1 min-w-0 border-r border-border last:border-r-0"
             >
               <div
                 className={
-                  "h-10 border-b flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 " +
+                  "h-10 border-b border-border flex flex-col items-center justify-center cursor-pointer hover:bg-accent " +
                   (isToday ? "bg-blue-50" : "")
                 }
                 onClick={() => onDayClick?.(day)}
               >
-                <span className="text-xs text-gray-500 uppercase">
+                <span className="text-xs text-muted-foreground uppercase">
                   {format(day, "EEE")}
                 </span>
                 <span
                   className={
                     "text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full " +
-                    (isToday ? "bg-blue-600 text-white" : "text-gray-700")
+                    (isToday ? "bg-blue-600 text-white" : "text-foreground")
                   }
                 >
                   {format(day, "d")}
@@ -177,7 +177,7 @@ function CalendarViewer({
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="border-b border-gray-100"
+                    className="border-b border-border"
                     style={{ height: HOUR_HEIGHT }}
                   />
                 ))}
@@ -212,26 +212,26 @@ function CalendarViewer({
     : [];
 
   return (
-    <div className="rounded-lg border bg-white mt-4 relative">
+    <div className="rounded-lg border border-border bg-card mt-4 relative">
       {/* Header — split into two independently-wrapping groups so "Today"
           isn't trapped in the same unbreakable line as the prev/next nav,
           which was pushing it off the card edge on narrow screens. Each
           group (nav / today+view-picker) wraps onto its own line as
           needed instead of overflowing horizontally. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <button
             onClick={goBack}
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded hover:bg-accent transition-colors text-foreground"
           >
             <ChevronLeft size={16} />
           </button>
-          <h2 className="text-base font-semibold min-w-[140px] sm:min-w-[200px] text-center">
+          <h2 className="text-base font-semibold min-w-[140px] sm:min-w-[200px] text-center text-foreground">
             {headerLabel}
           </h2>
           <button
             onClick={goForward}
-            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded hover:bg-accent transition-colors text-foreground"
           >
             <ChevronRight size={16} />
           </button>
@@ -240,13 +240,13 @@ function CalendarViewer({
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={goToday}
-            className="px-3 py-1 text-xs border rounded-md hover:bg-gray-50 transition-colors"
+            className="px-3 py-1 text-xs border border-border rounded-md hover:bg-accent transition-colors text-foreground"
           >
             Today
           </button>
 
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm">
+            <DropdownMenuTrigger className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-sm text-foreground">
               <span className="capitalize">{view}</span>
               <ChevronDown size={14} />
             </DropdownMenuTrigger>
@@ -268,11 +268,11 @@ function CalendarViewer({
       {/* Month view */}
       {view === "month" && (
         <>
-          <div className="grid grid-cols-7 border-b bg-gray-50">
+          <div className="grid grid-cols-7 border-b border-border bg-muted">
             {weekDayLabels.map((d) => (
               <div
                 key={d}
-                className="py-2 text-center text-xs font-semibold text-gray-500 tracking-wide"
+                className="py-2 text-center text-xs font-semibold text-muted-foreground tracking-wide"
               >
                 {d}
               </div>
@@ -290,9 +290,9 @@ function CalendarViewer({
                   key={day.toString()}
                   onClick={() => onDayClick?.(day)}
                   className={
-                    "border-r border-b flex flex-col cursor-pointer hover:bg-gray-50/80 transition-colors overflow-hidden " +
+                    "border-r border-b border-border flex flex-col cursor-pointer hover:bg-accent/80 transition-colors overflow-hidden " +
                     (idx % 7 === 6 ? "border-r-0 " : "") +
-                    (!isCurrentMonth ? "bg-gray-50/40" : "bg-white")
+                    (!isCurrentMonth ? "bg-muted/40" : "bg-card")
                   }
                 >
                   <div className="px-2 pt-1.5 pb-0.5">
@@ -302,8 +302,8 @@ function CalendarViewer({
                         (isToday
                           ? "bg-blue-600 text-white"
                           : isCurrentMonth
-                          ? "text-gray-700"
-                          : "text-gray-300")
+                          ? "text-foreground"
+                          : "text-muted-foreground")
                       }
                     >
                       {format(day, "d")}
@@ -361,16 +361,16 @@ function CalendarViewer({
           onClick={() => setExpandedDay(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+            className="bg-card rounded-xl shadow-xl w-full max-w-sm mx-4 max-h-[80vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="font-semibold text-gray-800 text-sm">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="font-semibold text-foreground text-sm">
                 {format(expandedDay, "EEEE, MMMM d, yyyy")}
               </h3>
               <button
                 onClick={() => setExpandedDay(null)}
-                className="p-1 text-gray-400 hover:text-gray-600"
+                className="p-1 text-muted-foreground hover:text-foreground"
               >
                 <X size={16} />
               </button>
@@ -403,16 +403,16 @@ function CalendarViewer({
           onClick={() => setPopoverAppt(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
+            className="bg-card rounded-2xl shadow-xl w-full max-w-xs mx-4 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="font-semibold text-gray-800 text-sm">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="font-semibold text-foreground text-sm">
                 Appointment Details
               </h3>
               <button
                 onClick={() => setPopoverAppt(null)}
-                className="p-1 text-gray-400 hover:text-gray-600"
+                className="p-1 text-muted-foreground hover:text-foreground"
               >
                 <X size={16} />
               </button>
@@ -433,21 +433,21 @@ function CalendarViewer({
                     .slice(0, 2)}
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-800 text-sm">
+                  <p className="font-semibold text-foreground text-sm">
                     {popoverAppt.patientName}
                   </p>
-                  <p className="text-xs text-gray-400">Patient</p>
+                  <p className="text-xs text-muted-foreground">Patient</p>
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-1">
-                <p className="text-xs text-gray-400 uppercase tracking-wide">
+              <div className="bg-muted rounded-xl px-3 py-2.5 space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">
                   Time
                 </p>
-                <p className="text-sm font-medium text-gray-700">
+                <p className="text-sm font-medium text-foreground">
                   {format(popoverAppt.start, "EEEE, MMM d")}
                 </p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   {format(popoverAppt.start, "h:mm a")} –{" "}
                   {format(popoverAppt.end, "h:mm a")}
                 </p>
@@ -457,7 +457,7 @@ function CalendarViewer({
                 <div className="space-y-1.5">
                   {popoverLocationType && (
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-400">Type</p>
+                      <p className="text-xs text-muted-foreground">Type</p>
                       <span
                         className={
                           "text-xs px-2 py-0.5 rounded-full font-medium capitalize " +
@@ -472,8 +472,8 @@ function CalendarViewer({
                   )}
                   {popoverServiceName && (
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-gray-400">Service</p>
-                      <p className="text-xs text-gray-700 font-medium">
+                      <p className="text-xs text-muted-foreground">Service</p>
+                      <p className="text-xs text-foreground font-medium">
                         {popoverServiceName}
                       </p>
                     </div>

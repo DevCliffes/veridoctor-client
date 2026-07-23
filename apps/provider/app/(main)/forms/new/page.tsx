@@ -200,10 +200,10 @@ function FormBuilderInner() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {editingField && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="bg-card text-foreground rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <h3 className="font-bold text-lg mb-4">Edit Field</h3>
             <div className="flex flex-col gap-3">
               <div>
@@ -211,7 +211,7 @@ function FormBuilderInner() {
                 <input
                   defaultValue={editingField.field.label}
                   onChange={(e) => setEditingField({ ...editingField, field: { ...editingField.field, label: e.target.value } })}
-                  className="w-full p-2 border border-gray-300 rounded mt-1"
+                  className="w-full p-2 border border-border rounded mt-1 bg-background text-foreground"
                 />
               </div>
               <div>
@@ -219,7 +219,7 @@ function FormBuilderInner() {
                 <select
                   defaultValue={editingField.field.type}
                   onChange={(e) => setEditingField({ ...editingField, field: { ...editingField.field, type: e.target.value as FieldType } })}
-                  className="w-full p-2 border border-gray-300 rounded mt-1"
+                  className="w-full p-2 border border-border rounded mt-1 bg-background text-foreground"
                 >
                   {fieldTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
@@ -238,14 +238,14 @@ function FormBuilderInner() {
                   <input
                     defaultValue={editingField.field.options?.join(", ")}
                     onChange={(e) => setEditingField({ ...editingField, field: { ...editingField.field, options: e.target.value.split(",").map(o => o.trim()) } })}
-                    className="w-full p-2 border border-gray-300 rounded mt-1"
+                    className="w-full p-2 border border-border rounded mt-1 bg-background text-foreground"
                     placeholder="Option 1, Option 2, Option 3"
                   />
                 </div>
               )}
             </div>
             <div className="flex gap-3 justify-end mt-6">
-              <button onClick={() => setEditingField(null)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => setEditingField(null)} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-accent">Cancel</button>
               <button
                 onClick={() => updateField(editingField.sectionId, editingField.field.id, editingField.field)}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -257,17 +257,17 @@ function FormBuilderInner() {
         </div>
       )}
 
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <div className="bg-card border-b border-border px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.push("/forms")} className="text-gray-500 hover:text-gray-700">← Back</button>
+          <button onClick={() => router.push("/forms")} className="text-muted-foreground hover:text-foreground">← Back</button>
           <input
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
-            className="text-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-200 rounded px-2 py-1"
+            className="text-xl font-bold border-none outline-none focus:ring-2 focus:ring-blue-200 rounded px-2 py-1 bg-transparent text-foreground"
           />
         </div>
         <div className="flex gap-3">
-          <button onClick={addSection} className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">+ Add Section</button>
+          <button onClick={addSection} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-accent">+ Add Section</button>
           <button onClick={handleSave} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
             {editId ? "Update Form" : "Save Form"}
           </button>
@@ -276,12 +276,12 @@ function FormBuilderInner() {
 
       <div className="max-w-3xl mx-auto py-8 px-4 flex flex-col gap-6">
         {sections.map((section) => (
-          <div key={section.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 border-b px-4 py-3 flex items-center justify-between">
+          <div key={section.id} className="bg-card rounded-lg border border-border overflow-hidden">
+            <div className="bg-muted/40 border-b border-border px-4 py-3 flex items-center justify-between">
               <input
                 value={section.title}
                 onChange={(e) => setSections(prev => prev.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))}
-                className="font-semibold text-gray-800 bg-transparent border-none outline-none focus:ring-2 focus:ring-blue-200 rounded px-1"
+                className="font-semibold text-foreground bg-transparent border-none outline-none focus:ring-2 focus:ring-blue-200 rounded px-1"
               />
               <button onClick={() => deleteSection(section.id)} className="text-red-400 hover:text-red-600 text-sm">Remove section</button>
             </div>
@@ -292,27 +292,27 @@ function FormBuilderInner() {
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
                     This section renders a full medication builder when filling the form — drug name, frequency, duration, and special instructions per medication.
                   </div>
-                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 opacity-60 pointer-events-none select-none flex flex-col gap-3">
+                  <div className="border border-border rounded-lg p-4 bg-muted/40 opacity-60 pointer-events-none select-none flex flex-col gap-3">
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Diagnosis / Indication</p>
-                      <div className="h-8 bg-gray-200 rounded w-full" />
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Diagnosis / Indication</p>
+                      <div className="h-8 bg-muted rounded w-full" />
                     </div>
-                    <div className="border border-gray-200 rounded-lg p-3 bg-white">
+                    <div className="border border-border rounded-lg p-3 bg-card">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-medium text-gray-600">Medication 1</p>
-                        <div className="h-4 w-12 bg-gray-200 rounded" />
+                        <p className="text-xs font-medium text-muted-foreground">Medication 1</p>
+                        <div className="h-4 w-12 bg-muted rounded" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <div className="h-8 bg-gray-200 rounded" />
-                        <div className="h-8 bg-gray-200 rounded" />
-                        <div className="h-8 bg-gray-200 rounded" />
-                        <div className="h-8 bg-gray-200 rounded" />
+                        <div className="h-8 bg-muted rounded" />
+                        <div className="h-8 bg-muted rounded" />
+                        <div className="h-8 bg-muted rounded" />
+                        <div className="h-8 bg-muted rounded" />
                       </div>
                     </div>
                     <div className="h-8 w-36 bg-blue-100 rounded" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Additional Notes</p>
-                      <div className="h-16 bg-gray-200 rounded w-full" />
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Additional Notes</p>
+                      <div className="h-16 bg-muted rounded w-full" />
                     </div>
                   </div>
                 </div>
@@ -325,13 +325,13 @@ function FormBuilderInner() {
                       onDragStart={() => handleDragStart(section.id, field.id)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => handleDrop(section.id, field.id)}
-                      className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg bg-gray-50 cursor-grab group"
+                      className="flex items-center gap-3 p-3 border border-border rounded-lg bg-muted/40 cursor-grab group"
                     >
-                      <span className="text-gray-400 cursor-grab">⠿</span>
+                      <span className="text-muted-foreground cursor-grab">⠿</span>
                       <div className="flex-1">
-                        <span className="text-sm font-medium">{field.label}</span>
+                        <span className="text-sm font-medium text-foreground">{field.label}</span>
                         {field.required && <span className="text-red-500 ml-1">*</span>}
-                        <span className="ml-2 text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded">
+                        <span className="ml-2 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                           {fieldTypes.find(t => t.value === field.type)?.label}
                         </span>
                       </div>
@@ -385,7 +385,7 @@ function FormBuilderInner() {
                   ) : (
                     <button
                       onClick={() => setAddingFieldTo(section.id)}
-                      className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                      className="w-full py-2 border border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-blue-400 hover:text-blue-500 transition-colors"
                     >
                       + Add field
                     </button>
@@ -397,7 +397,7 @@ function FormBuilderInner() {
         ))}
         <button
           onClick={addSection}
-          className="w-full py-3 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors"
+          className="w-full py-3 border border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-blue-400 hover:text-blue-500 transition-colors"
         >
           + Add new section
         </button>
@@ -408,7 +408,7 @@ function FormBuilderInner() {
 
 export default function FormBuilder() {
   return (
-    <Suspense fallback={<div className="p-6">Loading...</div>}>
+    <Suspense fallback={<div className="p-6 text-foreground">Loading...</div>}>
       <FormBuilderInner />
     </Suspense>
   );

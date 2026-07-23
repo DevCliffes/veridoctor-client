@@ -1,402 +1,219 @@
 "use client";
+import { useEffect, useState } from "react";
 import { axiosClient } from "@veridoctor/api-client";
-import { Button } from "@veridoctor/design/components";
-import { LucidePlus, LucideTrash2, LucidePrinter, LucideCheck } from "@veridoctor/design/icons";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
 import { useSelector } from "react-redux";
+import { RootState } from "../../store";
+import { useRouter } from "next/navigation";
+import {
+  LucideFileText,
+  LucidePlus,
+  LucideChevronDown,
+  LucideChevronUp,
+  LucideTrash2,
+  LucidePill,
+  LucideUser,
+  LucideMail,
+} from "@veridoctor/design/icons";
 import { toast } from "sonner";
-import { RootState } from "../../../store";
 
-interface DrugEntry {
+type Drug = {
   id: string;
-  drug_name: string;  // ← was "name", now matches backend field exactly
-  dosage: string;     // ← was missing from UI
+  drug_name: string;
+  dosage?: string;
   frequency: string;
   duration: string;
-  instructions: string;
-}
+  instructions?: string;
+};
 
-interface Patient {
+type Prescription = {
   id: string;
-  name: string;
-  patient_identity: string | null;
+  patient_name: string;
   patient_email: string;
-  patient_phone_number: string;
-}
+  diagnosis: string;
+  notes: string;
+  created_at: string;
+  drugs: Drug[];
+};
 
-interface RawAppointment {
-  id: string;
-  patient_first_name: string;
-  patient_last_name: string;
-  patient_email: string;
-  patient_phone_number: string;
-  patient_identity: string | null;
-  start_time: string;
-}
-
-const FREQUENCIES = [
-  "Once daily",
-  "Twice daily (BD)",
-  "Three times daily (TDS)",
-  "Four times daily (QDS)",
-  "Every 8 hours",
-  "Every 6 hours",
-  "At night (nocte)",
-  "In the morning",
-  "As needed (PRN)",
-  "Once weekly",
-];
-
-const DURATIONS = [
-  "3 days",
-  "5 days",
-  "7 days",
-  "10 days",
-  "14 days",
-  "1 month",
-  "2 months",
-  "3 months",
-  "6 months",
-  "Ongoing",
-];
-
-const COMMON_DRUGS = [
-  "Amoxicillin",
-  "Metformin",
-  "Amlodipine",
-  "Atorvastatin",
-  "Omeprazole",
-  "Paracetamol",
-  "Ibuprofen",
-  "Metronidazole",
-  "Ciprofloxacin",
-  "Doxycycline",
-  "Lisinopril",
-  "Salbutamol",
-];
-
-const emptyDrug = (): DrugEntry => ({
-  id: crypto.randomUUID(),
-  drug_name: "",
-  dosage: "",
-  frequency: "Once daily",
-  duration: "7 days",
-  instructions: "",
-});
-
-export default function PrescriptionForm() {
+export default function Prescriptions() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const patientId = searchParams.get("patient_id");
   const userId = useSelector((state: RootState) => state.auth.identity);
-
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [patientSearch, setPatientSearch] = useState("");
-  const [allPatients, setAllPatients] = useState<Patient[]>([]);
-  const [patientsLoaded, setPatientsLoaded] = useState(false);
-  const [drugs, setDrugs] = useState<DrugEntry[]>([emptyDrug()]);
-  const [diagnosis, setDiagnosis] = useState("");
-  const [notes, setNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [drugSuggestions, setDrugSuggestions] = useState<string[]>([]);
-  const [activeDrugIdx, setActiveDrugIdx] = useState<number | null>(null);
-
-  const hasSubmitted = useRef(false);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
     axiosClient
-      .get(`provider/${userId}/appointments?filter=all`)
-      .then((res) => {
-        const all: RawAppointment[] = res.data ?? [];
-        all.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
-        const seen = new Set<string>();
-        const unique: Patient[] = [];
-        for (const a of all) {
-          const key = a.patient_email || `${a.patient_first_name}-${a.patient_last_name}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          unique.push({
-            id: a.patient_identity || a.id,
-            name: `${a.patient_first_name} ${a.patient_last_name}`.trim(),
-            patient_identity: a.patient_identity,
-            patient_email: a.patient_email,
-            patient_phone_number: a.patient_phone_number,
-          });
-        }
-        setAllPatients(unique);
-      })
+      .get(`provider/${userId}/prescriptions`)
+      .then((res) => setPrescriptions(res.data ?? []))
       .catch(() => {})
-      .finally(() => setPatientsLoaded(true));
+      .finally(() => setLoading(false));
   }, [userId]);
 
-  useEffect(() => {
-    if (!patientId || !patientsLoaded) return;
-    const match = allPatients.find(
-      (p) => p.id === patientId || p.patient_identity === patientId
-    );
-    if (match) setPatient(match);
-  }, [patientId, patientsLoaded, allPatients]);
-
-  const patientResults =
-    !patient && patientSearch.trim()
-      ? allPatients.filter((p) =>
-          p.name.toLowerCase().includes(patientSearch.toLowerCase())
-        )
-      : [];
-
-  const updateDrug = (idx: number, field: keyof DrugEntry, value: string) => {
-    setDrugs((prev) =>
-      prev.map((d, i) => (i === idx ? { ...d, [field]: value } : d))
-    );
-  };
-
-  const handleDrugNameChange = (idx: number, value: string) => {
-    updateDrug(idx, "drug_name", value);  // ← key fix: field is drug_name
-    setActiveDrugIdx(idx);
-    if (value.length >= 2) {
-      setDrugSuggestions(
-        COMMON_DRUGS.filter((d) => d.toLowerCase().includes(value.toLowerCase()))
-      );
-    } else {
-      setDrugSuggestions([]);
-    }
-  };
-
-  const addDrug = () => setDrugs((prev) => [...prev, emptyDrug()]);
-  const removeDrug = (idx: number) => setDrugs((prev) => prev.filter((_, i) => i !== idx));
-
-  const handleSubmit = async () => {
-    if (hasSubmitted.current || submitting) return;
-    if (!patient) { toast.error("Please select a patient"); return; }
-    if (drugs.some((d) => !d.drug_name.trim())) {
-      toast.error("Please fill in all drug names");
-      return;
-    }
-
-    hasSubmitted.current = true;
-    setSubmitting(true);
-
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Delete this prescription? This cannot be undone.")) return;
+    setDeletingId(id);
     try {
-      await axiosClient.post(`provider/${userId}/prescriptions`, {
-        patient_id: patient.id,
-        patient_name: patient.name,
-        patient_email: patient.patient_email,
-        diagnosis,
-        notes,
-        // Send exactly what the backend PrescriptionDrugSerializer expects
-        drugs: drugs.map(({ id, ...rest }) => rest),
-        // rest now contains: drug_name, dosage, frequency, duration, instructions
-      });
-      toast.success("Prescription saved");
-      router.push("/prescriptions");
+      await axiosClient.delete(`provider/${userId}/prescriptions/${id}`);
+      setPrescriptions((prev) => prev.filter((rx) => rx.id !== id));
+      if (expanded === id) setExpanded(null);
+      toast.success("Prescription deleted");
     } catch {
-      toast.error("Failed to save prescription. Please try again.");
-      hasSubmitted.current = false;
-      setSubmitting(false);
+      toast.error("Failed to delete prescription");
+    } finally {
+      setDeletingId(null);
     }
   };
 
   return (
-    <div className="p-4 mx-4 max-w-3xl space-y-5">
-     {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
+    <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="bg-card rounded-xl p-5 shadow-sm border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <p className="text-xl font-bold">Write prescription</p>
-          <p className="text-gray-500 text-sm">Fill in patient details and medications below</p>
+          <h1 className="text-xl font-bold text-foreground">Prescriptions</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {prescriptions.length} prescription{prescriptions.length !== 1 ? "s" : ""} written
+          </p>
         </div>
-        <Button variant="roundedOutline" onClick={() => router.back()} className="w-full sm:w-auto">Cancel</Button>
+        <button
+          onClick={() => router.push("/forms/prescription")}
+          className="flex items-center justify-center gap-2 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-medium w-full sm:w-auto"
+        >
+          <LucidePlus size={16} /> New prescription
+        </button>
       </div>
 
-      {/* Patient */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-3">
-        <p className="font-bold text-sm">Patient</p>
-        {patient ? (
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div>
-              <p className="font-medium text-sm">{patient.name}</p>
-              {patient.patient_email && (
-                <p className="text-xs text-gray-500">{patient.patient_email}</p>
-              )}
-            </div>
-            <button className="text-xs text-red-500 hover:underline" onClick={() => setPatient(null)}>
-              Change
+      {/* List */}
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : prescriptions.length === 0 ? (
+          <div className="text-center py-12">
+            <LucideFileText size={32} className="mx-auto text-muted-foreground/50 mb-2" />
+            <p className="text-muted-foreground text-sm">No prescriptions yet.</p>
+            <button
+              onClick={() => router.push("/forms/prescription")}
+              className="text-blue-600 text-sm font-medium hover:underline mt-1 inline-block"
+            >
+              Write one now
             </button>
           </div>
         ) : (
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={patientsLoaded ? "Search patient by name..." : "Loading patients..."}
-              value={patientSearch}
-              onChange={(e) => setPatientSearch(e.target.value)}
-              disabled={!patientsLoaded}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 disabled:bg-gray-50"
-            />
-            {patientResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {patientResults.map((p) => (
-                  <button
-                    key={p.id}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2"
-                    onClick={() => { setPatient(p); setPatientSearch(""); }}
-                  >
-                    <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-medium">
-                      {p.name.charAt(0)}
+          <div className="space-y-3">
+            {prescriptions.map((rx) => (
+              <div key={rx.id} className="border border-border rounded-xl overflow-hidden">
+                <div
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent"
+                  onClick={() => setExpanded(expanded === rx.id ? null : rx.id)}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                      <LucideFileText size={16} />
                     </div>
-                    {p.name}
-                  </button>
-                ))}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground text-sm truncate">
+                        {rx.patient_name || "Unknown patient"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {rx.diagnosis || "No diagnosis"} · {rx.drugs?.length ?? 0} drug(s) ·{" "}
+                        {new Date(rx.created_at).toLocaleDateString("en-KE")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    <button
+                      onClick={(e) => handleDelete(rx.id, e)}
+                      disabled={deletingId === rx.id}
+                      className="p-1.5 text-muted-foreground/60 hover:text-red-500 transition-colors disabled:opacity-50 rounded-lg hover:bg-red-50"
+                      title="Delete prescription"
+                    >
+                      <LucideTrash2 size={14} />
+                    </button>
+                    {expanded === rx.id ? (
+                      <LucideChevronUp size={16} className="text-muted-foreground" />
+                    ) : (
+                      <LucideChevronDown size={16} className="text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+
+                {expanded === rx.id && (
+                  <div className="border-t border-border bg-muted/30 px-4 py-4 space-y-4">
+                    <div className="flex flex-wrap gap-4">
+                      {rx.patient_name && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <LucideUser size={12} className="text-muted-foreground" />
+                          {rx.patient_name}
+                        </div>
+                      )}
+                      {rx.patient_email && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <LucideMail size={12} className="text-muted-foreground" />
+                          {rx.patient_email}
+                        </div>
+                      )}
+                    </div>
+
+                    {rx.diagnosis && (
+                      <div className="bg-card rounded-lg p-3 border border-border">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                          Diagnosis / Indication
+                        </p>
+                        <p className="text-sm text-foreground">{rx.diagnosis}</p>
+                      </div>
+                    )}
+
+                    {rx.drugs?.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Medications ({rx.drugs.length})
+                        </p>
+                        {rx.drugs.map((drug, i) => (
+                          <div key={drug.id ?? i} className="bg-card rounded-lg p-3 border border-border flex gap-3">
+                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                              <LucidePill size={13} />
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="font-semibold text-sm text-foreground">{drug.drug_name}</p>
+                              {drug.dosage && (
+                                <p className="text-xs text-muted-foreground">Dosage: {drug.dosage}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                {drug.frequency} · {drug.duration}
+                              </p>
+                              {drug.instructions && (
+                                <p className="text-xs text-muted-foreground italic">{drug.instructions}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        No medications recorded — this record can be safely deleted.
+                      </p>
+                    )}
+
+                    {rx.notes && (
+                      <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-100">
+                        <p className="text-xs font-semibold text-yellow-700 mb-1">Additional notes</p>
+                        <p className="text-sm text-foreground">{rx.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-            {patientsLoaded && patientSearch.trim() && patientResults.length === 0 && (
-              <p className="text-xs text-gray-400 mt-1">No patients match &quot;{patientSearch}&quot;.</p>
-            )}
+            ))}
           </div>
         )}
-      </div>
-
-      {/* Diagnosis */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-3">
-        <p className="font-bold text-sm">Diagnosis / Indication</p>
-        <input
-          type="text"
-          placeholder="e.g. Hypertension, Type 2 Diabetes, Upper respiratory tract infection..."
-          value={diagnosis}
-          onChange={(e) => setDiagnosis(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-        />
-      </div>
-
-      {/* Medications */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-4">
-        <div className="flex justify-between items-center">
-          <p className="font-bold text-sm">Medications</p>
-          <button
-            onClick={addDrug}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium"
-          >
-            <LucidePlus className="w-3 h-3" /> Add medication
-          </button>
-        </div>
-
-        {drugs.map((drug, idx) => (
-          <div key={drug.id} className="border border-gray-200 rounded-lg p-3 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-medium text-gray-400">Medication {idx + 1}</span>
-              {drugs.length > 1 && (
-                <button onClick={() => removeDrug(idx)} className="text-red-400 hover:text-red-600">
-                  <LucideTrash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Drug name */}
-            <div className="relative">
-              <label className="text-xs text-gray-500 mb-1 block">Drug name</label>
-              <input
-                type="text"
-                placeholder="e.g. Amoxicillin, Paracetamol..."
-                value={drug.drug_name}
-                onChange={(e) => handleDrugNameChange(idx, e.target.value)}
-                onBlur={() => setTimeout(() => { setDrugSuggestions([]); setActiveDrugIdx(null); }, 150)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-              />
-              {activeDrugIdx === idx && drugSuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
-                  {drugSuggestions.map((s) => (
-                    <button
-                      key={s}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50"
-                      onMouseDown={() => { updateDrug(idx, "drug_name", s); setDrugSuggestions([]); }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Dosage — was missing, now present */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Dosage</label>
-              <input
-                type="text"
-                placeholder="e.g. 500mg, 1 tablet, 10ml"
-                value={drug.dosage}
-                onChange={(e) => updateDrug(idx, "dosage", e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-              />
-            </div>
-
-            {/* Frequency + Duration */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Frequency</label>
-                <select
-                  value={drug.frequency}
-                  onChange={(e) => updateDrug(idx, "frequency", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-                >
-                  {FREQUENCIES.map((f) => <option key={f}>{f}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Duration</label>
-                <select
-                  value={drug.duration}
-                  onChange={(e) => updateDrug(idx, "duration", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-                >
-                  {DURATIONS.map((d) => <option key={d}>{d}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Special instructions */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Special instructions (optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. Take with food, avoid alcohol..."
-                value={drug.instructions}
-                onChange={(e) => updateDrug(idx, "instructions", e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Additional notes */}
-      <div className="bg-white shadow-md rounded-lg p-4 space-y-3">
-        <p className="font-bold text-sm">Additional notes</p>
-        <textarea
-          placeholder="Follow-up instructions, referrals, lifestyle advice..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 resize-none"
-        />
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 pb-8">
-        <Button variant="roundedOutline" onClick={() => window.print()} className="w-full sm:w-auto sm:flex-shrink-0">
-          <LucidePrinter className="w-4 h-4" /> Preview & print
-        </Button>
-        <Button onClick={handleSubmit} disabled={submitting} className="w-full sm:flex-1">
-          {submitting ? (
-            <span className="flex items-center gap-2 justify-center">
-              <LucideCheck className="w-4 h-4 animate-pulse" /> Saving...
-            </span>
-          ) : (
-            "Save prescription"
-          )}
-        </Button>
       </div>
     </div>
   );
 }
-

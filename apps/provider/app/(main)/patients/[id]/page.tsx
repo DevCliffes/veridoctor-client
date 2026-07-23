@@ -30,6 +30,21 @@ type Appointment = {
   message: string;
 };
 
+// DRF returns `next` as a full absolute URL built from the request's Host
+// header. Passing that straight to axios makes it bypass baseURL entirely
+// and hit whatever host DRF thinks it is -- which can differ from what the
+// frontend/proxy expects. Stripping it back down to a relative path keeps
+// every page of the loop going through the same baseURL as every other
+// request in the app.
+function toRelativeApiPath(url: string): string {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.pathname + parsed.search;
+  } catch {
+    return url;
+  }
+}
+
 export default function PatientPortal({
   params,
 }: {
@@ -44,17 +59,26 @@ export default function PatientPortal({
   const fetchData = useCallback(() => {
     if (!userId) return;
     setLoading(true);
-
     axiosClient
       .get(`provider/${userId}/appointments/${params.id}`)
-      .then((res) => {
+      .then(async (res) => {
         const appt: Appointment = res.data;
         setAppointment(appt);
-        // ← filter=all so past appointments are included in history
-        return axiosClient.get(`provider/${userId}/appointments?filter=all`);
-      })
-      .then((res) => {
-        setAllAppointments(res.data ?? []);
+
+        // Needs every appointment for this provider, across all pages, to
+        // find every appointment belonging to this specific patient --
+        // filter=all returns paginated results now, so loop on `next`
+        // (normalized to a relative path).
+        let url: string | null = `provider/${userId}/appointments?filter=all&page_size=100`;
+        let results: Appointment[] = [];
+        let guard = 0;
+        while (url && guard < 50) { // safety cap against a runaway loop
+          const page = await axiosClient.get(url);
+          results = results.concat(page.data?.results ?? []);
+          url = page.data?.next ? toRelativeApiPath(page.data.next) : null;
+          guard++;
+        }
+        setAllAppointments(results);
       })
       .catch(() => toast.error("Could not load patient data"))
       .finally(() => setLoading(false));
@@ -83,7 +107,7 @@ export default function PatientPortal({
 
   if (loading) {
     return (
-      <div className="p-6 bg-white rounded-lg mx-4 text-gray-500">
+      <div className="p-6 bg-card rounded-lg mx-4 text-muted-foreground">
         Loading patient data...
       </div>
     );
@@ -91,7 +115,7 @@ export default function PatientPortal({
 
   if (!appointment) {
     return (
-      <div className="p-6 bg-white rounded-lg mx-4 text-gray-500">
+      <div className="p-6 bg-card rounded-lg mx-4 text-muted-foreground">
         Patient not found.
       </div>
     );
@@ -101,42 +125,42 @@ export default function PatientPortal({
     <div className="p-6 mx-4 space-y-6">
       <button
         onClick={() => router.back()}
-        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800"
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
       >
         <LucideArrowLeft size={16} />
         Back to Appointments
       </button>
 
       {/* Patient Info Card */}
-      <div className="bg-white rounded-lg p-6 space-y-4">
+      <div className="bg-card rounded-lg p-6 space-y-4 border border-border">
         <div className="flex items-center gap-3">
           <div className="bg-blue-100 text-blue-600 rounded-full p-3">
             <LucideUser size={28} />
           </div>
           <div>
-            <h1 className="text-xl font-bold">
+            <h1 className="text-xl font-bold text-foreground">
               {appointment.patient_first_name} {appointment.patient_last_name}
             </h1>
-            <p className="text-sm text-gray-500 capitalize">
+            <p className="text-sm text-muted-foreground capitalize">
               {appointment.appointment_type} Appointment
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <LucideMail size={16} />
             <span className="text-sm">
               {appointment.patient_email || "No email provided"}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <LucidePhone size={16} />
             <span className="text-sm">
               {appointment.patient_phone_number || "No phone provided"}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <LucideCalendarCheck size={16} />
             <span className="text-sm">
               {new Date(appointment.start_time).toLocaleString()}
@@ -145,31 +169,31 @@ export default function PatientPortal({
         </div>
 
         {appointment.message && (
-          <div className="bg-gray-50 rounded p-3 mt-2">
-            <p className="text-xs text-gray-400 mb-1 uppercase font-medium">
+          <div className="bg-muted/50 rounded p-3 mt-2">
+            <p className="text-xs text-muted-foreground mb-1 uppercase font-medium">
               Notes
             </p>
-            <p className="text-sm text-gray-700">{appointment.message}</p>
+            <p className="text-sm text-foreground">{appointment.message}</p>
           </div>
         )}
       </div>
 
       {/* Appointment History */}
-      <div className="bg-white rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Appointment History</h2>
+      <div className="bg-card rounded-lg p-6 border border-border">
+        <h2 className="text-lg font-semibold mb-4 text-foreground">Appointment History</h2>
 
         {patientAppointments.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">
+          <p className="text-sm text-muted-foreground text-center py-8">
             No appointment history found.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-left">
-                  <th className="py-3 px-2 font-semibold text-gray-700">Date/Time</th>
-                  <th className="py-3 px-2 font-semibold text-gray-700">Type</th>
-                  <th className="py-3 px-2 font-semibold text-gray-700">Status</th>
+                <tr className="border-b border-border text-left">
+                  <th className="py-3 px-2 font-semibold text-foreground">Date/Time</th>
+                  <th className="py-3 px-2 font-semibold text-foreground">Type</th>
+                  <th className="py-3 px-2 font-semibold text-foreground">Status</th>
                   <th className="py-3 px-2 w-8" />
                 </tr>
               </thead>
@@ -178,11 +202,11 @@ export default function PatientPortal({
                   <tr
                     key={a.id}
                     onClick={() => router.push(`/appointments/${a.id}`)}
-                    className={`cursor-pointer hover:bg-gray-50 transition-colors ${
-                      idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                    } ${idx !== patientAppointments.length - 1 ? "border-b border-gray-100" : ""}`}
+                    className={`cursor-pointer hover:bg-accent transition-colors ${
+                      idx % 2 === 0 ? "bg-card" : "bg-muted/30"
+                    } ${idx !== patientAppointments.length - 1 ? "border-b border-border" : ""}`}
                   >
-                    <td className="py-3 px-2 text-gray-700">
+                    <td className="py-3 px-2 text-foreground">
                       {new Date(a.start_time).toLocaleString("en-KE", {
                         year: "numeric",
                         month: "2-digit",
@@ -212,7 +236,7 @@ export default function PatientPortal({
                       </span>
                     </td>
                     <td className="py-3 px-2 text-right">
-                      <LucideChevronRight size={14} className="text-gray-300" />
+                      <LucideChevronRight size={14} className="text-muted-foreground" />
                     </td>
                   </tr>
                 ))}

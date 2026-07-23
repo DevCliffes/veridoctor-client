@@ -60,8 +60,6 @@ function getScopedKeys() {
   };
 }
 
-const keys = getScopedKeys();
-
 // FIX: some cookie writes have historically stored the literal strings
 // "null"/"undefined" (see cookieStorage.ts fix). This guards every place
 // identity enters Redux state so a bad stored value can never leak into
@@ -85,48 +83,81 @@ export type authState = {
     last_name: string;
     email: string;
   } | null;
+  // FIX: tracks whether cookie/localStorage values have been synced into
+  // Redux yet. Reading cookies at module-eval time used to populate
+  // initialAuthState directly -- but document.cookie doesn't exist during
+  // SSR, so the server always built its store with logged-out defaults
+  // while the client's first render (which does have real cookies)
+  // immediately built its store with the real values. Any component
+  // reading isLoggedIn/identity on first render therefore produced
+  // different output on server vs. client -- a hydration mismatch
+  // (React error #418). Initial state is now always the SSR-safe
+  // logged-out shape on both sides; the real values are synced in via
+  // hydrateAuth(), dispatched from a useEffect in StoreProvider, which
+  // only ever runs after hydration has already completed.
+  hydrated: boolean;
 };
 
 const initialAuthState: authState = {
-  isLoggedIn: CookieService.get(keys.loggedInKey) === "true",
-  access_token: CookieService.get(keys.accessTokenKey) || null,
-  refresh_token: CookieService.get(keys.refreshTokenKey) || null,
-  auth_code: CookieService.get(keys.authCodeKey) || null,
-  user: safeStorage.get(keys.userStorageKey),
-  identity: sanitizeIdentity(CookieService.get(keys.identityKey)),
+  isLoggedIn: false,
+  access_token: null,
+  refresh_token: null,
+  auth_code: null,
+  user: null,
+  identity: null,
+  hydrated: false,
 };
 
 export const authSlice = createSlice({
   name: "auth",
   initialState: initialAuthState,
   reducers: {
+    // FIX: new. Call once, client-side only, from a useEffect after mount
+    // to sync real cookie/localStorage values into state post-hydration.
+    hydrateAuth: (state) => {
+      const keys = getScopedKeys();
+      state.isLoggedIn = CookieService.get(keys.loggedInKey) === "true";
+      state.access_token = CookieService.get(keys.accessTokenKey) || null;
+      state.refresh_token = CookieService.get(keys.refreshTokenKey) || null;
+      state.auth_code = CookieService.get(keys.authCodeKey) || null;
+      state.user = safeStorage.get(keys.userStorageKey);
+      state.identity = sanitizeIdentity(CookieService.get(keys.identityKey));
+      state.hydrated = true;
+    },
     setIsLoggedIn: (state) => {
+      const keys = getScopedKeys();
       state.isLoggedIn = true;
       CookieService.set(keys.loggedInKey, "true");
     },
     setAccessToken: (state, action) => {
+      const keys = getScopedKeys();
       state.access_token = action.payload;
       CookieService.set(keys.accessTokenKey, action.payload);
     },
     setRefreshToken: (state, action) => {
+      const keys = getScopedKeys();
       state.refresh_token = action.payload;
       CookieService.set(keys.refreshTokenKey, action.payload);
     },
     setAuthCode: (state, action) => {
+      const keys = getScopedKeys();
       const clean = sanitizeIdentity(action.payload); // reuse same guard
       state.auth_code = clean;
       CookieService.set(keys.authCodeKey, clean);
     },
     setUser: (state, action) => {
+      const keys = getScopedKeys();
       state.user = action.payload;
       safeStorage.set(keys.userStorageKey, action.payload);
     },
     setUserId: (state, action) => {
+      const keys = getScopedKeys();
       const clean = sanitizeIdentity(action.payload);
       state.identity = clean;
       CookieService.set(keys.identityKey, clean);
     },
     revokeTokens: (state) => {
+      const keys = getScopedKeys();
       state.access_token = null;
       state.refresh_token = null;
       state.auth_code = null;
@@ -144,6 +175,7 @@ export const authSlice = createSlice({
 });
 
 export const {
+  hydrateAuth,
   setIsLoggedIn,
   setUser,
   setAccessToken,

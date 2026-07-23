@@ -39,12 +39,20 @@ export type DatatableActions = {
   secondary?: ButtonAction[];
 };
 
+export type DatatablePagination = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  onPageChange: (page: number) => void;
+};
+
 export type DatatableProps = {
   rows: any[];
   columns: DatatableColumnHeader[];
   filterTabs?: DatatableFilterTabs;
   tableActions?: DatatableActions;
   isLoading: boolean;
+  pagination?: DatatablePagination;
 };
 
 function DataTable({
@@ -53,9 +61,13 @@ function DataTable({
   filterTabs,
   isLoading,
   tableActions,
+  pagination,
 }: DatatableProps) {
   const hasPrimaryActions = (tableActions?.primary?.length ?? 0) > 0;
   const hasSecondaryActions = (tableActions?.secondary?.length ?? 0) > 0;
+  const totalPages = pagination
+    ? Math.max(1, Math.ceil(pagination.totalCount / pagination.pageSize))
+    : 1;
 
   return (
     <div className="relative min-h-52 overflow-x-auto">
@@ -162,6 +174,32 @@ function DataTable({
               )}
         </tbody>
       </table>
+
+      {pagination && totalPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-3 text-sm text-gray-600">
+          <span>
+            Page {pagination.page} of {totalPages} · {pagination.totalCount} total
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page <= 1 || isLoading}
+              onClick={() => pagination.onPageChange(pagination.page - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page >= totalPages || isLoading}
+              onClick={() => pagination.onPageChange(pagination.page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

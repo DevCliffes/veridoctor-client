@@ -1,5 +1,6 @@
 "use client";
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 
 export type navITem = {
@@ -42,7 +43,7 @@ function SideNav({
     <>
       <div className="hidden lg:flex">
         <div
-          className={`overflow-visible relative bg-white flex-col border-r h-full transition-all ease-in-out duration-75 ${
+          className={`overflow-visible relative bg-background text-foreground flex-col border-r h-full transition-all ease-in-out duration-75 ${
             sidebarOpen ? "w-44" : "w-16"
           }`}
         >
@@ -55,7 +56,7 @@ function SideNav({
           <div className="absolute -right-2">
             <button
               onClick={() => setSidebarOpen((prev) => !prev)}
-              className="rounded-full bg-gray-100 cursor-pointer shadow-md border"
+              className="rounded-full bg-muted text-foreground cursor-pointer shadow-md border"
             >
               {sidebarOpen ? <ChevronLeft /> : <ChevronRight />}
             </button>
@@ -101,9 +102,9 @@ function SideNav({
       {/* MOBILE NAV */}
       <div className="fixed top-0 left-0 lg:hidden items-center justify-between px-4 h-fit py-2 z-50">
         {!dropdownOpen ? (
-          <Menu onClick={openMobileDropdown} />
+          <Menu onClick={openMobileDropdown} className="text-foreground" />
         ) : (
-          <div className="w-full h-full fixed top-0 left-0 p-4 bg-white">
+          <div className="w-full h-full fixed top-0 left-0 p-4 bg-background text-foreground">
             <div className="flex justify-between mb-4">
               <p className="font-extrabold text-3xl">
                 V<span className="text-blue-500">D</span>
@@ -112,9 +113,17 @@ function SideNav({
             </div>
             <div className="flex flex-col m-auto px-4 mt-10">
               {navItems.map((navItem, index) => (
-                <a href={navItem.linkTo} key={index}>
+                // FIX: was a raw <a href>, which forces a full document
+                // reload on every sidebar click — re-downloading every JS
+                // chunk/font and re-running every page's mount-time
+                // fetches from scratch. next/link does a client-side
+                // transition instead.
+                <Link
+                  href={navItem.linkTo}
+                  key={index}
+                  onClick={closeMobileDropdown}
+                >
                   <div
-                    onClick={closeMobileDropdown}
                     className={`flex gap-2 items-center py-4 px-2 ${
                       isActive(navItem.linkTo) ? "bg-primary/70" : ""
                     }`}
@@ -122,7 +131,7 @@ function SideNav({
                     {navItem.icon}
                     <p className="text-sm">{navItem.name}</p>
                   </div>
-                </a>
+                </Link>
               ))}
             </div>
           </div>
@@ -157,18 +166,21 @@ function NavItem({
   }
 
   return (
-    <a href={navItem.linkTo}>
+    // FIX: was a raw <a href> — same full-reload issue as the mobile item
+    // above, except this is the desktop sidebar, meaning it fired on
+    // essentially every navigation in the app.
+    <Link href={navItem.linkTo}>
       <div
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`flex gap-2 p-2 items-center hover:bg-primary/70 cursor-pointer ${
+        className={`flex gap-2 p-2 items-center text-foreground hover:bg-primary/70 cursor-pointer ${
           isActive ? "bg-primary/70" : ""
         } ${sidebarOpen ? "justify-start" : "justify-center"}`}
       >
         {navItem.icon}
         {sidebarOpen && <p className="text-sm">{navItem.name}</p>}
       </div>
-    </a>
+    </Link>
   );
 }
 

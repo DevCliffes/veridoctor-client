@@ -16,6 +16,12 @@ interface AppointmentTrendChartsProps {
   identityId: string;
 }
 
+interface TooltipState {
+  index: number;
+  x: number;
+  y: number;
+}
+
 function getCurrentMonthValue() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -44,6 +50,18 @@ function formatDayLabel(dateStr: string, useShortForm: boolean) {
   return d.toLocaleDateString("en-KE", { weekday: "short" });
 }
 
+// Fuller date for tooltip content, e.g. "Mon, 14 Jul 2026" — always
+// unambiguous regardless of which range/label mode the chart is in.
+function formatFullDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-KE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 // Decides which indices in the data array actually get a visible label,
 // so long ranges (30 days, a full month) don't cram in every single date
 // and become illegible. Short ranges show every label.
@@ -58,6 +76,8 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
   const [data, setData] = useState<TrendDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [revenueTooltip, setRevenueTooltip] = useState<TooltipState | null>(null);
+  const [apptTooltip, setApptTooltip] = useState<TooltipState | null>(null);
 
   const monthOptions = useMemo(() => formatMonthOptions(), []);
 
@@ -151,31 +171,61 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
           <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
         ) : (
           <>
-            <div className="flex items-end gap-1 h-24">
-              {data.map((d) => {
-                const completedPct = (d.completed_revenue / maxRevenue) * 100;
-                const lostPct = (d.lost_revenue / maxRevenue) * 100;
-                return (
-                  <div key={d.date} className="flex-1 flex items-end gap-0.5 h-full">
+            <div className="relative">
+              {revenueTooltip && (
+                <div
+                  className="absolute z-10 bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs pointer-events-none -translate-x-1/2"
+                  style={{ left: revenueTooltip.x, bottom: revenueTooltip.y }}
+                >
+                  <p className="font-semibold text-foreground mb-1">
+                    {formatFullDate(data[revenueTooltip.index].date)}
+                  </p>
+                  <p className="text-blue-500">
+                    Completed: KES {data[revenueTooltip.index].completed_revenue.toLocaleString()}
+                  </p>
+                  <p className="text-red-400">
+                    Cancelled/no-show: KES {data[revenueTooltip.index].lost_revenue.toLocaleString()}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-end gap-1 h-24">
+                {data.map((d, i) => {
+                  const completedPct = (d.completed_revenue / maxRevenue) * 100;
+                  const lostPct = (d.lost_revenue / maxRevenue) * 100;
+                  return (
                     <div
-                      className="flex-1 rounded-t-sm bg-blue-700"
-                      style={{
-                        height: `${completedPct}%`,
-                        minHeight: d.completed_revenue > 0 ? "2px" : "0",
+                      key={d.date}
+                      className="flex-1 flex items-end gap-0.5 h-full cursor-pointer"
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const parentRect =
+                          e.currentTarget.parentElement!.parentElement!.getBoundingClientRect();
+                        setRevenueTooltip({
+                          index: i,
+                          x: rect.left - parentRect.left + rect.width / 2,
+                          y: parentRect.bottom - rect.top + 8,
+                        });
                       }}
-                      title={`Completed: KES ${d.completed_revenue.toLocaleString()}`}
-                    />
-                    <div
-                      className="flex-1 rounded-t-sm bg-red-400"
-                      style={{
-                        height: `${lostPct}%`,
-                        minHeight: d.lost_revenue > 0 ? "2px" : "0",
-                      }}
-                      title={`Cancelled/no-show: KES ${d.lost_revenue.toLocaleString()}`}
-                    />
-                  </div>
-                );
-              })}
+                      onMouseLeave={() => setRevenueTooltip(null)}
+                    >
+                      <div
+                        className="flex-1 rounded-t-sm bg-blue-700"
+                        style={{
+                          height: `${completedPct}%`,
+                          minHeight: d.completed_revenue > 0 ? "2px" : "0",
+                        }}
+                      />
+                      <div
+                        className="flex-1 rounded-t-sm bg-red-400"
+                        style={{
+                          height: `${lostPct}%`,
+                          minHeight: d.lost_revenue > 0 ? "2px" : "0",
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex gap-1 mt-1">
               {data.map((d, i) => (
@@ -213,7 +263,40 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
         ) : (
           <>
             <div className="relative h-24">
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
+              {apptTooltip && (
+                <div
+                  className="absolute z-10 bg-popover border border-border rounded-lg shadow-lg px-3 py-2 text-xs pointer-events-none -translate-x-1/2 -translate-y-full"
+                  style={{ left: apptTooltip.x, top: apptTooltip.y }}
+                >
+                  <p className="font-semibold text-foreground mb-1">
+                    {formatFullDate(data[apptTooltip.index].date)}
+                  </p>
+                  <p className="text-blue-500">
+                    Virtual: {data[apptTooltip.index].virtual_count}
+                  </p>
+                  <p className="text-orange-500">
+                    In-person: {data[apptTooltip.index].physical_count}
+                  </p>
+                </div>
+              )}
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                className="w-full h-full"
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const relX = (e.clientX - rect.left) / rect.width;
+                  const index =
+                    data.length > 1
+                      ? Math.round(relX * (data.length - 1))
+                      : 0;
+                  const clamped = Math.max(0, Math.min(data.length - 1, index));
+                  const x = data.length > 1 ? (clamped / (data.length - 1)) * rect.width : rect.width / 2;
+                  const y = 100 - (Math.max(data[clamped].virtual_count, data[clamped].physical_count) / maxCount) * 100;
+                  setApptTooltip({ index: clamped, x, y: (y / 100) * rect.height });
+                }}
+                onMouseLeave={() => setApptTooltip(null)}
+              >
                 <polyline
                   points={data
                     .map((d, i) => {
@@ -240,6 +323,18 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
                   strokeWidth="2"
                   vectorEffect="non-scaling-stroke"
                 />
+                {apptTooltip && (
+                  <line
+                    x1={(apptTooltip.index / Math.max(data.length - 1, 1)) * 100}
+                    y1="0"
+                    x2={(apptTooltip.index / Math.max(data.length - 1, 1)) * 100}
+                    y2="100"
+                    stroke="currentColor"
+                    strokeOpacity="0.15"
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
               </svg>
             </div>
             <div className="flex gap-1 mt-1">

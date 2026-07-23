@@ -52,9 +52,12 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
     const params: Record<string, string> = { range };
     if (range === "month") params.month = selectedMonth;
     axiosClient
-      .get(`/provider/${identityId}/appointments/trend/`, { params })
+      .get(`/appointments/provider/${identityId}/appointments/trend/`, { params })
       .then((res) => setData(res.data))
-      .catch(() => setData([]))
+      .catch((err) => {
+        console.error("Trend fetch failed:", err);
+        setData([]);
+      })
       .finally(() => setLoading(false));
   }, [identityId, range, selectedMonth]);
 

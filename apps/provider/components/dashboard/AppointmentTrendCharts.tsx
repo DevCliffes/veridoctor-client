@@ -33,12 +33,13 @@ function formatMonthOptions() {
   return options;
 }
 
-// Short weekday name for small ranges (e.g. "Mon"), day-of-month number
-// for larger ranges (e.g. "14") where full weekday names would collide.
+// Short weekday name for small ranges (e.g. "Mon"), "24 Jul" style for
+// larger ranges where full weekday names would collide and a bare day
+// number ("24") is ambiguous about which month it's in.
 function formatDayLabel(dateStr: string, useShortForm: boolean) {
   const d = new Date(dateStr + "T00:00:00");
   if (useShortForm) {
-    return String(d.getDate());
+    return d.toLocaleDateString("en-KE", { day: "numeric", month: "short" });
   }
   return d.toLocaleDateString("en-KE", { weekday: "short" });
 }

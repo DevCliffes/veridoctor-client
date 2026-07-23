@@ -33,9 +33,23 @@ function formatMonthOptions() {
   return options;
 }
 
-function formatDayLabel(dateStr: string) {
+// Short weekday name for small ranges (e.g. "Mon"), day-of-month number
+// for larger ranges (e.g. "14") where full weekday names would collide.
+function formatDayLabel(dateStr: string, useShortForm: boolean) {
   const d = new Date(dateStr + "T00:00:00");
+  if (useShortForm) {
+    return String(d.getDate());
+  }
   return d.toLocaleDateString("en-KE", { weekday: "short" });
+}
+
+// Decides which indices in the data array actually get a visible label,
+// so long ranges (30 days, a full month) don't cram in every single date
+// and become illegible. Short ranges show every label.
+function getLabelStep(length: number) {
+  if (length <= 10) return 1;
+  if (length <= 20) return 3;
+  return 5;
 }
 
 export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsProps) {
@@ -74,7 +88,9 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
     ...data.map((d) => Math.max(d.virtual_count, d.physical_count)),
     1
   );
-  const showLabels = data.length <= 14;
+
+  const useShortForm = data.length > 10;
+  const labelStep = getLabelStep(data.length);
 
   const filterButtons: { value: RangeOption; label: string }[] = [
     { value: "last_7_days", label: "Last 7 days" },
@@ -160,18 +176,16 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
                 );
               })}
             </div>
-            {showLabels && (
-              <div className="flex gap-1 mt-1">
-                {data.map((d) => (
-                  <span
-                    key={d.date}
-                    className="flex-1 text-center text-[10px] text-muted-foreground truncate"
-                  >
-                    {formatDayLabel(d.date)}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-1 mt-1">
+              {data.map((d, i) => (
+                <span
+                  key={d.date}
+                  className="flex-1 text-center text-[10px] text-muted-foreground truncate"
+                >
+                  {i % labelStep === 0 ? formatDayLabel(d.date, useShortForm) : ""}
+                </span>
+              ))}
+            </div>
           </>
         )}
         <div className="flex gap-4 mt-3 pt-3 border-t border-border">
@@ -227,18 +241,16 @@ export function AppointmentTrendCharts({ identityId }: AppointmentTrendChartsPro
                 />
               </svg>
             </div>
-            {showLabels && (
-              <div className="flex gap-1 mt-1">
-                {data.map((d) => (
-                  <span
-                    key={d.date}
-                    className="flex-1 text-center text-[10px] text-muted-foreground truncate"
-                  >
-                    {formatDayLabel(d.date)}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-1 mt-1">
+              {data.map((d, i) => (
+                <span
+                  key={d.date}
+                  className="flex-1 text-center text-[10px] text-muted-foreground truncate"
+                >
+                  {i % labelStep === 0 ? formatDayLabel(d.date, useShortForm) : ""}
+                </span>
+              ))}
+            </div>
           </>
         )}
         <div className="flex gap-4 mt-3 pt-3 border-t border-border">

@@ -23,7 +23,7 @@
     "@veridoctor/typescript-config": "workspace:*",
     "eslint": "^9.34.0",
     "next": "^16.1.1",
-    "typescript": "5.9.2"
+    "typescript": "7.0.2"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.1",

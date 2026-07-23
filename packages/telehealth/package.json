@@ -19,7 +19,7 @@
     "@veridoctor/typescript-config": "workspace:*",
     "eslint": "^9.34.0",
     "tailwindcss": "^4",
-    "typescript": "5.9.2"
+    "typescript": "7.0.2"
   },
   "dependencies": {
     "@veridoctor/design": "workspace:*",

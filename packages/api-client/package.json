@@ -20,6 +20,6 @@
     "@veridoctor/eslint-config": "workspace:*",
     "@veridoctor/typescript-config": "workspace:*",
     "eslint": "^9.34.0",
-    "typescript": "^5"
+    "typescript": "^7"
   }
 }

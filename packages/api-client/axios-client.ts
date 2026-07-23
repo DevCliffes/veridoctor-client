@@ -65,6 +65,30 @@ function consumePendingRedirect(): string | null {
   return value;
 }
 
+// FIX (login loop): wipes every auth cookie for both patient and provider
+// apps. Called (a) whenever a brand-new session is persisted after a fresh
+// login, and (b) on any forced logout (401/403). Previously, an expired
+// session left the old access_token/refresh_token/auth_code cookies sitting
+// on disk untouched. On the next login, maybeAuthorise() would try that
+// stale refresh_token *before* ever looking at the brand-new auth_code just
+// issued by the login the user is currently completing. If the old refresh
+// token was dead server-side (which it is, by definition, once the session
+// that issued it has expired), that request 401'd, the response interceptor
+// treated it as a fresh auth failure, set vd_pending_redirect again, and
+// bounced back to the homepage -- indistinguishable from the login never
+// having worked at all. Clearing all auth cookies at both of these points
+// means a dead token can never be picked back up again.
+function clearAllAuthCookies(): void {
+  clearCookie(PATIENT_ACCESS_TOKEN_KEY);
+  clearCookie(PATIENT_REFRESH_TOKEN_KEY);
+  clearCookie(PATIENT_AUTH_CODE_KEY);
+  clearCookie(PATIENT_IDENTITY_KEY);
+  clearCookie(PROVIDER_ACCESS_TOKEN_KEY);
+  clearCookie(PROVIDER_REFRESH_TOKEN_KEY);
+  clearCookie(PROVIDER_AUTH_CODE_KEY);
+  clearCookie(PROVIDER_IDENTITY_KEY);
+}
+
 function getSafeLoginUrl(): string {
   const webAppUrl = process.env.NEXT_PUBLIC_WEB_APP_URL;
   if (webAppUrl && webAppUrl.startsWith("https://")) {
@@ -128,6 +152,12 @@ let authorisePromise: Promise<string | null> | null = null;
 // the long-lived refresh_token instead (which TokenView already returns --
 // it just wasn't being persisted), and only falls back to the one-time
 // auth_code exchange if no refresh token has been stored yet.
+//
+// FIX (login loop): if the refresh call itself fails, the refresh_token is
+// dead (expired/invalidated server-side) and must be cleared immediately.
+// Previously it was left in place, so it kept getting tried -- and kept
+// failing -- ahead of any newly-issued auth_code on every subsequent login
+// attempt, which is what produced the post-expiry login loop.
 async function refreshPatientAccessToken(): Promise<string | null> {
   const refreshToken = getCookie(PATIENT_REFRESH_TOKEN_KEY);
   if (!refreshToken) return null;
@@ -141,8 +171,11 @@ async function refreshPatientAccessToken(): Promise<string | null> {
     return a_token as string;
   } catch {
     // Refresh token itself is dead/invalid (e.g. >1 day old, per
-    // RefreshTokenView's own docstring) -- fall through to auth_code
-    // exchange / eventual re-login rather than erroring here.
+    // RefreshTokenView's own docstring). Clear both cookies so this dead
+    // token isn't retried again on the next call -- fall through cleanly
+    // to the auth_code exchange / eventual re-login instead.
+    clearCookie(PATIENT_REFRESH_TOKEN_KEY);
+    clearCookie(PATIENT_ACCESS_TOKEN_KEY);
     return null;
   }
 }
@@ -186,6 +219,16 @@ async function maybeAuthorise(): Promise<string | null> {
   return authorisePromise;
 }
 
+// FIX (login loop, primary fix): a brand-new login must always win over
+// whatever auth state is left from a previous session. Previously this
+// only wrote the new auth_code/identity, leaving any old access_token /
+// refresh_token cookies in place. maybeAuthorise() checks refresh_token
+// *before* auth_code, so a stale (server-dead) refresh token from the
+// expired session kept getting tried first on the very login that was
+// meant to replace it -- 401, forced logout, redirect home, loop. Clearing
+// the old tokens here guarantees the fresh auth_code is what actually gets
+// used on the first authenticated request after this login.
+//
 // FIX: the post-login handoff page (apps/health-portal/app/page.tsx) receives
 // ?auth_tkn=...&identity=... as URL query params and previously only
 // dispatched them into Redux, which maybeAuthorise() above never reads --
@@ -197,6 +240,8 @@ async function maybeAuthorise(): Promise<string | null> {
 // write the cookies maybeAuthorise() actually reads, and wait for the
 // code -> access-token exchange to finish before navigating anywhere.
 function persistPatientSession(authCode: string, identity: string): void {
+  clearCookie(PATIENT_ACCESS_TOKEN_KEY);
+  clearCookie(PATIENT_REFRESH_TOKEN_KEY);
   setCookie(PATIENT_AUTH_CODE_KEY, authCode);
   setCookie(PATIENT_IDENTITY_KEY, identity);
 }
@@ -208,7 +253,8 @@ async function ensurePatientAccessToken(): Promise<string | null> {
 // ── Provider auth ───────────────────────────────────────────────
 let providerAuthorisePromise: Promise<string | null> | null = null;
 
-// Mirrors refreshPatientAccessToken() but for the vd_provider_* cookies.
+// Mirrors refreshPatientAccessToken() but for the vd_provider_* cookies,
+// including the same dead-refresh-token cleanup on failure.
 async function refreshProviderAccessToken(): Promise<string | null> {
   const refreshToken = getCookie(PROVIDER_REFRESH_TOKEN_KEY);
   if (!refreshToken) return null;
@@ -221,6 +267,8 @@ async function refreshProviderAccessToken(): Promise<string | null> {
     setCookie(PROVIDER_ACCESS_TOKEN_KEY, a_token);
     return a_token as string;
   } catch {
+    clearCookie(PROVIDER_REFRESH_TOKEN_KEY);
+    clearCookie(PROVIDER_ACCESS_TOKEN_KEY);
     return null;
   }
 }
@@ -262,7 +310,13 @@ async function maybeAuthoriseProvider(): Promise<string | null> {
   return providerAuthorisePromise;
 }
 
+// FIX (login loop): mirrors persistPatientSession() -- clear any stale
+// provider access/refresh tokens before writing the fresh auth_code/identity
+// from this login, so a dead token from a previous session can't be tried
+// ahead of it.
 function persistProviderSession(authCode: string, identity: string): void {
+  clearCookie(PROVIDER_ACCESS_TOKEN_KEY);
+  clearCookie(PROVIDER_REFRESH_TOKEN_KEY);
   setCookie(PROVIDER_AUTH_CODE_KEY, authCode);
   setCookie(PROVIDER_IDENTITY_KEY, identity);
 }
@@ -295,6 +349,13 @@ function isPublicPath(url?: string): boolean {
 // cases apart and force-logs the practitioner out just for clicking an
 // approved-record category whose grant happens to be expired or missing --
 // a 403 there is a normal, anticipated outcome, not an auth failure.
+//
+// NOTE (separate, known issue -- not fixed here): this list is a substring
+// allowlist and is not exhaustive -- e.g. /records/pin/status is not
+// covered by either pattern below, so a business 403 from that endpoint
+// still force-logs the user out. Track/fix this separately from the login
+// loop fix above; ideally replace this with an explicit error-code check
+// in the 403 response body instead of a path allowlist.
 const EXPECTED_FORBIDDEN_PATH_PATTERNS = [
   "/granted-records/",
   "/records/patient/",
@@ -345,6 +406,16 @@ axiosClient.interceptors.response.use(
         // form, while still returning them to what they were doing.
         const loginBase = getSafeLoginUrl();
         setPendingRedirect(window.location.pathname + window.location.search);
+
+        // FIX (login loop): wipe every auth cookie the moment we force a
+        // logout. Previously the dead access_token/refresh_token/auth_code
+        // cookies were left in place, so the next login attempt's very
+        // first authenticated request picked the dead refresh_token back
+        // up in maybeAuthorise(), 401'd again, hit this same branch again,
+        // and looped indefinitely. A forced logout must always leave a
+        // clean slate for the next login.
+        clearAllAuthCookies();
+
         window.location.href = `${loginBase}/`;
       }
     }
@@ -360,5 +431,5 @@ export {
   ensureProviderAccessToken,
   setPendingRedirect,
   consumePendingRedirect,
+  clearAllAuthCookies,
 };
-

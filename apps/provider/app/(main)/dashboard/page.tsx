@@ -145,10 +145,12 @@ export default function Dashboard() {
             data={stats?.revenue_by_service ?? []}
             loading={statsLoading}
           />
-          <PendingActions
-            upcomingCount={stats?.pending_count ?? 0}
-            loading={statsLoading}
-          />
+          {/* FIX: PendingActions expects an onNavigate callback prop -- it
+              was previously being passed upcomingCount/loading instead,
+              which that component doesn't accept at all. onNavigate was
+              therefore undefined, so every click threw silently
+              (calling undefined(path)) and nothing ever happened. */}
+          <PendingActions onNavigate={(path) => router.push(path)} />
           <div className="bg-background text-foreground shadow-sm rounded-xl border border-border p-4 space-y-2">
             <p className="font-bold text-sm text-muted-foreground uppercase tracking-wide">
               Quick actions

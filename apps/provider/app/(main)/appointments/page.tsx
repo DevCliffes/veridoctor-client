@@ -56,6 +56,7 @@ interface Slot {
 }
 
 const DONE_STATUSES = ["completed", "cancelled", "no-show"];
+const PAGE_SIZE = 25;
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-KE", {
@@ -215,6 +216,8 @@ export default function Appointments() {
 
   const [loading, setLoading] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [reschedulingAppt, setReschedulingAppt] = useState<Appointment | null>(null);
 
@@ -350,17 +353,27 @@ export default function Appointments() {
     setLoading(true);
     const params = new URLSearchParams();
     params.set("filter", filter);
+    params.set("page", String(page));
     if (appointmentType) params.set("appointment_type", appointmentType);
     axiosClient
       .get(`/provider/${userId}/appointments?${params.toString()}`)
-      .then((res) => setAppointments(res.data ?? []))
+      .then((res) => {
+        setAppointments(res.data?.results ?? []);
+        setTotalCount(res.data?.count ?? 0);
+      })
       .catch(() => toast.error("Could not load appointments"))
       .finally(() => setLoading(false));
-  }, [appointmentType, filter, userId]);
+  }, [appointmentType, filter, page, userId]);
 
   useEffect(() => {
     fetchAppointments();
   }, [fetchAppointments]);
+
+  // Reset to page 1 whenever the filter changes, otherwise switching from
+  // "Past" (on page 4) to "Today" would silently request Today's page 4.
+  useEffect(() => {
+    setPage(1);
+  }, [filter, appointmentType]);
 
   const updateQueryParams = (name: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -415,6 +428,12 @@ export default function Appointments() {
         columns={tableColumns}
         isLoading={loading}
         filterTabs={filterTabs}
+        pagination={{
+          page,
+          pageSize: PAGE_SIZE,
+          totalCount,
+          onPageChange: setPage,
+        }}
       />
     </div>
   );

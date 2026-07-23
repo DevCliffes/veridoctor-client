@@ -113,7 +113,7 @@ function PrescriptionSection({
     <div className="flex flex-col gap-4">
       {/* Diagnosis */}
       <div>
-        <label className="text-sm font-medium text-gray-700">
+        <label className="text-sm font-medium text-foreground">
           Diagnosis / Indication
         </label>
         <input
@@ -121,7 +121,7 @@ function PrescriptionSection({
           value={value.diagnosis}
           onChange={(e) => onChange({ ...value, diagnosis: e.target.value })}
           placeholder="e.g. Acute pharyngitis"
-          className="w-full p-2 border border-gray-300 rounded text-sm mt-1"
+          className="w-full p-2 border border-border rounded text-sm mt-1 bg-background text-foreground"
         />
       </div>
 
@@ -130,10 +130,10 @@ function PrescriptionSection({
         {value.drugs.map((drug, idx) => (
           <div
             key={drug.id}
-            className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+            className="border border-border rounded-lg p-4 bg-muted/40"
           >
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-gray-700">
+              <p className="text-sm font-semibold text-foreground">
                 Medication {idx + 1}
               </p>
               <button
@@ -145,7 +145,7 @@ function PrescriptionSection({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="text-xs font-medium text-gray-500">
+                <label className="text-xs font-medium text-muted-foreground">
                   Drug name
                 </label>
                 <input
@@ -155,11 +155,11 @@ function PrescriptionSection({
                     updateDrug(drug.id, { drug_name: e.target.value })
                   }
                   placeholder="e.g. Amoxicillin 500mg"
-                  className="w-full p-2 border border-gray-300 rounded text-sm mt-1"
+                  className="w-full p-2 border border-border rounded text-sm mt-1 bg-background text-foreground"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500">
+                <label className="text-xs font-medium text-muted-foreground">
                   Frequency
                 </label>
                 <select
@@ -167,7 +167,7 @@ function PrescriptionSection({
                   onChange={(e) =>
                     updateDrug(drug.id, { frequency: e.target.value })
                   }
-                  className="w-full p-2 border border-gray-300 rounded text-sm mt-1"
+                  className="w-full p-2 border border-border rounded text-sm mt-1 bg-background text-foreground"
                 >
                   <option value="">Select...</option>
                   {FREQUENCY_OPTIONS.map((o) => (
@@ -178,7 +178,7 @@ function PrescriptionSection({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500">
+                <label className="text-xs font-medium text-muted-foreground">
                   Duration
                 </label>
                 <select
@@ -186,7 +186,7 @@ function PrescriptionSection({
                   onChange={(e) =>
                     updateDrug(drug.id, { duration: e.target.value })
                   }
-                  className="w-full p-2 border border-gray-300 rounded text-sm mt-1"
+                  className="w-full p-2 border border-border rounded text-sm mt-1 bg-background text-foreground"
                 >
                   <option value="">Select...</option>
                   {DURATION_OPTIONS.map((o) => (
@@ -197,7 +197,7 @@ function PrescriptionSection({
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="text-xs font-medium text-gray-500">
+                <label className="text-xs font-medium text-muted-foreground">
                   Special instructions
                 </label>
                 <input
@@ -207,7 +207,7 @@ function PrescriptionSection({
                     updateDrug(drug.id, { instructions: e.target.value })
                   }
                   placeholder="e.g. Take with food"
-                  className="w-full p-2 border border-gray-300 rounded text-sm mt-1"
+                  className="w-full p-2 border border-border rounded text-sm mt-1 bg-background text-foreground"
                 />
               </div>
             </div>
@@ -223,7 +223,7 @@ function PrescriptionSection({
 
       {/* Notes */}
       <div>
-        <label className="text-sm font-medium text-gray-700">
+        <label className="text-sm font-medium text-foreground">
           Additional Notes
         </label>
         <textarea
@@ -231,7 +231,7 @@ function PrescriptionSection({
           onChange={(e) => onChange({ ...value, notes: e.target.value })}
           rows={3}
           placeholder="Any additional instructions or notes..."
-          className="w-full p-2 border border-gray-300 rounded text-sm mt-1"
+          className="w-full p-2 border border-border rounded text-sm mt-1 bg-background text-foreground"
         />
       </div>
     </div>
@@ -359,7 +359,7 @@ export default function FormDetailPage() {
 
   const renderField = (field: Field) => {
     const val = fieldValues[field.id] ?? "";
-    const cls = "w-full p-2 border border-gray-300 rounded text-sm";
+    const cls = "w-full p-2 border border-border rounded text-sm bg-background text-foreground";
     switch (field.type) {
       case "textarea":
         return (
@@ -426,17 +426,17 @@ export default function FormDetailPage() {
     }
   };
 
-  if (loading) return <div className="p-6">Loading...</div>;
-  if (!form) return <div className="p-6">Form not found.</div>;
+  if (loading) return <div className="p-6 text-foreground">Loading...</div>;
+  if (!form) return <div className="p-6 text-foreground">Form not found.</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Top bar */}
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <div className="bg-card border-b border-border px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-muted-foreground hover:text-foreground"
           >
             ← Back
           </button>
@@ -446,7 +446,7 @@ export default function FormDetailPage() {
                 <input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="text-xl font-bold border border-blue-300 rounded px-2 py-1 outline-none"
+                  className="text-xl font-bold border border-blue-300 rounded px-2 py-1 outline-none bg-background text-foreground"
                   autoFocus
                 />
                 <button
@@ -457,24 +457,24 @@ export default function FormDetailPage() {
                 </button>
                 <button
                   onClick={() => setEditingName(false)}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                  className="px-3 py-1 text-sm border border-border rounded hover:bg-accent"
                 >
                   Cancel
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold">{form.name}</h1>
+                <h1 className="text-xl font-bold text-foreground">{form.name}</h1>
                 <button
                   onClick={() => setEditingName(true)}
-                  className="text-xs px-2 py-1 text-gray-500 hover:text-blue-600"
+                  className="text-xs px-2 py-1 text-muted-foreground hover:text-blue-600"
                 >
                   ✏️ Rename
                 </button>
               </div>
             )
           ) : (
-            <h1 className="text-xl font-bold">{form.name}</h1>
+            <h1 className="text-xl font-bold text-foreground">{form.name}</h1>
           )}
         </div>
         <div className="flex gap-3">
@@ -482,7 +482,7 @@ export default function FormDetailPage() {
             <>
               <button
                 onClick={() => router.push(`/forms/new?edit=${formId}`)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-accent"
               >
                 Edit Form
               </button>
@@ -535,10 +535,10 @@ export default function FormDetailPage() {
         {form.sections?.map((section) => (
           <div
             key={section.id}
-            className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+            className="bg-card rounded-lg border border-border overflow-hidden"
           >
-            <div className="bg-gray-50 border-b px-4 py-3">
-              <h2 className="font-semibold text-gray-800">{section.title}</h2>
+            <div className="bg-muted/40 border-b border-border px-4 py-3">
+              <h2 className="font-semibold text-foreground">{section.title}</h2>
             </div>
             <div className="p-4 flex flex-col gap-4">
               {section.isPrescription ? (
@@ -549,7 +549,7 @@ export default function FormDetailPage() {
               ) : (
                 section.fields?.map((field) => (
                   <div key={field.id} className="flex flex-col gap-1">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       {field.label}
                       {field.required && (
                         <span className="text-red-500 ml-1">*</span>

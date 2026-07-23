@@ -71,10 +71,10 @@ export default function Prescriptions() {
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-card rounded-xl p-5 shadow-sm border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Prescriptions</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold text-foreground">Prescriptions</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {prescriptions.length} prescription{prescriptions.length !== 1 ? "s" : ""} written
           </p>
         </div>
@@ -87,17 +87,17 @@ export default function Prescriptions() {
       </div>
 
       {/* List */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+              <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
             ))}
           </div>
         ) : prescriptions.length === 0 ? (
           <div className="text-center py-12">
-            <LucideFileText size={32} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-gray-400 text-sm">No prescriptions yet.</p>
+            <LucideFileText size={32} className="mx-auto text-muted-foreground mb-2" />
+            <p className="text-muted-foreground text-sm">No prescriptions yet.</p>
             <button
               onClick={() => router.push("/forms/prescription")}
               className="text-blue-600 text-sm font-medium hover:underline mt-1 inline-block"
@@ -108,9 +108,9 @@ export default function Prescriptions() {
         ) : (
           <div className="space-y-3">
             {prescriptions.map((rx) => (
-              <div key={rx.id} className="border border-gray-100 rounded-xl overflow-hidden">
+              <div key={rx.id} className="border border-border rounded-xl overflow-hidden">
                 <div
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent"
                   onClick={() => setExpanded(expanded === rx.id ? null : rx.id)}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -118,10 +118,10 @@ export default function Prescriptions() {
                       <LucideFileText size={16} />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-gray-800 text-sm truncate">
+                      <p className="font-semibold text-foreground text-sm truncate">
                         {rx.patient_name || "Unknown patient"}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {rx.diagnosis || "No diagnosis"} · {rx.drugs?.length ?? 0} drug(s) ·{" "}
                         {new Date(rx.created_at).toLocaleDateString("en-KE")}
                       </p>
@@ -131,72 +131,72 @@ export default function Prescriptions() {
                     <button
                       onClick={(e) => handleDelete(rx.id, e)}
                       disabled={deletingId === rx.id}
-                      className="p-1.5 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-50 rounded-lg hover:bg-red-50"
+                      className="p-1.5 text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50 rounded-lg hover:bg-red-50"
                       title="Delete prescription"
                     >
                       <LucideTrash2 size={14} />
                     </button>
                     {expanded === rx.id ? (
-                      <LucideChevronUp size={16} className="text-gray-400" />
+                      <LucideChevronUp size={16} className="text-muted-foreground" />
                     ) : (
-                      <LucideChevronDown size={16} className="text-gray-400" />
+                      <LucideChevronDown size={16} className="text-muted-foreground" />
                     )}
                   </div>
                 </div>
 
                 {expanded === rx.id && (
-                  <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-4">
+                  <div className="border-t border-border bg-muted/40 px-4 py-4 space-y-4">
                     <div className="flex flex-wrap gap-4">
                       {rx.patient_name && (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <LucideUser size={12} className="text-gray-400" />
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <LucideUser size={12} className="text-muted-foreground" />
                           {rx.patient_name}
                         </div>
                       )}
                       {rx.patient_email && (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <LucideMail size={12} className="text-gray-400" />
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <LucideMail size={12} className="text-muted-foreground" />
                           {rx.patient_email}
                         </div>
                       )}
                     </div>
 
                     {rx.diagnosis && (
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                      <div className="bg-card rounded-lg p-3 border border-border">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
                           Diagnosis / Indication
                         </p>
-                        <p className="text-sm text-gray-800">{rx.diagnosis}</p>
+                        <p className="text-sm text-foreground">{rx.diagnosis}</p>
                       </div>
                     )}
 
                     {rx.drugs?.length > 0 ? (
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                           Medications ({rx.drugs.length})
                         </p>
                         {rx.drugs.map((drug, i) => (
-                          <div key={drug.id ?? i} className="bg-white rounded-lg p-3 border border-gray-100 flex gap-3">
+                          <div key={drug.id ?? i} className="bg-card rounded-lg p-3 border border-border flex gap-3">
                             <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                               <LucidePill size={13} />
                             </div>
                             <div className="space-y-0.5">
-                              <p className="font-semibold text-sm text-gray-800">{drug.drug_name}</p>
+                              <p className="font-semibold text-sm text-foreground">{drug.drug_name}</p>
                               {drug.dosage && (
-                                <p className="text-xs text-gray-500">Dosage: {drug.dosage}</p>
+                                <p className="text-xs text-muted-foreground">Dosage: {drug.dosage}</p>
                               )}
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-muted-foreground">
                                 {drug.frequency} · {drug.duration}
                               </p>
                               {drug.instructions && (
-                                <p className="text-xs text-gray-400 italic">{drug.instructions}</p>
+                                <p className="text-xs text-muted-foreground italic">{drug.instructions}</p>
                               )}
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-400 italic">
+                      <p className="text-xs text-muted-foreground italic">
                         No medications recorded — this record can be safely deleted.
                       </p>
                     )}

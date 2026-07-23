@@ -276,21 +276,21 @@ function renderPrescription(val: { diagnosis?: string; drugs?: unknown[]; notes?
   return (
     <div className="flex flex-col gap-2 mt-1">
       {val.diagnosis && (
-        <p className="text-xs text-gray-600"><span className="text-gray-400">Diagnosis: </span>{val.diagnosis}</p>
+        <p className="text-xs text-muted-foreground"><span className="text-muted-foreground/70">Diagnosis: </span>{val.diagnosis}</p>
       )}
       {drugs.length > 0 && (
         <div className="flex flex-col gap-1.5">
           {drugs.map((d, i) => (
-            <div key={i} className="bg-white border border-gray-100 rounded-lg px-3 py-2">
-              <p className="text-xs font-semibold text-gray-800">{d.drug_name || "—"}</p>
-              <p className="text-xs text-gray-500">{[d.frequency, d.duration].filter(Boolean).join(" · ")}</p>
-              {d.instructions && <p className="text-xs text-gray-400 italic">{d.instructions}</p>}
+            <div key={i} className="bg-card border border-border rounded-lg px-3 py-2">
+              <p className="text-xs font-semibold text-foreground">{d.drug_name || "—"}</p>
+              <p className="text-xs text-muted-foreground">{[d.frequency, d.duration].filter(Boolean).join(" · ")}</p>
+              {d.instructions && <p className="text-xs text-muted-foreground/70 italic">{d.instructions}</p>}
             </div>
           ))}
         </div>
       )}
       {val.notes && (
-        <p className="text-xs text-gray-600"><span className="text-gray-400">Notes: </span>{val.notes}</p>
+        <p className="text-xs text-muted-foreground"><span className="text-muted-foreground/70">Notes: </span>{val.notes}</p>
       )}
     </div>
   );
@@ -377,8 +377,8 @@ export default function AppointmentDetailPage() {
   if (loading) {
     return (
       <div className="p-6 space-y-4 animate-pulse max-w-3xl mx-auto">
-        <div className="h-8 bg-gray-200 rounded w-1/3" />
-        <div className="h-40 bg-gray-200 rounded" />
+        <div className="h-8 bg-muted rounded w-1/3" />
+        <div className="h-40 bg-muted rounded" />
       </div>
     );
   }
@@ -386,7 +386,7 @@ export default function AppointmentDetailPage() {
   if (!appointment) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
-        <p className="text-gray-500">Appointment not found.</p>
+        <p className="text-muted-foreground">Appointment not found.</p>
         <button onClick={() => router.push("/appointments")} className="mt-4 text-blue-600 text-sm hover:underline">← Back to appointments</button>
       </div>
     );
@@ -419,19 +419,19 @@ export default function AppointmentDetailPage() {
 
   return (
     <div className="p-4 space-y-4 max-w-3xl mx-auto">
-      <button onClick={() => router.push("/appointments")} className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+      <button onClick={() => router.push("/appointments")} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
         ← Back to appointments
       </button>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div className="bg-card rounded-xl shadow-sm border border-border p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xl font-bold shrink-0">
               {appointment.patient_first_name?.[0]}{appointment.patient_last_name?.[0]}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">{appointment.patient_first_name} {appointment.patient_last_name}</h1>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${STATUS_STYLES[appointment.status] ?? "bg-gray-100 text-gray-600"}`}>
+              <h1 className="text-xl font-bold text-foreground">{appointment.patient_first_name} {appointment.patient_last_name}</h1>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${STATUS_STYLES[appointment.status] ?? "bg-muted text-muted-foreground"}`}>
                 {appointment.status}
               </span>
               {patientInsurances.length > 0 && (
@@ -463,7 +463,7 @@ export default function AppointmentDetailPage() {
                 <select
                   value={selectedFormId}
                   onChange={(e) => setSelectedFormId(e.target.value)}
-                  className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer"
+                  className="appearance-none pl-3 pr-8 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer"
                 >
                   {forms.length === 0
                     ? <option value="">No forms available</option>
@@ -474,7 +474,7 @@ export default function AppointmentDetailPage() {
                       ))
                   }
                 </select>
-                <LucideChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <LucideChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               </div>
               <button
                 onClick={handleStartCapture}
@@ -498,16 +498,16 @@ export default function AppointmentDetailPage() {
         </div>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab("details")}
-          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === "details" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === "details" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         >
           Details
         </button>
         <button
           onClick={() => setActiveTab("records")}
-          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === "records" ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === "records" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         >
           Patient Records
         </button>
@@ -515,26 +515,26 @@ export default function AppointmentDetailPage() {
 
       {activeTab === "details" && (
         <>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-700">Appointment Details</h2>
+          <div className="bg-card rounded-xl shadow-sm border border-border p-5 space-y-4">
+            <h2 className="font-semibold text-foreground">Appointment Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex items-start gap-3">
                 <LucideCalendarCheck size={16} className="text-blue-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Date</p>
-                  <p className="text-sm text-gray-700 font-medium">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Date</p>
+                  <p className="text-sm text-foreground font-medium">
                     {startTime.toLocaleDateString("en-KE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                   </p>
                   {isToday && <span className="text-xs text-green-600 font-medium">Today</span>}
                   {isFuture && !isToday && <span className="text-xs text-blue-500 font-medium">Upcoming</span>}
-                  {isPast && !isToday && <span className="text-xs text-gray-400 font-medium">Past</span>}
+                  {isPast && !isToday && <span className="text-xs text-muted-foreground font-medium">Past</span>}
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <LucideCalendarCheck size={16} className="text-blue-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Time</p>
-                  <p className="text-sm text-gray-700 font-medium">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Time</p>
+                  <p className="text-sm text-foreground font-medium">
                     {startTime.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
                     {" – "}
                     {endTime.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
@@ -547,23 +547,23 @@ export default function AppointmentDetailPage() {
                   : <LucideMapPin size={16} className="text-green-500 mt-0.5 shrink-0" />
                 }
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Type</p>
-                  <p className="text-sm text-gray-700 font-medium capitalize">{appointment.appointment_type}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Type</p>
+                  <p className="text-sm text-foreground font-medium capitalize">{appointment.appointment_type}</p>
                 </div>
               </div>
               {appointment.appointment_type === "virtual" && appointment.meet_id && (
                 <div className="flex items-start gap-3">
-                  <LucideVideo size={16} className={canJoinCall ? "text-indigo-500 mt-0.5 shrink-0" : "text-gray-300 mt-0.5 shrink-0"} />
+                  <LucideVideo size={16} className={canJoinCall ? "text-indigo-500 mt-0.5 shrink-0" : "text-muted-foreground/40 mt-0.5 shrink-0"} />
                   <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Call</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Call</p>
                     {canJoinCall ? (
                       <button onClick={handleJoinCall} className="text-sm text-blue-600 hover:underline font-medium">Join video call →</button>
                     ) : callHasEnded ? (
-                      <p className="text-sm text-gray-400 font-medium">Call has ended</p>
+                      <p className="text-sm text-muted-foreground font-medium">Call has ended</p>
                     ) : callNotYetOpen ? (
-                      <p className="text-sm text-gray-400 font-medium">Available 30 min before start</p>
+                      <p className="text-sm text-muted-foreground font-medium">Available 30 min before start</p>
                     ) : (
-                      <p className="text-sm text-gray-400 font-medium">Call unavailable</p>
+                      <p className="text-sm text-muted-foreground font-medium">Call unavailable</p>
                     )}
                   </div>
                 </div>
@@ -572,8 +572,8 @@ export default function AppointmentDetailPage() {
           </div>
 
           {!isTerminal && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <h2 className="font-semibold text-gray-700 mb-3">Update Status</h2>
+            <div className="bg-card rounded-xl shadow-sm border border-border p-5">
+              <h2 className="font-semibold text-foreground mb-3">Update Status</h2>
               <div className="flex flex-wrap gap-2">
                 {STATUS_OPTIONS.filter((s) => s.value !== appointment.status && s.value !== "scheduled" && s.value !== "confirmed").map((s) => (
                   <button
@@ -586,7 +586,7 @@ export default function AppointmentDetailPage() {
                       : s.value === "rescheduled" ? "border-purple-200 text-purple-700 hover:bg-purple-50"
                       : s.value === "cancelled" ? "border-red-200 text-red-600 hover:bg-red-50"
                       : s.value === "in-progress" ? "border-blue-200 text-blue-700 hover:bg-blue-50"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      : "border-border text-muted-foreground hover:bg-accent"
                     }`}
                   >
                     {updatingStatus ? "Updating…" : s.label}
@@ -596,18 +596,18 @@ export default function AppointmentDetailPage() {
             </div>
           )}
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-700">Patient Contact</h2>
+          <div className="bg-card rounded-xl shadow-sm border border-border p-5 space-y-3">
+            <h2 className="font-semibold text-foreground">Patient Contact</h2>
             {appointment.patient_email && (
               <div className="flex items-center gap-3">
-                <LucideMail size={15} className="text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-700">{appointment.patient_email}</span>
+                <LucideMail size={15} className="text-muted-foreground shrink-0" />
+                <span className="text-sm text-foreground">{appointment.patient_email}</span>
               </div>
             )}
             {appointment.patient_phone_number && (
               <div className="flex items-center gap-3">
-                <LucidePhone size={15} className="text-gray-400 shrink-0" />
-                <span className="text-sm text-gray-700">{appointment.patient_phone_number}</span>
+                <LucidePhone size={15} className="text-muted-foreground shrink-0" />
+                <span className="text-sm text-foreground">{appointment.patient_phone_number}</span>
               </div>
             )}
           </div>
@@ -637,16 +637,16 @@ function PastCaptures({ appointmentId, userId, router }: { appointmentId: string
   if (captures.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 space-y-3">
-      <h2 className="font-semibold text-gray-700">Captures for this appointment</h2>
+    <div className="bg-card rounded-xl shadow-sm border border-border p-5 space-y-3">
+      <h2 className="font-semibold text-foreground">Captures for this appointment</h2>
       <div className="space-y-2">
         {captures.map((c) => (
-          <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+          <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border">
             <div className="flex items-center gap-3">
               <LucideFileText size={15} className="text-blue-400 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-gray-700">{c.form_name}</p>
-                <p className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString("en-KE")}</p>
+                <p className="text-sm font-medium text-foreground">{c.form_name}</p>
+                <p className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString("en-KE")}</p>
               </div>
             </div>
             <button onClick={() => router.push(`/appointments/${appointmentId}/capture/${c.id}`)} className="text-xs text-blue-600 hover:underline">View →</button>
@@ -661,15 +661,15 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <button onClick={() => setExpanded((e) => !e)} className="w-full text-left px-4 py-3 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <button onClick={() => setExpanded((e) => !e)} className="w-full text-left px-4 py-3 flex items-start justify-between gap-3 hover:bg-accent transition-colors">
         <div className="flex gap-3 items-start flex-1 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
             <LucideStethoscope size={14} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-800">{record.service_name ?? "Consultation"}</p>
+              <p className="text-sm font-semibold text-foreground">{record.service_name ?? "Consultation"}</p>
               <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium capitalize">{record.appointment_type}</span>
               {record.has_clinical_notes && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
@@ -677,20 +677,20 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {new Date(record.date).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
               {" · "}
-              <span className={`font-medium ${record.status === "completed" ? "text-gray-500" : record.status === "in-progress" ? "text-blue-600" : "text-gray-400"}`}>
+              <span className={`font-medium ${record.status === "completed" ? "text-muted-foreground" : record.status === "in-progress" ? "text-blue-600" : "text-muted-foreground"}`}>
                 {record.status}
               </span>
             </p>
           </div>
         </div>
-        {record.has_clinical_notes && (expanded ? <LucideChevronUp size={15} className="text-gray-400 shrink-0 mt-1" /> : <LucideChevronDown size={15} className="text-gray-400 shrink-0 mt-1" />)}
+        {record.has_clinical_notes && (expanded ? <LucideChevronUp size={15} className="text-muted-foreground shrink-0 mt-1" /> : <LucideChevronDown size={15} className="text-muted-foreground shrink-0 mt-1" />)}
       </button>
 
       {expanded && record.captures && record.captures.length > 0 && (
-        <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 space-y-5">
+        <div className="border-t border-border px-4 py-4 bg-muted/40 space-y-5">
           {record.captures.map((cap, i) => {
             const smuggled = cap.values?.[SNAPSHOT_KEY];
             const snapshot = (Array.isArray(smuggled) ? smuggled : null) ?? cap.form_snapshot ?? [];
@@ -701,7 +701,7 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
 
             return (
               <div key={i}>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                   {cap.form_name || "Clinical Notes"}
                 </p>
                 <div className="space-y-2">
@@ -710,15 +710,15 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
                     if (isPrescriptionValue(val)) {
                       return (
                         <div key={key} className="flex flex-col gap-1 text-sm">
-                          <span className="text-gray-400 capitalize font-medium">{label}</span>
+                          <span className="text-muted-foreground capitalize font-medium">{label}</span>
                           {renderPrescription(val)}
                         </div>
                       );
                     }
                     return (
                       <div key={key} className="flex gap-2 text-sm">
-                        <span className="text-gray-400 shrink-0 min-w-[140px] capitalize">{label}</span>
-                        <span className="text-gray-800 font-medium">{renderValue(val)}</span>
+                        <span className="text-muted-foreground shrink-0 min-w-[140px] capitalize">{label}</span>
+                        <span className="text-foreground font-medium">{renderValue(val)}</span>
                       </div>
                     );
                   })}
@@ -740,30 +740,30 @@ function OwnRecordCard({ record }: { record: OwnRecord }) {
 function GrantedRecordEntry({ record }: { record: GrantedRecord }) {
   if (record.record_type === "prescription") {
     return (
-      <div className="bg-white border border-gray-100 rounded-lg p-3">
+      <div className="bg-card border border-border rounded-lg p-3">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <p className="text-xs font-semibold text-gray-700">Prescription</p>
-          <span className="text-xs text-gray-400">
+          <p className="text-xs font-semibold text-foreground">Prescription</p>
+          <span className="text-xs text-muted-foreground">
             {new Date(record.date).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
           </span>
         </div>
-        <p className="text-xs text-gray-400 mb-2">{record.provider_name}</p>
+        <p className="text-xs text-muted-foreground mb-2">{record.provider_name}</p>
         {renderPrescription({ diagnosis: record.diagnosis, drugs: record.drugs, notes: record.notes })}
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg p-3">
+    <div className="bg-card border border-border rounded-lg p-3">
       <div className="flex items-center gap-2 flex-wrap mb-2">
-        <p className="text-xs font-semibold text-gray-700">{record.service_name ?? "Consultation"}</p>
+        <p className="text-xs font-semibold text-foreground">{record.service_name ?? "Consultation"}</p>
         {record.appointment_type && (
           <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium capitalize">
             {record.appointment_type}
           </span>
         )}
       </div>
-      <p className="text-xs text-gray-400 mb-2">
+      <p className="text-xs text-muted-foreground mb-2">
         {record.provider_name} · {new Date(record.date).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
       </p>
       {record.captures && record.captures.length > 0 ? (
@@ -777,22 +777,22 @@ function GrantedRecordEntry({ record }: { record: GrantedRecord }) {
             );
             return (
               <div key={i}>
-                <p className="text-xs font-medium text-gray-500 mb-1.5">{cap.form_name || "Clinical notes"}</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">{cap.form_name || "Clinical notes"}</p>
                 <div className="space-y-1.5">
                   {Object.entries(displayValues).map(([key, val]) => {
                     const label = labelMap[key] ?? key.replace(/_/g, " ");
                     if (isPrescriptionValue(val)) {
                       return (
                         <div key={key} className="flex flex-col gap-1 text-xs">
-                          <span className="text-gray-400 capitalize font-medium">{label}</span>
+                          <span className="text-muted-foreground capitalize font-medium">{label}</span>
                           {renderPrescription(val)}
                         </div>
                       );
                     }
                     return (
                       <div key={key} className="flex gap-2 text-xs">
-                        <span className="text-gray-400 shrink-0 min-w-[110px] capitalize">{label}</span>
-                        <span className="text-gray-700 font-medium">{renderValue(val)}</span>
+                        <span className="text-muted-foreground shrink-0 min-w-[110px] capitalize">{label}</span>
+                        <span className="text-foreground font-medium">{renderValue(val)}</span>
                       </div>
                     );
                   })}
@@ -802,7 +802,7 @@ function GrantedRecordEntry({ record }: { record: GrantedRecord }) {
           })}
         </div>
       ) : (
-        <p className="text-xs text-gray-300 italic">No clinical notes on this consultation.</p>
+        <p className="text-xs text-muted-foreground/60 italic">No clinical notes on this consultation.</p>
       )}
     </div>
   );
@@ -811,13 +811,13 @@ function GrantedRecordEntry({ record }: { record: GrantedRecord }) {
 function InsuranceCard({ ins }: { ins: Insurance }) {
   if (typeof ins === "string") {
     return (
-      <div className="bg-white rounded-lg border border-blue-100 px-3 py-2">
+      <div className="bg-card rounded-lg border border-blue-100 px-3 py-2">
         <p className="text-xs font-semibold text-gray-800">{ins}</p>
       </div>
     );
   }
   return (
-    <div className="bg-white rounded-lg border border-blue-100 px-3 py-2">
+    <div className="bg-card rounded-lg border border-blue-100 px-3 py-2">
       <p className="text-xs font-semibold text-gray-800">{ins.provider}</p>
       <div className="mt-1 space-y-0.5">
         {ins.policy_number && (
@@ -849,7 +849,7 @@ function VitalsCard({ patientIdentityId }: { patientIdentityId: string }) {
 
   if (loadingVitals) {
     return (
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex justify-center py-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4 flex justify-center py-6">
         <LucideLoader2 size={18} className="animate-spin text-blue-400" />
       </div>
     );
@@ -858,22 +858,22 @@ function VitalsCard({ patientIdentityId }: { patientIdentityId: string }) {
   if (vitals.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Recent Vitals</p>
+    <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Recent Vitals</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {vitals.map((v) => {
           const Icon = VITAL_ICONS[v.key] ?? LucideActivity;
           return (
-            <div key={v.key} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <div key={v.key} className="rounded-lg border border-border bg-muted/40 p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Icon size={13} className="text-blue-500 shrink-0" />
-                <p className="text-xs text-gray-400">{v.label}</p>
+                <p className="text-xs text-muted-foreground">{v.label}</p>
               </div>
-              <p className="text-base font-bold text-gray-800">
+              <p className="text-base font-bold text-foreground">
                 {v.value}
-                {v.unit && <span className="text-xs font-normal text-gray-400 ml-1">{v.unit}</span>}
+                {v.unit && <span className="text-xs font-normal text-muted-foreground ml-1">{v.unit}</span>}
               </p>
-              <p className="text-[11px] text-gray-400 mt-0.5">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 {timeAgo(v.recorded_at)}
                 {v.provider_name && <span> · {v.provider_name}</span>}
               </p>
@@ -997,9 +997,9 @@ function PatientRecordPanel({
 
   if (!summary) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-        <LucideHistory size={28} className="text-gray-300 mx-auto mb-2" />
-        <p className="text-sm text-gray-400">No patient identity linked to this appointment.</p>
+      <div className="bg-card rounded-xl shadow-sm border border-border p-8 text-center">
+        <LucideHistory size={28} className="text-muted-foreground/40 mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground">No patient identity linked to this appointment.</p>
       </div>
     );
   }
@@ -1017,15 +1017,15 @@ function PatientRecordPanel({
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div className="bg-card rounded-xl shadow-sm border border-border p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-bold shrink-0">
               {patient.first_name[0]}{patient.last_name[0]}
             </div>
             <div>
-              <p className="font-bold text-gray-800 text-base">{patient.first_name} {patient.last_name}</p>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="font-bold text-foreground text-base">{patient.first_name} {patient.last_name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {patient.uid && <span>ID · {patient.uid}</span>}
                 {dobFormatted && <span> · DOB: {dobFormatted}</span>}
                 {patient.gender && patient.gender !== "UNKNOWN" && (
@@ -1050,15 +1050,15 @@ function PatientRecordPanel({
           { label: "Active meds", value: stats.active_medications },
           { label: "Prior facilities", value: stats.prior_facilities },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 text-center">
-            <p className="text-lg font-bold text-gray-800">{stat.value}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{stat.label}</p>
+          <div key={stat.label} className="bg-card rounded-xl border border-border shadow-sm p-3 text-center">
+            <p className="text-lg font-bold text-foreground">{stat.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Always visible</p>
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Always visible</p>
         <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-100">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
@@ -1115,21 +1115,21 @@ function PatientRecordPanel({
 
       <VitalsCard patientIdentityId={patient.identity_id} />
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Your records for this patient</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Your records for this patient</p>
           <span className="text-xs px-2 py-0.5 rounded-full border border-blue-200 text-blue-700 font-medium">No consent needed</span>
         </div>
         {loadingOwn
           ? <div className="flex justify-center py-4"><LucideLoader2 size={18} className="animate-spin text-blue-400" /></div>
           : ownRecords.length === 0
-          ? <p className="text-xs text-gray-400 py-2">No previous consultations on record for this patient.</p>
+          ? <p className="text-xs text-muted-foreground py-2">No previous consultations on record for this patient.</p>
           : (
             <>
               <div className="overflow-y-auto max-h-[1056px] min-h-[300px] space-y-2 pr-1">
                 {ownRecords.map((rec) => <OwnRecordCard key={rec.id} record={rec} />)}
               </div>
-              {ownRecords.length > 4 && <p className="text-xs text-gray-400 text-center mt-2">Scroll to see all {ownRecords.length} records</p>}
+              {ownRecords.length > 4 && <p className="text-xs text-muted-foreground text-center mt-2">Scroll to see all {ownRecords.length} records</p>}
             </>
           )
         }
@@ -1141,8 +1141,8 @@ function PatientRecordPanel({
           here, so hide them entirely rather than show a stale, no-longer-
           actionable "Approved" state. */}
       {!consultationOver && record_categories.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Record categories — consent required</p>
+        <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Record categories — consent required</p>
           <div className="space-y-2">
             {record_categories.map((cat) => {
               const isExpanded = expandedCategory === cat.speciality;
@@ -1151,15 +1151,15 @@ function PatientRecordPanel({
               const records = categoryRecords[cat.speciality] ?? [];
 
               return (
-                <div key={cat.speciality + cat.facility_name} className="rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
+                <div key={cat.speciality + cat.facility_name} className="rounded-lg bg-muted/40 border border-border overflow-hidden">
                   <div className="flex items-center justify-between gap-3 p-3">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                         <LucideFileText size={14} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800">{cat.speciality}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-sm font-semibold text-foreground">{cat.speciality}</p>
+                        <p className="text-xs text-muted-foreground">
                           {[cat.facility_name, cat.record_count > 0 ? `${cat.record_count} records` : null, cat.last_record_at ? timeAgo(cat.last_record_at) : null].filter(Boolean).join(" · ")}
                         </p>
                       </div>
@@ -1170,7 +1170,7 @@ function PatientRecordPanel({
                         onClick={() => handleToggleCategory(cat)}
                         className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium shrink-0 border transition-colors ${
                           isExpired
-                            ? "text-gray-500 bg-gray-100 border-gray-200 hover:bg-gray-200"
+                            ? "text-muted-foreground bg-muted border-border hover:bg-accent"
                             : "text-green-700 bg-green-50 border-green-200 hover:bg-green-100"
                         }`}
                       >
@@ -1186,7 +1186,7 @@ function PatientRecordPanel({
                       <button
                         onClick={() => handleRequest(cat.speciality)}
                         disabled={requesting === cat.speciality}
-                        className="flex items-center gap-1.5 text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 shrink-0 font-medium"
+                        className="flex items-center gap-1.5 text-xs border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-accent transition-colors disabled:opacity-50 shrink-0 font-medium"
                       >
                         <LucideLock size={11} />
                         {requesting === cat.speciality ? "Sending…" : "Request"}
@@ -1195,14 +1195,14 @@ function PatientRecordPanel({
                   </div>
 
                   {isExpanded && cat.access_status === "approved" && (
-                    <div className="border-t border-gray-100 bg-white px-3 py-3 space-y-2">
+                    <div className="border-t border-border bg-card px-3 py-3 space-y-2">
                       {panelStatus === "loading" && (
                         <div className="flex justify-center py-3">
                           <LucideLoader2 size={16} className="animate-spin text-blue-400" />
                         </div>
                       )}
                       {panelStatus === "expired" && (
-                        <p className="text-xs text-gray-400 flex items-center gap-1.5 py-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5 py-1">
                           <LucideLock size={12} /> Access window for this consultation has closed.
                         </p>
                       )}
@@ -1210,7 +1210,7 @@ function PatientRecordPanel({
                         <p className="text-xs text-red-500 py-1">{categoryErrorMsg[cat.speciality] ?? "Could not load records."}</p>
                       )}
                       {panelStatus === "loaded" && records.length === 0 && (
-                        <p className="text-xs text-gray-400 py-1">No records found for this category.</p>
+                        <p className="text-xs text-muted-foreground py-1">No records found for this category.</p>
                       )}
                       {panelStatus === "loaded" && records.length > 0 && (
                         <div className="space-y-2">
@@ -1227,17 +1227,17 @@ function PatientRecordPanel({
       )}
 
       {!consultationOver && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Access granted this consultation</p>
+        <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Access granted this consultation</p>
           {access_granted.length === 0
-            ? <p className="text-xs text-gray-400 flex items-center gap-1.5"><LucideLock size={12} /> No records shared yet.</p>
+            ? <p className="text-xs text-muted-foreground flex items-center gap-1.5"><LucideLock size={12} /> No records shared yet.</p>
             : (
               <div className="space-y-2">
                 {access_granted.map((g) => (
-                  <div key={g.id} className="flex items-center gap-2 text-sm text-gray-700">
+                  <div key={g.id} className="flex items-center gap-2 text-sm text-foreground">
                     <LucideShieldCheck size={14} className="text-green-500 shrink-0" />
                     <span className="font-medium">{g.requested_category}</span>
-                    <span className="text-xs text-gray-400">— access approved</span>
+                    <span className="text-xs text-muted-foreground">— access approved</span>
                   </div>
                 ))}
               </div>

@@ -16,7 +16,7 @@ jobs:
     runs-on: self-hosted
     environment: development
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to develop
         run: |
           docker-build veridoctor-web dev ./apps/web/Dockerfile /home/veridoctor/veridoctor/env/.client-dev.env.sh -y
@@ -26,7 +26,7 @@ jobs:
     runs-on: self-hosted
     environment: uat
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to uat
         run: |
           docker-build veridoctor-web uat ./apps/web/Dockerfile -y
@@ -36,7 +36,7 @@ jobs:
     runs-on: self-hosted
     environment: production
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to production
         run: |
           docker-build veridoctor-web prod ./apps/web/Dockerfile -y
@@ -47,7 +47,7 @@ jobs:
     runs-on: self-hosted
     environment: development
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to develop
         run: |
           docker-build providerapp dev ./apps/provider/Dockerfile -y
@@ -57,7 +57,7 @@ jobs:
     runs-on: self-hosted
     environment: uat
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to uat
         run: |
           docker-build providerapp uat ./apps/provider/Dockerfile -y
@@ -67,7 +67,7 @@ jobs:
     runs-on: self-hosted
     environment: production
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to production
         run: |
           docker-build providerapp prod ./apps/provider/Dockerfile -y
@@ -78,7 +78,7 @@ jobs:
     runs-on: self-hosted
     environment: development
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to develop
         run: |
           docker-build facilityapp dev ./apps/facility/Dockerfile -y
@@ -88,7 +88,7 @@ jobs:
     runs-on: self-hosted
     environment: uat
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to uat
         run: |
           docker-build facilityapp uat ./apps/facility/Dockerfile -y
@@ -98,7 +98,7 @@ jobs:
     runs-on: self-hosted
     environment: production
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to production
         run: |
           docker-build facilityapp prod ./apps/facility/Dockerfile /home/veridoctor/veridoctor/env/.client-dev.env.sh -y
@@ -109,7 +109,7 @@ jobs:
     runs-on: self-hosted
     environment: development
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to develop
         run: |
           docker-build healthportal dev ./apps/health-portal/Dockerfile -y
@@ -119,7 +119,7 @@ jobs:
     runs-on: self-hosted
     environment: uat
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to uat
         run: |
           docker-build healthportal uat ./apps/health-portal/Dockerfile -y
@@ -129,7 +129,7 @@ jobs:
     runs-on: self-hosted
     environment: production
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Build and deploy to production
         run: |
           docker-build healthportal prod ./apps/health-portal/Dockerfile -y

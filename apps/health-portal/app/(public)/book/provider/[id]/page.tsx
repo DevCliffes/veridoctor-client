@@ -10,6 +10,15 @@ interface Service {
   description?: string;
 }
 
+interface ProviderLocation {
+  id: string;
+  name: string;
+  address: string;
+  county: string;
+  country: string;
+  is_primary: boolean;
+}
+
 interface ProviderProfile {
   id: string;
   first_name: string;
@@ -17,10 +26,7 @@ interface ProviderProfile {
   title: string;
   speciality: string;
   subspecialties: string[];
-  clinic_name: string;
-  address: string;
-  county: string;
-  country: string;
+  locations: ProviderLocation[];
   bio: string;
   languages: string[];
   insurances_accepted: string[];
@@ -46,6 +52,20 @@ const apiUrl =
   process.env.NEXT_PUBLIC_API_URL || "https://veridoctor-backend-1.onrender.com";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://app.veridoctor.com";
 
+// A provider can now have several approved locations. Metadata/JSON-LD
+// only ever describe one "primary" place of practice — this picks the
+// one flagged is_primary, falling back to the first approved location
+// for a provider who hasn't designated one (shouldn't normally happen,
+// since the first location added is auto-primary on the backend, but
+// this keeps generateMetadata/JSON-LD from breaking if that invariant
+// is ever violated).
+function getPrimaryLocation(
+  locations: ProviderLocation[] | undefined
+): ProviderLocation | null {
+  if (!locations || locations.length === 0) return null;
+  return locations.find((l) => l.is_primary) ?? locations[0];
+}
+
 async function getProvider(id: string): Promise<ProviderProfile | null> {
   try {
     const res = await fetch(`${apiUrl}/provider/${id}/public-profile`, {
@@ -58,6 +78,7 @@ async function getProvider(id: string): Promise<ProviderProfile | null> {
     return {
       ...data,
       subspecialties: data.subspecialties ?? [],
+      locations: data.locations ?? [],
     };
   } catch {
     return null;
@@ -94,9 +115,10 @@ export async function generateMetadata({
   }
 
   const fullName = `${provider.title} ${provider.first_name} ${provider.last_name}`.trim();
-  const locationPart = [provider.clinic_name, provider.county]
-    .filter(Boolean)
-    .join(", ");
+  const primaryLocation = getPrimaryLocation(provider.locations);
+  const locationPart = primaryLocation
+    ? [primaryLocation.name, primaryLocation.county].filter(Boolean).join(", ")
+    : "";
   const description =
     (provider.bio && provider.bio.slice(0, 155)) ||
     `Book an appointment with ${fullName}, ${provider.speciality || "healthcare provider"}${
@@ -139,17 +161,19 @@ export default async function ProviderProfilePage({
     getReviews(id),
   ]);
 
+  const primaryLocation = provider ? getPrimaryLocation(provider.locations) : null;
+
   const jsonLd = provider
     ? {
         "@context": "https://schema.org",
         "@type": "Physician",
         name: `${provider.title} ${provider.first_name} ${provider.last_name}`.trim(),
         medicalSpecialty: provider.speciality || undefined,
-        ...(provider.clinic_name || provider.county || provider.country
+        ...(primaryLocation
           ? {
               address: {
                 "@type": "PostalAddress",
-                addressLocality: provider.county || undefined,
+                addressLocality: primaryLocation.county || undefined,
                 addressCountry: "KE",
               },
             }

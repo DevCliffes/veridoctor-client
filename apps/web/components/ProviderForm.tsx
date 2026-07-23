@@ -34,7 +34,12 @@ type ProviderForm = {
   subSpeciality: { value: string; valid: boolean };
   acceptedTC: boolean;
 };
-export default function ProviderForm() {
+
+// FIX: previously received no way to authenticate this pre-session POST --
+// auth_tkn now comes down from RegisterAccount (which reads it out of the
+// URL) so it can be sent as a query param on account creation, matching
+// what IdentityAccountsView._identity_authorised() requires.
+export default function ProviderForm({ authTkn }: { authTkn: string }) {
   const router = useRouter();
   const pathParams: { userId: string } = useParams();
   const [form, setForm] = useState<ProviderForm>({
@@ -68,7 +73,11 @@ export default function ProviderForm() {
       sub_speciality: form.subSpeciality.value,
     };
     axiosClient
-      .post(`identity/${pathParams.userId}/accounts`, { ...payload, account_type: "healthcare_provider" })
+      .post(
+        `identity/${pathParams.userId}/accounts`,
+        { ...payload, account_type: "healthcare_provider" },
+        { params: { auth_tkn: authTkn } },
+      )
       .then((res) => {
         if (res.status === 201) {
           toast.success("Healthcare provider account created successfully");

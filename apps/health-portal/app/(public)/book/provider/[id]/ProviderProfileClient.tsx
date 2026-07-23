@@ -11,6 +11,7 @@ import {
   LucideStethoscope,
   LucideStar,
   LucideMessageSquare,
+  LucideBuilding2,
 } from "@veridoctor/design/icons";
 
 interface Service {
@@ -22,6 +23,15 @@ interface Service {
   description?: string;
 }
 
+interface ProviderLocation {
+  id: string;
+  name: string;
+  address: string;
+  county: string;
+  country: string;
+  is_primary: boolean;
+}
+
 interface ProviderProfile {
   id: string;
   first_name: string;
@@ -29,10 +39,7 @@ interface ProviderProfile {
   title: string;
   speciality: string;
   subspecialties: string[];
-  clinic_name: string;
-  address: string;
-  county: string;
-  country: string;
+  locations: ProviderLocation[];
   bio: string;
   languages: string[];
   insurances_accepted: string[];
@@ -64,6 +71,15 @@ function formatReviewDate(iso: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+// Picks which location to show in the compact header line. Falls back to
+// the first location for a provider who somehow has none flagged primary
+// (shouldn't happen — the backend auto-primaries the first location a
+// provider adds — but this keeps the header from just being blank).
+function getPrimaryLocation(locations: ProviderLocation[]): ProviderLocation | null {
+  if (locations.length === 0) return null;
+  return locations.find((l) => l.is_primary) ?? locations[0];
 }
 
 /** Renders 5 stars, filled up to `rating` (rounded to nearest whole star
@@ -119,6 +135,8 @@ export default function ProviderProfileClient({
     (provider.first_name[0] ?? "") + (provider.last_name[0] ?? "");
 
   const hasReviews = reviewsData.review_count > 0 && reviewsData.average_rating !== null;
+  const primaryLocation = getPrimaryLocation(provider.locations);
+  const hasMultipleLocations = provider.locations.length > 1;
 
   return (
     <div className="space-y-4 max-w-3xl mx-auto p-4">
@@ -186,12 +204,17 @@ export default function ProviderProfileClient({
                 ))}
               </div>
             )}
-            {(provider.clinic_name || provider.county) && (
+            {primaryLocation && (
               <p className="text-sm text-gray-500 mt-2 flex items-center justify-center gap-1.5">
                 <LucideMapPin size={14} className="text-gray-400" />
-                {[provider.clinic_name, provider.county, provider.country]
+                {[primaryLocation.name, primaryLocation.county, primaryLocation.country]
                   .filter(Boolean)
                   .join(", ")}
+                {hasMultipleLocations && (
+                  <span className="text-xs text-blue-600 font-medium">
+                    +{provider.locations.length - 1} more
+                  </span>
+                )}
               </p>
             )}
           </div>
@@ -214,6 +237,44 @@ export default function ProviderProfileClient({
           <p className="text-sm text-gray-600 whitespace-pre-wrap">
             {capitalizeFirst(provider.bio)}
           </p>
+        </div>
+      )}
+
+      {/* Full location list — only broken out as its own card once there's
+          more than one, so a single-location provider's page still reads
+          exactly like it did before (header line is enough). Facility
+          *selection* for booking happens on the booking page itself; this
+          is purely informational, so patients can see where a provider
+          practices before deciding to book. */}
+      {hasMultipleLocations && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h2 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <LucideBuilding2 size={16} className="text-blue-500" />
+            Practice Locations
+          </h2>
+          <div className="space-y-2">
+            {provider.locations.map((loc) => (
+              <div
+                key={loc.id}
+                className="flex items-start gap-2.5 p-3 rounded-lg bg-gray-50 border border-gray-100"
+              >
+                <LucideMapPin size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-gray-700">
+                    {loc.name}
+                    {loc.is_primary && (
+                      <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">
+                        Main
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {[loc.address, loc.county, loc.country].filter(Boolean).join(", ")}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

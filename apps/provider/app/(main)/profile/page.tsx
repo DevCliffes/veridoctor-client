@@ -191,10 +191,10 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
       <div className="flex items-center gap-2 mb-5">
         <div className="text-blue-600">{icon}</div>
-        <h2 className="font-semibold text-gray-800">{title}</h2>
+        <h2 className="font-semibold text-foreground">{title}</h2>
       </div>
       {children}
     </div>
@@ -204,13 +204,13 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-400 uppercase tracking-wide font-medium">{label}</label>
+      <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{label}</label>
       {children}
     </div>
   );
 }
 
-const inputClass = "border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-gray-50 w-full";
+const inputClass = "border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 bg-muted/40 text-foreground w-full";
 const selectClass = inputClass;
 
 // ─────────────────────────────────────────────────────────────────
@@ -406,14 +406,14 @@ function PhotoCropModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div>
-            <h2 className="font-semibold text-gray-800">Position your photo</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Drag to reposition · Scroll or use buttons to zoom</p>
+            <h2 className="font-semibold text-foreground">Position your photo</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Drag to reposition · Scroll or use buttons to zoom</p>
           </div>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onCancel} className="text-muted-foreground hover:text-foreground">
             <LucideX size={18} />
           </button>
         </div>
@@ -466,9 +466,9 @@ function PhotoCropModal({
           <div className="flex items-center gap-3">
             <button
               onClick={() => zoom(-0.1)}
-              className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-100 transition-colors"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
             >
-              <LucideZoomOut size={16} className="text-gray-600" />
+              <LucideZoomOut size={16} className="text-muted-foreground" />
             </button>
             <input
               type="range"
@@ -491,18 +491,18 @@ function PhotoCropModal({
             />
             <button
               onClick={() => zoom(0.1)}
-              className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-100 transition-colors"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center hover:bg-accent transition-colors"
             >
-              <LucideZoomIn size={16} className="text-gray-600" />
+              <LucideZoomIn size={16} className="text-muted-foreground" />
             </button>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="px-5 py-4 border-t flex gap-3">
+        <div className="px-5 py-4 border-t border-border flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200"
+            className="flex-1 py-2.5 text-sm text-muted-foreground hover:bg-accent rounded-xl border border-border"
           >
             Cancel
           </button>
@@ -550,27 +550,27 @@ function DocumentImageUpload({
     // scroll straight to this exact upload control -- see the hash-scroll
     // effect in ProfilePage below.
     <div id={fieldName} className="flex flex-col gap-1 rounded-xl scroll-mt-6 transition-shadow duration-300">
-      <label className="text-xs text-gray-400 uppercase tracking-wide font-medium">{label}</label>
+      <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{label}</label>
       <div
-        className="border border-dashed border-gray-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-blue-300 transition-colors bg-gray-50"
+        className="border border-dashed border-border rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-blue-300 transition-colors bg-muted/40"
         onClick={() => fileRef.current?.click()}
       >
         {currentUrl ? (
-          <img src={currentUrl} className="w-12 h-12 object-cover rounded-lg shrink-0 border border-gray-100" alt={label} />
+          <img src={currentUrl} className="w-12 h-12 object-cover rounded-lg shrink-0 border border-border" alt={label} />
         ) : (
-          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-            <LucideFileText size={16} className="text-gray-400" />
+          <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center shrink-0">
+            <LucideFileText size={16} className="text-muted-foreground" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-600 font-medium truncate">
+          <p className="text-sm text-muted-foreground font-medium truncate">
             {uploading ? "Uploading…" : currentUrl ? "Change document" : "Upload document"}
           </p>
-          <p className="text-xs text-gray-400">JPG, PNG or PDF · Max 5MB</p>
+          <p className="text-xs text-muted-foreground/70">JPG, PNG or PDF · Max 5MB</p>
         </div>
         {uploading
           ? <LucideLoader2 size={16} className="animate-spin text-blue-500 shrink-0" />
-          : <LucideUpload size={14} className="text-gray-400 shrink-0" />
+          : <LucideUpload size={14} className="text-muted-foreground shrink-0" />
         }
       </div>
       <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={handleChange} />
@@ -609,20 +609,20 @@ function LogoUpload({ currentUrl, identityId, onUploaded, review }: {
     <div id="clinic_logo_url" className="flex flex-col items-center gap-1 rounded-xl scroll-mt-6 transition-shadow duration-300">
       <div className="relative shrink-0">
         <div
-          className="w-16 h-16 rounded-xl border-2 border-gray-200 bg-gray-100 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-300 transition-colors"
+          className="w-16 h-16 rounded-xl border-2 border-border bg-muted flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-300 transition-colors"
           onClick={() => fileRef.current?.click()}
         >
           {uploading
             ? <LucideLoader2 size={18} className="animate-spin text-blue-500" />
             : currentUrl
             ? <img src={currentUrl} className="w-full h-full object-cover" alt="Clinic logo" />
-            : <LucideBuilding size={22} className="text-gray-400" />
+            : <LucideBuilding size={22} className="text-muted-foreground" />
           }
         </div>
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="absolute -bottom-1 -right-1 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow text-blue-600 hover:bg-blue-50"
+          className="absolute -bottom-1 -right-1 w-6 h-6 bg-card border border-border rounded-full flex items-center justify-center shadow text-blue-600 hover:bg-blue-50"
         >
           <LucideCamera size={12} />
         </button>
@@ -659,32 +659,32 @@ function ExtraCredentialCard({ credential, identityId, onChange, onRemove }: {
   };
 
   return (
-    <div className="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50">
+    <div className="border border-border rounded-xl p-4 space-y-3 bg-muted/40">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Additional Credential</p>
-        <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Additional Credential</p>
+        <button onClick={onRemove} className="text-muted-foreground hover:text-red-500 transition-colors">
           <LucideTrash2 size={14} />
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-400 uppercase tracking-wide">Credential Name</label>
+          <label className="text-xs text-muted-foreground uppercase tracking-wide">Credential Name</label>
           <input value={credential.name} onChange={(e) => onChange({ ...credential, name: e.target.value })} placeholder="e.g. KMPDB Registration" className={inputClass} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-gray-400 uppercase tracking-wide">Number / Reference</label>
+          <label className="text-xs text-muted-foreground uppercase tracking-wide">Number / Reference</label>
           <input value={credential.number} onChange={(e) => onChange({ ...credential, number: e.target.value })} placeholder="e.g. KMPDB/12345" className={inputClass} />
         </div>
       </div>
       <div
-        className="border border-dashed border-gray-200 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-blue-300 transition-colors"
+        className="border border-dashed border-border rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:border-blue-300 transition-colors"
         onClick={() => fileRef.current?.click()}
       >
         {credential.image_url
           ? <img src={credential.image_url} className="w-10 h-10 object-cover rounded-lg shrink-0" alt="Credential" />
-          : <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0"><LucideFileText size={14} className="text-gray-400" /></div>
+          : <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center shrink-0"><LucideFileText size={14} className="text-muted-foreground" /></div>
         }
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           {uploading ? "Uploading…" : credential.image_url ? "Change image" : "Upload credential image"}
         </p>
         {uploading && <LucideLoader2 size={14} className="animate-spin text-blue-500 ml-auto" />}
@@ -1069,7 +1069,7 @@ export default function ProfilePage() {
               ))}
             </div>
           )}
-          <p className="text-xs text-gray-400 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             Add specific areas of focus within your speciality — these appear on your public profile so patients can find you more easily.
           </p>
         </div>
@@ -1110,7 +1110,7 @@ export default function ProfilePage() {
 
       {/* Practice & Location */}
       <Section title="Practice & Location" icon={<LucideMapPin size={18} />}>
-        <div className="flex items-center gap-4 mb-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+        <div className="flex items-center gap-4 mb-4 p-4 bg-muted/40 rounded-xl border border-border">
           <LogoUpload
             currentUrl={profile.clinic_logo_url}
             identityId={identityId}
@@ -1118,9 +1118,9 @@ export default function ProfilePage() {
             review={documentReviews["clinic_logo_url"]}
           />
           <div className="flex-1">
-            <label className="text-xs text-gray-400 uppercase tracking-wide font-medium block mb-1">Clinic / Hospital Name</label>
+            <label className="text-xs text-muted-foreground uppercase tracking-wide font-medium block mb-1">Clinic / Hospital Name</label>
             <input value={profile.clinic_name} onChange={(e) => set("clinic_name", e.target.value)} className={inputClass} placeholder="e.g. Nairobi Women's Hospital" />
-            <p className="text-xs text-gray-400 mt-1">Click the logo to upload clinic logo</p>
+            <p className="text-xs text-muted-foreground mt-1">Click the logo to upload clinic logo</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -1138,7 +1138,7 @@ export default function ProfilePage() {
           </Field>
         </div>
         <div className="mt-5 space-y-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Facility Documents</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Facility Documents</p>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Business Registration Number">
               <input value={profile.business_reg_number} onChange={(e) => set("business_reg_number", e.target.value)} className={inputClass} placeholder="e.g. BN/2024/12345" />
@@ -1247,7 +1247,7 @@ export default function ProfilePage() {
             <button
               key={ins}
               onClick={() => toggleInsurance(ins)}
-              className={"text-xs px-3 py-1.5 rounded-full border font-medium transition-colors " + (profile.insurances_accepted.includes(ins) ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-600")}
+              className={"text-xs px-3 py-1.5 rounded-full border font-medium transition-colors " + (profile.insurances_accepted.includes(ins) ? "bg-blue-600 text-white border-blue-600" : "border-border text-muted-foreground hover:border-blue-300 hover:text-blue-600")}
             >
               {ins}
             </button>

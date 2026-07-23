@@ -40,7 +40,7 @@ function Row({ appt }: { appt: Appointment }) {
 
   const borderClass = isNext
     ? "border-blue-200 bg-blue-50"
-    : "border-gray-100 bg-gray-50";
+    : "border-border bg-muted/40";
   const typeClass =
     appt.appointment_type === "virtual"
       ? "bg-indigo-100 text-indigo-700"
@@ -63,10 +63,10 @@ function Row({ appt }: { appt: Appointment }) {
         {getInitials(appt.patient_first_name, appt.patient_last_name)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-800 truncate">
+        <p className="text-sm font-medium text-foreground truncate">
           {appt.patient_first_name} {appt.patient_last_name}
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           {formatTime(appt.start_time)} – {formatTime(appt.end_time)}
         </p>
       </div>
@@ -93,13 +93,11 @@ export function TodaySchedule({ identityId }: TodayScheduleProps) {
     if (!identityId) return;
     axiosClient
       .get(`/provider/${identityId}/appointments?filter=today`)
-      .then((res) => setAppointments(res.data ?? []))
+      .then((res) => setAppointments(res.data?.results ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [identityId]);
 
-  // Only show appointments that are still ongoing or upcoming — hide
-  // anything whose end_time has already passed.
   const now = Date.now();
   const visibleAppointments = appointments.filter(
     (appt) => new Date(appt.end_time).getTime() >= now
@@ -107,11 +105,11 @@ export function TodaySchedule({ identityId }: TodayScheduleProps) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-        <h2 className="font-semibold text-gray-700 mb-3">Today's Schedule</h2>
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4 mb-6">
+        <h2 className="font-semibold text-foreground mb-3">Today's Schedule</h2>
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />
+            <div key={i} className="h-14 bg-muted rounded-lg animate-pulse" />
           ))}
         </div>
       </div>
@@ -119,21 +117,18 @@ export function TodaySchedule({ identityId }: TodayScheduleProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-      <h2 className="font-semibold text-gray-700 mb-3">
+    <div className="bg-card rounded-xl shadow-sm border border-border p-4 mb-6">
+      <h2 className="font-semibold text-foreground mb-3">
         Today's Schedule{" "}
-        <span className="text-gray-400 font-normal text-sm">
+        <span className="text-muted-foreground font-normal text-sm">
           ({visibleAppointments.length})
         </span>
       </h2>
       {visibleAppointments.length === 0 ? (
-        <p className="text-gray-400 text-sm text-center py-6">
+        <p className="text-muted-foreground text-sm text-center py-6">
           No more appointments scheduled for today.
         </p>
       ) : (
-        // max-h-[26rem] replaces the old inline maxHeight: "420px" —
-        // 26rem scales with root font size / browser zoom exactly like
-        // every other spacing value in this file.
         <div className="space-y-2 overflow-y-auto pr-1 max-h-[26rem]">
           {visibleAppointments.map((appt) => (
             <Row key={appt.id} appt={appt} />

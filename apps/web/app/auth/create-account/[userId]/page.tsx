@@ -53,6 +53,11 @@ const accounts: {
 export default function RegisterAccount() {
   const [selectedAccount, setSelectedAccount] = useState<AccountType>();
   const [additionalInfoStep, setAdditionalInfoStep] = useState(false);
+  // FIX: auth_tkn was never read out of the URL here, so it silently
+  // never reached createPatientAccount() or ProviderForm/FacilityForm --
+  // every account-creation POST from this page went out with no
+  // credential and 403'd against IdentityAccountsView's ownership check.
+  const [authTkn, setAuthTkn] = useState("");
   const router = useRouter();
   const pathParams: { userId: string } = useParams();
   const searchParams = useSearchParams();
@@ -61,8 +66,10 @@ export default function RegisterAccount() {
   useEffect(() => {
     const step = searchParams.get("step");
     const selectedAccount = searchParams.get("account");
+    const auth_tkn = searchParams.get("auth_tkn");
     // ensure type of selected account from params and step are of AccountType
     if (selectedAccount) setSelectedAccount(selectedAccount as AccountType);
+    if (auth_tkn) setAuthTkn(auth_tkn);
     if (step !== null && step === "additional-info") {
       setAdditionalInfoStep(true);
     }
@@ -84,7 +91,11 @@ export default function RegisterAccount() {
    */
   const createPatientAccount = () => {
     axiosClient
-      .post(`identity/${pathParams.userId}/accounts`, { account_type: "patient" })
+      .post(
+        `identity/${pathParams.userId}/accounts`,
+        { account_type: "patient" },
+        { params: { auth_tkn: authTkn } },
+      )
       .then((res) => {
         if (res.status === 201) {
           toast.success("Patient account created successfully");
@@ -137,8 +148,12 @@ export default function RegisterAccount() {
         <div className="w-full flex flex-col items-center justify-center min-h-[70vh] my-8">
           {additionalInfoStep ? (
             <>
-              {selectedAccount === "healthProvider" && <ProviderForm />}
-              {selectedAccount === "healthFacility" && <FacilityForm />}
+              {selectedAccount === "healthProvider" && (
+                <ProviderForm authTkn={authTkn} />
+              )}
+              {selectedAccount === "healthFacility" && (
+                <FacilityForm authTkn={authTkn} />
+              )}
             </>
           ) : (
             <>

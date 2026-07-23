@@ -12,7 +12,7 @@
   },
   "keywords": [],
   "devDependencies": {
-    "@types/node": "^22.15.3",
+    "@types/node": "^26.1.1",
     "@types/react": "19.1.0",
     "@types/react-dom": "19.1.1",
     "@veridoctor/eslint-config": "workspace:*",

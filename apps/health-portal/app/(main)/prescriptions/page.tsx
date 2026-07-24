@@ -70,75 +70,75 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden hover:border-blue-100 transition-colors">
+    <div className="border border-border rounded-xl overflow-hidden hover:border-primary/30 transition-colors">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-gray-50 transition-colors"
+        className="w-full flex items-start justify-between gap-3 p-4 text-left hover:bg-muted/40 transition-colors"
       >
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
             <LucideFileText size={18} />
           </div>
           <div>
-            <p className="font-semibold text-gray-800 text-sm">
+            <p className="font-semibold text-foreground text-sm">
               {prescription.diagnosis || "No diagnosis"}
             </p>
             {prescription.provider && (
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Dr. {prescription.provider.first_name}{" "}
                 {prescription.provider.last_name}
                 {prescription.provider.speciality &&
                   " · " + prescription.provider.speciality}
               </p>
             )}
-            <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
+            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
               <LucideCalendar size={11} />
               <span>{formatDate(prescription.created_at)}</span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+          <span className="text-xs bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded-full font-medium">
             {prescription.drugs.length}{" "}
             {prescription.drugs.length === 1 ? "drug" : "drugs"}
           </span>
           {expanded ? (
-            <LucideChevronUp size={16} className="text-gray-400" />
+            <LucideChevronUp size={16} className="text-muted-foreground" />
           ) : (
-            <LucideChevronDown size={16} className="text-gray-400" />
+            <LucideChevronDown size={16} className="text-muted-foreground" />
           )}
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50 space-y-3">
+        <div className="border-t border-border px-4 pb-4 pt-3 bg-muted/30 space-y-3">
 
           {/* Medications */}
           {prescription.drugs.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Medications
               </p>
               {prescription.drugs.map((drug, i) => (
                 <div
                   key={drug.id ?? i}
-                  className="flex items-start gap-3 bg-white rounded-lg p-3 border border-gray-100"
+                  className="flex items-start gap-3 bg-card rounded-lg p-3 border border-border"
                 >
-                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
                     <LucidePill size={14} />
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-sm font-semibold text-gray-800">
+                    <p className="text-sm font-semibold text-foreground">
                       {drug.drug_name}
                     </p>
                     {drug.dosage && (
-                      <p className="text-xs text-gray-500">Dosage: {drug.dosage}</p>
+                      <p className="text-xs text-muted-foreground">Dosage: {drug.dosage}</p>
                     )}
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {drug.frequency} · {drug.duration}
                     </p>
                     {drug.instructions && (
-                      <p className="text-xs text-gray-400 italic">
+                      <p className="text-xs text-muted-foreground/80 italic">
                         {drug.instructions}
                       </p>
                     )}
@@ -147,16 +147,16 @@ function PrescriptionCard({ prescription }: { prescription: Prescription }) {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-400 italic">No medications recorded.</p>
+            <p className="text-xs text-muted-foreground italic">No medications recorded.</p>
           )}
 
           {/* Doctor's notes */}
           {prescription.notes && (
-            <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-3">
-              <p className="text-xs font-medium text-yellow-700 mb-1">
+            <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-100 dark:border-yellow-900 rounded-lg p-3">
+              <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400 mb-1">
                 Doctor&apos;s Notes
               </p>
-              <p className="text-xs text-yellow-800">{prescription.notes}</p>
+              <p className="text-xs text-yellow-800 dark:text-yellow-300">{prescription.notes}</p>
             </div>
           )}
         </div>
@@ -200,23 +200,23 @@ export default function Prescriptions() {
         />
       )}
 
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <h1 className="text-xl font-bold text-gray-800">My Prescriptions</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+      <div className="bg-card rounded-xl p-5 shadow-sm border border-border">
+        <h1 className="text-xl font-bold text-foreground">My Prescriptions</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
           View prescriptions issued by your doctors
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <LucideLoader2 size={24} className="animate-spin text-blue-500" />
+            <LucideLoader2 size={24} className="animate-spin text-primary" />
           </div>
         ) : prescriptions.length === 0 ? (
           <div className="text-center py-12">
-            <LucideFileText size={36} className="mx-auto text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No prescriptions yet</p>
-            <p className="text-gray-400 text-sm mt-1">
+            <LucideFileText size={36} className="mx-auto text-muted-foreground/50 mb-3" />
+            <p className="text-foreground font-medium">No prescriptions yet</p>
+            <p className="text-muted-foreground text-sm mt-1">
               Prescriptions issued by your doctor will appear here.
             </p>
           </div>
@@ -234,4 +234,3 @@ export default function Prescriptions() {
     </div>
   );
 }
-

@@ -177,7 +177,7 @@ function StarRow({ rating, size = 13 }: { rating: number; size?: number }) {
           className={
             i <= Math.round(rating)
               ? "fill-amber-400 text-amber-400"
-              : "fill-gray-200 text-gray-200"
+              : "fill-gray-200 text-gray-200 dark:fill-gray-700 dark:text-gray-700"
           }
         />
       ))}
@@ -207,7 +207,7 @@ function ProviderAvatarLarge({ provider }: { provider: Provider }) {
   }
 
   return (
-    <div className="w-16 h-16 flex items-center justify-center bg-blue-600 text-white font-bold text-lg">
+    <div className="w-16 h-16 flex items-center justify-center bg-primary text-primary-foreground font-bold text-lg">
       {initials.toUpperCase()}
     </div>
   );
@@ -225,12 +225,12 @@ function ProviderAvatar({ provider }: { provider: Provider }) {
         alt={`${title} ${provider.first_name} ${provider.last_name}`}
         width={48}
         height={48}
-        className="w-12 h-12 rounded-full object-cover shrink-0 border border-gray-100"
+        className="w-12 h-12 rounded-full object-cover shrink-0 border border-border"
       />
     );
   }
   return (
-    <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold shrink-0 text-base">
+    <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 flex items-center justify-center font-bold shrink-0 text-base">
       {initials.toUpperCase()}
     </div>
   );
@@ -262,17 +262,17 @@ function SlotColumn({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="border border-gray-100 rounded-lg p-2 text-center bg-gray-50">
-        <p className="text-xs font-semibold text-gray-700 leading-tight">
+      <div className="border border-border rounded-lg p-2 text-center bg-muted/40">
+        <p className="text-xs font-semibold text-foreground leading-tight">
           {dateLabel(day)}
         </p>
         {loading ? (
           <LucideLoader2
             size={12}
-            className="animate-spin text-gray-300 mx-auto mt-1"
+            className="animate-spin text-muted-foreground mx-auto mt-1"
           />
         ) : (
-          <p className="text-[10px] text-gray-400 mt-0.5">
+          <p className="text-[10px] text-muted-foreground mt-0.5">
             {slots.length === 0
               ? "No slots"
               : slots.length + " slot" + (slots.length !== 1 ? "s" : "")}
@@ -290,9 +290,9 @@ function SlotColumn({
         <button
           onClick={() => setOffset(Math.max(0, offset - 1))}
           disabled={!canUp}
-          className="flex items-center justify-center py-0.5 rounded border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 transition-opacity"
+          className="flex items-center justify-center py-0.5 rounded border border-border bg-card hover:bg-muted disabled:opacity-40 transition-opacity"
         >
-          <LucideChevronUp size={14} className="text-gray-700" />
+          <LucideChevronUp size={14} className="text-foreground" />
         </button>
       )}
 
@@ -302,7 +302,7 @@ function SlotColumn({
             <button
               key={slot.start_time}
               onClick={() => onBook(slot)}
-              className="text-xs py-2 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 border border-blue-100 transition-colors w-full"
+              className="text-xs py-2 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 font-medium hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-100 dark:border-blue-900 transition-colors w-full"
             >
               {formatTime(slot.start_time)}
             </button>
@@ -314,15 +314,15 @@ function SlotColumn({
         <button
           onClick={() => setOffset(Math.min(slots.length - SLOTS_PER_PAGE, offset + 1))}
           disabled={!canDown}
-          className="flex items-center justify-center py-0.5 rounded hover:bg-gray-100 disabled:opacity-20 transition-opacity"
+          className="flex items-center justify-center py-0.5 rounded border border-border bg-card hover:bg-muted disabled:opacity-40 transition-opacity"
         >
-          <LucideChevronDown size={14} className="text-gray-500" />
+          <LucideChevronDown size={14} className="text-foreground" />
         </button>
       )}
 
       {!loading && slots.length === 0 && (
         <div
-          className="flex items-center justify-center text-[10px] text-gray-300"
+          className="flex items-center justify-center text-[10px] text-muted-foreground"
           style={{ minHeight: `${SLOTS_PER_PAGE * 38}px` }}
         >
           —
@@ -478,19 +478,19 @@ function ProviderCard({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
       {/* ── IDENTITY STRIP (horizontal, full width) ── */}
-      <div className="flex items-start gap-4 p-5 border-b border-gray-100">
-        <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 bg-blue-50">
+      <div className="flex items-start gap-4 p-5 border-b border-border">
+        <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 bg-blue-50 dark:bg-blue-950">
           <ProviderAvatarLarge provider={provider} />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <h3 className="font-bold text-gray-900 text-base leading-tight">
+            <h3 className="font-bold text-foreground text-base leading-tight">
               {provider.title || "Dr."} {provider.first_name} {provider.last_name}
             </h3>
-            <span className="text-sm text-blue-600 font-medium">
+            <span className="text-sm text-primary font-medium">
               {provider.speciality || "General Practitioner"}
             </span>
           </div>
@@ -500,10 +500,10 @@ function ProviderCard({
             {typeof provider.average_rating === "number" && (provider.review_count ?? 0) > 0 && (
               <div className="flex items-center gap-1">
                 <StarRow rating={provider.average_rating} size={12} />
-                <span className="text-xs font-semibold text-gray-700">
+                <span className="text-xs font-semibold text-foreground">
                   {provider.average_rating.toFixed(1)}
                 </span>
-                <span className="text-[11px] text-gray-400">
+                <span className="text-[11px] text-muted-foreground">
                   ({provider.review_count})
                 </span>
               </div>
@@ -511,9 +511,9 @@ function ProviderCard({
             {provider.subspecialties && provider.subspecialties.length > 0 && (
               <>
                 {typeof provider.average_rating === "number" && (provider.review_count ?? 0) > 0 && (
-                  <span className="text-gray-300">·</span>
+                  <span className="text-border">·</span>
                 )}
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">
                   {provider.subspecialties.join(" · ")}
                 </span>
               </>
@@ -522,24 +522,24 @@ function ProviderCard({
 
           <div className="flex items-center gap-3 flex-wrap mt-2">
             {locationLabel && (
-              <span className="flex items-center gap-1 text-xs text-gray-400">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <LucideMapPin size={12} className="shrink-0" />
                 {locationLabel}
                 {(provider.locations?.length ?? 0) > 1 && (
-                  <span className="text-blue-600 font-medium">
+                  <span className="text-primary font-medium">
                     +{(provider.locations!.length - 1)} more
                   </span>
                 )}
               </span>
             )}
             {languageSummary && (
-              <span className="flex items-center gap-1 text-xs text-gray-400">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <LucideLanguages size={12} className="shrink-0" />
                 {languageSummary}
               </span>
             )}
             {insuranceSummary && (
-              <span className="flex items-center gap-1 text-xs text-gray-400">
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <LucideShieldCheck size={12} className="shrink-0" />
                 {insuranceSummary}
               </span>
@@ -550,9 +550,9 @@ function ProviderCard({
         <div className="text-right shrink-0">
           {selectedService && (
             <>
-              <p className="text-[11px] text-gray-400">{selectedService.name}</p>
+              <p className="text-[11px] text-muted-foreground">{selectedService.name}</p>
               {selectedService.price != null && (
-                <p className="text-lg font-bold text-gray-900 mt-0.5">
+                <p className="text-lg font-bold text-foreground mt-0.5">
                   {selectedService.currency}{" "}
                   {Number(selectedService.price).toLocaleString()}
                 </p>
@@ -561,7 +561,7 @@ function ProviderCard({
           )}
           <button
             onClick={() => router.push("/book/provider/" + provider.id)}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium mt-1.5 ml-auto"
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium mt-1.5 ml-auto"
           >
             Full profile <LucideChevronRightCircle size={13} />
           </button>
@@ -569,7 +569,7 @@ function ProviderCard({
       </div>
 
       {/* ── CONTROLS ROW (services + appointment type, full width) ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap p-4 border-b border-gray-100">
+      <div className="flex items-center justify-between gap-3 flex-wrap p-4 border-b border-border">
         {provider.services.length > 0 && (
           <div className="flex gap-2 flex-wrap">
             {provider.services.map((s) => (
@@ -579,8 +579,8 @@ function ProviderCard({
                 className={
                   "text-xs px-3 py-1.5 rounded-lg border transition-colors " +
                   (selectedServiceId === s.id
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "border-gray-200 text-gray-600 hover:border-gray-300")
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:border-primary/40")
                 }
               >
                 {s.name} · {s.estimated_duration} mins
@@ -595,8 +595,8 @@ function ProviderCard({
             className={
               "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors " +
               (selectedApptType === "virtual"
-                ? "bg-indigo-50 border-indigo-300 text-indigo-700 font-medium"
-                : "border-gray-200 text-gray-600")
+                ? "bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 font-medium"
+                : "border-border text-muted-foreground")
             }
           >
             <LucideVideo size={13} /> Virtual
@@ -610,8 +610,8 @@ function ProviderCard({
               className={
                 "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors " +
                 (selectedApptType === "physical"
-                  ? "bg-green-50 border-green-300 text-green-700 font-medium"
-                  : "border-gray-200 text-gray-600")
+                  ? "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-800 text-green-700 dark:text-green-400 font-medium"
+                  : "border-border text-muted-foreground")
               }
             >
               <LucideMapPin size={13} /> In-person
@@ -627,7 +627,7 @@ function ProviderCard({
             <select
               value={selectedLocationId ?? ""}
               onChange={(e) => setSelectedLocationId(e.target.value || null)}
-              className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white focus:outline-none focus:border-blue-400"
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-border text-foreground bg-card focus:outline-none focus:border-primary"
             >
               {provider.locations!.map((loc) => (
                 <option key={loc.id} value={loc.id}>
@@ -642,14 +642,14 @@ function ProviderCard({
       {/* ── AVAILABILITY (full width) ── */}
       <div className="p-5">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">
             Availability
           </p>
           <div className="flex gap-1">
             <button
               onClick={() => setDayOffset(Math.max(0, dayOffset - 3))}
               disabled={dayOffset === 0}
-              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+              className="p-1 rounded hover:bg-muted disabled:opacity-30"
             >
               <LucideChevronLeft size={14} />
             </button>
@@ -658,7 +658,7 @@ function ProviderCard({
                 setDayOffset(Math.min(days.length - 3, dayOffset + 3))
               }
               disabled={dayOffset + 3 >= days.length}
-              className="p-1 rounded hover:bg-gray-100 disabled:opacity-30"
+              className="p-1 rounded hover:bg-muted disabled:opacity-30"
             >
               <LucideChevronRight size={14} />
             </button>
@@ -678,7 +678,7 @@ function ProviderCard({
         </div>
 
         {allVisibleDaysLoaded && !anyVisibleDayHasSlots && (
-          <p className="text-xs text-gray-400 text-center mt-3">
+          <p className="text-xs text-muted-foreground text-center mt-3">
             No bookable times in this range for{" "}
             {selectedService?.name ?? "this service"} ·{" "}
             {selectedApptType === "virtual" ? "Virtual" : "In-person"}
@@ -775,33 +775,33 @@ function BookingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <LucideCalendarCheck size={18} className="text-blue-600" />
-            <h2 className="font-semibold text-gray-800">Confirm booking</h2>
+            <LucideCalendarCheck size={18} className="text-primary" />
+            <h2 className="font-semibold text-foreground">Confirm booking</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <LucideX size={18} />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          <div className="bg-blue-50 rounded-xl p-4 flex items-center gap-3">
+          <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-4 flex items-center gap-3">
             <ProviderAvatar provider={booking.provider} />
             <div>
-              <p className="font-semibold text-gray-800">
+              <p className="font-semibold text-foreground">
                 {booking.provider.title || "Dr."} {booking.provider.first_name} {booking.provider.last_name}
               </p>
-              <p className="text-sm text-blue-600 mt-0.5">
+              <p className="text-sm text-primary mt-0.5">
                 {booking.provider.speciality}
               </p>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 {dateLabel(booking.date)} · {formatTime(booking.slot.start_time)}{" "}
                 – {formatTime(booking.slot.end_time)}
               </p>
               {booking.slot.service_name && (
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {booking.slot.service_name}
                 </p>
               )}
@@ -809,34 +809,34 @@ function BookingModal({
           </div>
 
           {(patientFirst || patientEmail) && (
-            <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+            <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
               Booking as:{" "}
-              <span className="font-medium text-gray-700">
+              <span className="font-medium text-foreground">
                 {[patientFirst, patientLast].filter(Boolean).join(" ") || patientEmail}
               </span>
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 w-fit">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 w-fit">
             {booking.appointmentType === "virtual" ? (
-              <LucideVideo size={13} className="text-indigo-500" />
+              <LucideVideo size={13} className="text-indigo-500 dark:text-indigo-400" />
             ) : (
-              <LucideMapPin size={13} className="text-green-500" />
+              <LucideMapPin size={13} className="text-green-500 dark:text-green-400" />
             )}
-            <span className="font-medium text-gray-700 capitalize">
+            <span className="font-medium text-foreground capitalize">
               {booking.appointmentType === "virtual" ? "Virtual" : "In-person"}
             </span>
             {/* NEW: shows which facility, when physical */}
             {booking.appointmentType === "physical" && booking.locationName && (
               <>
-                <span className="text-gray-300">·</span>
-                <span className="text-gray-600">{booking.locationName}</span>
+                <span className="text-border">·</span>
+                <span className="text-muted-foreground">{booking.locationName}</span>
               </>
             )}
           </div>
 
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
               Message (optional)
             </p>
             <textarea
@@ -844,28 +844,28 @@ function BookingModal({
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Describe your symptoms or reason for visit..."
               rows={3}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-400 bg-gray-50"
+              className="w-full border border-border rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-primary bg-muted/30"
             />
           </div>
 
           {error && (
-            <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">
+            <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
         </div>
 
-        <div className="px-5 py-3 border-t flex gap-2">
+        <div className="px-5 py-3 border-t border-border flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+            className="flex-1 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="flex-1 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+            className="flex-1 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 font-medium"
           >
             {saving ? "Booking..." : "Confirm"}
           </button>
@@ -969,22 +969,22 @@ export default function BookPage() {
         />
       )}
 
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <h1 className="text-xl font-bold text-gray-800">Find a Doctor</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+      <div className="bg-card rounded-xl p-5 shadow-sm border border-border">
+        <h1 className="text-xl font-bold text-foreground">Find a Doctor</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
           Search and book appointments with our providers
         </p>
 
         <div className="mt-4 relative">
           <LucideSearch
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, speciality, clinic or insurance..."
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 bg-gray-50"
+            className="w-full pl-9 pr-4 py-2.5 border border-border rounded-xl text-sm focus:outline-none focus:border-primary bg-muted/30 text-foreground"
           />
         </div>
 
@@ -995,8 +995,8 @@ export default function BookPage() {
               className={
                 "text-xs px-3 py-1 rounded-full border transition-colors " +
                 (search === ""
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "border-gray-200 text-gray-500 hover:border-gray-300")
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40")
               }
             >
               All
@@ -1008,8 +1008,8 @@ export default function BookPage() {
                 className={
                   "text-xs px-3 py-1 rounded-full border transition-colors " +
                   (search === s
-                    ? "bg-blue-600 text-white border-blue-600"
-                    : "border-gray-200 text-gray-500 hover:border-gray-300")
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:border-primary/40")
                 }
               >
                 {s}
@@ -1021,10 +1021,10 @@ export default function BookPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <LucideLoader2 size={28} className="animate-spin text-blue-500" />
+          <LucideLoader2 size={28} className="animate-spin text-primary" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-muted-foreground">
           No providers found matching your search.
         </div>
       ) : (

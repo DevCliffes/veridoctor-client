@@ -3,7 +3,6 @@ import "@veridoctor/design/styles/globals.css";
 import { Toaster } from "sonner";
 import Script from "next/script";
 import StoreProvider from "./StoreProvider";
-import { ThemeProvider } from "@veridoctor/design";
 
 export const metadata: Metadata = {
   title: {
@@ -34,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <StoreProvider>
         <body className="antialiased font-sans">
           {/* Google Analytics (GA4) — gtag.js loads after the page becomes
@@ -52,10 +51,8 @@ export default function RootLayout({
               gtag('config', 'G-KHXK82ZFFX');
             `}
           </Script>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <Toaster richColors position="top-center" />
-            {children}
-          </ThemeProvider>
+          <Toaster richColors position="top-center" />
+          {children}
         </body>
       </StoreProvider>
     </html>

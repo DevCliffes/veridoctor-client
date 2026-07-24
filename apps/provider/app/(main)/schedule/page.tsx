@@ -25,10 +25,23 @@ type LocationType = "virtual" | "physical" | "both";
 type RepeatType = "none" | "daily" | "weekly" | "weekdays" | "custom";
 type EndType = "never" | "on_date" | "after";
 
+// Minimal shape needed for the schedule picker -- ProviderLocationListView
+// actually returns the full ProviderLocationSerializer (document reviews,
+// business reg, etc.) but Schedule.tsx only ever needs enough to label a
+// dropdown option, so the rest is just ignored rather than typed out here.
+type ScheduleLocation = {
+  id: string;
+  name: string;
+  county: string;
+  is_primary: boolean;
+};
+
 type ScheduleBlock = {
   id: string;
   service: string | null;
   service_name: string | null;
+  location: string | null; // NEW
+  location_detail: { id: string; name: string; county: string } | null; // NEW
   location_type: LocationType;
   start_date: string;
   end_date: string;
@@ -40,7 +53,7 @@ type ScheduleBlock = {
   recurrence_end_type: EndType | null;
   recurrence_end_date: string | null;
   recurrence_count: number | null;
-  excluded_dates: string[]; // NEW
+  excluded_dates: string[];
 };
 
 type BookedAppointment = {
@@ -60,11 +73,17 @@ type BookedAppointment = {
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 
+// A schedule block only needs a location when it's physical/both --
+// virtual blocks are location-less by design, confirmed deliberately.
+function locationRequired(locationType: LocationType) {
+  return locationType === "physical" || locationType === "both";
+}
+
 function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-// NEW: local calendar date key, avoids UTC off-by-one when matching excluded_dates
+// local calendar date key, avoids UTC off-by-one when matching excluded_dates
 function dateKey(d: Date) {
   return (
     d.getFullYear() +
@@ -114,11 +133,11 @@ function computeSubmittedEndDate(params: {
   return startDate;
 }
 
-// NEW: extracts a human-readable message from a failed schedule API call.
+// extracts a human-readable message from a failed schedule API call.
 // Handles the 409 conflict shape returned by _check_schedule_overlap
-// ({ error: "..." }) and falls back to DRF's default serializer-error
-// shape ({ field: [messages] }) for 400s, plus a generic fallback for
-// anything else (network errors, 500s, etc).
+// ({ error: "..." }) and the 400 location-required shape returned by
+// ProviderScheduleSerializer.validate() ({ location: ["..."] }), falling
+// back to DRF's default serializer-error shape for anything else.
 function scheduleErrorMessage(err: unknown): string {
   const anyErr = err as { response?: { status?: number; data?: unknown } };
   const data = anyErr?.response?.data as
@@ -167,7 +186,7 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
 
   if (rangeStart > rangeEnd) return events;
 
-  const excluded = new Set(s.excluded_dates ?? []); // NEW
+  const excluded = new Set(s.excluded_dates ?? []);
 
   const cursor = new Date(rangeStart);
   while (cursor <= rangeEnd) {
@@ -185,10 +204,10 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
       include = s.recurrence_days?.includes(dow_abbr) ?? false;
     }
 
-    const key = dateKey(cursor); // NEW
+    const key = dateKey(cursor);
 
     if (include && excluded.has(key)) {
-      // NEW: this occurrence was deleted individually — render nothing for it
+      // this occurrence was deleted individually — render nothing for it
       include = false;
     }
 
@@ -201,11 +220,15 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
         id: "sched-" + s.id + "-" + key,
         start: evStart,
         end: evEnd,
-        patientName: s.service_name ?? "Available",
+        // NEW: surface which facility this block is at, right in the
+        // calendar label, for a provider with more than one location.
+        patientName:
+          (s.service_name ?? "Available") +
+          (s.location_detail ? " · " + s.location_detail.name : ""),
         meta: {
           scheduleId: s.id,
           type: "schedule",
-          occurrenceDate: key, // NEW: exact date this instance represents
+          occurrenceDate: key,
         },
       });
     }
@@ -216,21 +239,73 @@ function expandToCalendarEvents(s: ScheduleBlock): Appointment[] {
   return events;
 }
 
+// ── Location picker (shared between the create form and edit modal) ──────────
+
+function LocationPicker({
+  locationType,
+  locationId,
+  locations,
+  onChange,
+  disabled,
+}: {
+  locationType: LocationType;
+  locationId: string;
+  locations: ScheduleLocation[];
+  onChange: (id: string) => void;
+  disabled?: boolean;
+}) {
+  if (!locationRequired(locationType)) return null;
+
+  if (locations.length === 0) {
+    return (
+      <p className="text-xs text-red-600 pl-6">
+        You need at least one practice location before creating an in-person
+        or hybrid schedule block.{" "}
+        <Link href="/locations" className="underline">
+          Add a location →
+        </Link>
+      </p>
+    );
+  }
+
+  return (
+    <div className="pl-6">
+      <select
+        value={locationId}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-muted text-foreground disabled:opacity-50"
+      >
+        <option value="">Select a location</option>
+        {locations.map((loc) => (
+          <option key={loc.id} value={loc.id}>
+            {loc.name}
+            {loc.is_primary ? " (Main)" : ""}
+            {loc.county ? " — " + loc.county : ""}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 // ── Edit Modal ────────────────────────────────────────────────────────────────
 
 function EditScheduleModal({
   block,
-  occurrenceDate, // NEW
+  occurrenceDate,
   userId,
   services,
+  locations,
   onClose,
   onSaved,
   onDeleted,
 }: {
   block: ScheduleBlock;
-  occurrenceDate: string; // NEW
+  occurrenceDate: string;
   userId: string;
   services: Service[];
+  locations: ScheduleLocation[];
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
@@ -241,6 +316,7 @@ function EditScheduleModal({
   const [startTime, setStartTime] = useState(block.start_time.slice(0, 5));
   const [endTime, setEndTime] = useState(block.end_time.slice(0, 5));
   const [locationType, setLocationType] = useState<LocationType>(block.location_type);
+  const [locationId, setLocationId] = useState(block.location ?? ""); // NEW
   const [repeat, setRepeat] = useState<RepeatType>(block.recurrence);
   const [repeatDays, setRepeatDays] = useState<string[]>(block.recurrence_days ?? []);
   const [repeatInterval, setRepeatInterval] = useState(block.recurrence_interval ?? 1);
@@ -250,7 +326,7 @@ function EditScheduleModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // NEW: scope picker, only meaningful when the block actually recurs
+  // scope picker, only meaningful when the block actually recurs
   const isRecurring = block.recurrence !== "none";
   const [scope, setScope] = useState<"this" | "all">("this");
 
@@ -273,8 +349,22 @@ function EditScheduleModal({
     if (svc) setEndTime(computeEndTime(val, svc.estimated_duration));
   };
 
-  // NEW: branches on scope
+  // NEW: switching to virtual clears any selected location, so a stale
+  // pick from a previous physical/both selection never gets submitted.
+  const handleLocationTypeChange = (val: LocationType) => {
+    setLocationType(val);
+    if (val === "virtual") setLocationId("");
+  };
+
   const handleSave = async () => {
+    // NEW: block save client-side rather than round-tripping to the
+    // server just to get the same 400 back — same rule the backend
+    // enforces in ProviderScheduleSerializer.validate().
+    if (locationRequired(locationType) && !locationId) {
+      toast.error("Select a location for this in-person or hybrid block.");
+      return;
+    }
+
     setSaving(true);
     try {
       if (isRecurring && scope === "this") {
@@ -290,6 +380,7 @@ function EditScheduleModal({
         await axiosClient.post("provider/" + userId + "/schedule", {
           service: serviceId,
           location_type: locationType,
+          location: locationType === "virtual" ? null : locationId, // NEW
           start_date: occurrenceDate,
           end_date: occurrenceDate,
           start_time: startTime,
@@ -303,14 +394,12 @@ function EditScheduleModal({
         });
       } else {
         // Non-recurring block, or user explicitly chose "All events".
-        // FIX: end_date is now derived via computeSubmittedEndDate instead
-        // of sending the standalone `endDate` state unconditionally --
-        // see that function's comment for why the old behavior was wrong.
         await axiosClient.patch(
           "provider/" + userId + "/schedule/" + block.id,
           {
             service: serviceId,
             location_type: locationType,
+            location: locationType === "virtual" ? null : locationId, // NEW
             start_date: startDate,
             end_date: computeSubmittedEndDate({
               repeat,
@@ -338,7 +427,6 @@ function EditScheduleModal({
     }
   };
 
-  // NEW: branches on scope, matches the existing DELETE query param contract exactly
   const handleDelete = async () => {
     const confirmMsg =
       isRecurring && scope === "this"
@@ -396,7 +484,6 @@ function EditScheduleModal({
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-          {/* NEW: scope picker, shown only for recurring blocks */}
           {isRecurring && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
               <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">
@@ -435,7 +522,7 @@ function EditScheduleModal({
           <div className="flex items-start gap-2">
             <LucideClock size={16} className="text-muted-foreground mt-2 shrink-0" />
             <div className="flex flex-wrap items-center gap-2 flex-1">
-              {/* NEW: dates locked when editing a single occurrence — moving a date
+              {/* dates locked when editing a single occurrence — moving a date
                   is out of scope here; "This event" only edits time/service/location */}
               <input
                 type="date"
@@ -559,23 +646,32 @@ function EditScheduleModal({
 
           <div className="flex items-start gap-2">
             <LucideMapPin size={16} className="text-muted-foreground mt-2 shrink-0" />
-            <div className="flex gap-2 flex-wrap">
-              {locationOptions.map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setLocationType(opt.key)}
-                  className={
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors " +
-                    (locationType === opt.key
-                      ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
-                      : "bg-card border-border text-muted-foreground")
-                  }
-                >
-                  {opt.icon}
-                  {opt.label}
-                </button>
-              ))}
+            <div className="flex-1 space-y-2">
+              <div className="flex gap-2 flex-wrap">
+                {locationOptions.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => handleLocationTypeChange(opt.key)}
+                    className={
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors " +
+                      (locationType === opt.key
+                        ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
+                        : "bg-card border-border text-muted-foreground")
+                    }
+                  >
+                    {opt.icon}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {/* NEW: which facility, only for physical/both */}
+              <LocationPicker
+                locationType={locationType}
+                locationId={locationId}
+                locations={locations}
+                onChange={setLocationId}
+              />
             </div>
           </div>
         </div>
@@ -606,10 +702,11 @@ export default function Schedule() {
   const router = useRouter();
   const userId = useSelector((state: RootState) => state.auth.identity);
   const [services, setServices] = useState<Service[]>([]);
+  const [locations, setLocations] = useState<ScheduleLocation[]>([]); // NEW
   const [schedules, setSchedules] = useState<ScheduleBlock[]>([]);
   const [bookedAppts, setBookedAppts] = useState<BookedAppointment[]>([]);
   const [editingBlock, setEditingBlock] = useState<ScheduleBlock | null>(null);
-  const [editingOccurrenceDate, setEditingOccurrenceDate] = useState<string>(""); // NEW
+  const [editingOccurrenceDate, setEditingOccurrenceDate] = useState<string>("");
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [startDate, setStartDate] = useState(todayStr());
@@ -617,6 +714,7 @@ export default function Schedule() {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("09:45");
   const [locationType, setLocationType] = useState<LocationType>("virtual");
+  const [locationId, setLocationId] = useState(""); // NEW
   const [repeat, setRepeat] = useState<RepeatType>("none");
   const [repeatDays, setRepeatDays] = useState<string[]>([]);
   const [repeatInterval, setRepeatInterval] = useState(1);
@@ -632,14 +730,26 @@ export default function Schedule() {
       .catch(() => {});
   }, [userId]);
 
+  // NEW: locations for the picker. ProviderLocationListView returns the
+  // full ProviderLocationSerializer shape -- more than this page needs,
+  // but there's no lighter endpoint and a provider's location count is
+  // small, so no pagination/trimming concerns here.
+  const fetchLocations = useCallback(() => {
+    if (!userId) return;
+    axiosClient
+      .get("provider/" + userId + "/locations")
+      .then((res) => setLocations(res.data ?? []))
+      .catch(() => {});
+  }, [userId]);
+
   const fetchBookedAppts = useCallback(() => {
     if (!userId) return;
 
     // Match the same window the calendar actually renders (see
     // EXPAND_DAYS_BEFORE / EXPAND_DAYS_AFTER above), so this isn't pulling
     // the provider's entire appointment history just to draw ~67 days of
-    // calendar. Also unwraps the new paginated {count, results} shape
-    // from the backend.
+    // calendar. Also unwraps the paginated {count, results} shape from
+    // the backend.
     const start = new Date();
     start.setDate(start.getDate() - EXPAND_DAYS_BEFORE);
     const end = new Date();
@@ -664,8 +774,9 @@ export default function Schedule() {
       .then((res) => setServices(res.data ?? []))
       .catch(() => {});
     fetchSchedules();
+    fetchLocations();
     fetchBookedAppts();
-  }, [userId, fetchSchedules, fetchBookedAppts]);
+  }, [userId, fetchSchedules, fetchLocations, fetchBookedAppts]);
 
   const handleServiceChange = (id: string) => {
     setSelectedServiceId(id);
@@ -690,18 +801,30 @@ export default function Schedule() {
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
     );
 
+  // NEW: switching to virtual clears any selected location.
+  const handleLocationTypeChange = (val: LocationType) => {
+    setLocationType(val);
+    if (val === "virtual") setLocationId("");
+  };
+
   const weekdayLabel = DAY_FULL[new Date(startDate + "T00:00:00").getDay()];
 
   const handleSave = async () => {
     if (!selectedServiceId) return;
+
+    // NEW: same client-side guard as the edit modal -- catches the
+    // missing-location case before a round trip, matching the backend's
+    // ProviderScheduleSerializer.validate() rule.
+    if (locationRequired(locationType) && !locationId) {
+      toast.error("Select a location for this in-person or hybrid block.");
+      return;
+    }
+
     try {
-      // FIX: end_date now derived via computeSubmittedEndDate instead of
-      // sending the standalone `endDate` state unconditionally -- see
-      // that function's comment for why the old behavior silently
-      // truncated recurring schedules' real valid window.
       await axiosClient.post("provider/" + userId + "/schedule", {
         service: selectedServiceId,
         location_type: locationType,
+        location: locationType === "virtual" ? null : locationId, // NEW
         start_date: startDate,
         end_date: computeSubmittedEndDate({
           repeat,
@@ -719,13 +842,15 @@ export default function Schedule() {
         recurrence_end_date: endType === "on_date" ? endAfterDate : null,
         recurrence_count: endType === "after" ? endAfterCount : null,
       });
+      // Reset the location pick after a successful add, same as the rest
+      // of the form implicitly resets via the dialog closing/reopening.
+      setLocationId("");
       fetchSchedules();
     } catch (err) {
       toast.error(scheduleErrorMessage(err));
     }
   };
 
-  // NEW: read occurrenceDate out of the clicked event's meta
   const handleEventClick = (appt: Appointment) => {
     if (appt.meta?.type === "schedule") {
       const block = schedules.find((s) => s.id === appt.meta?.scheduleId);
@@ -734,10 +859,6 @@ export default function Schedule() {
         setEditingOccurrenceDate((appt.meta?.occurrenceDate as string) ?? block.start_date);
       }
     } else if (appt.meta?.type === "booked" && appt.meta?.appointmentId) {
-      // FIX: was window.location.href, which forces a full document reload —
-      // re-downloading every JS chunk/font and re-running every page's
-      // mount-time fetches from scratch. router.push does an in-app
-      // client-side transition instead.
       router.push("/appointments/" + appt.meta.appointmentId);
     }
   };
@@ -950,14 +1071,14 @@ export default function Schedule() {
 
             <div className="flex items-start gap-2">
               <LucideMapPin size={18} className="text-muted-foreground mt-2 shrink-0" />
-              <div className="flex-1">
+              <div className="flex-1 space-y-2">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1.5">Location</p>
                 <div className="flex gap-2">
                   {locationOptions.map((opt) => (
                     <button
                       key={opt.key}
                       type="button"
-                      onClick={() => setLocationType(opt.key)}
+                      onClick={() => handleLocationTypeChange(opt.key)}
                       className={
                         "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-colors " +
                         (locationType === opt.key
@@ -970,6 +1091,13 @@ export default function Schedule() {
                     </button>
                   ))}
                 </div>
+                {/* NEW: which facility, only for physical/both */}
+                <LocationPicker
+                  locationType={locationType}
+                  locationId={locationId}
+                  locations={locations}
+                  onChange={setLocationId}
+                />
               </div>
             </div>
           </div>
@@ -987,6 +1115,7 @@ export default function Schedule() {
           occurrenceDate={editingOccurrenceDate}
           userId={userId}
           services={services}
+          locations={locations}
           onClose={() => setEditingBlock(null)}
           onSaved={() => { setEditingBlock(null); fetchSchedules(); }}
           onDeleted={() => { setEditingBlock(null); fetchSchedules(); }}

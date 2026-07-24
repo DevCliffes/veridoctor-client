@@ -170,6 +170,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
+      {/* Gradient hero already reads fine in both modes -- brand blue/indigo
+          against white text keeps enough contrast either way, so no dark:
+          variants needed here. */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white">
         <p className="text-blue-100 text-sm">Good day,</p>
         <h1 className="text-2xl font-bold mt-0.5">
@@ -187,41 +190,41 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Link href="/book" className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2 hover:border-blue-200 transition-colors">
-          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+        <Link href="/book" className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col gap-2 hover:border-primary/40 transition-colors">
+          <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center">
             <LucideCalendarCheck size={18} />
           </div>
-          <p className="font-semibold text-gray-800 text-sm">Find a Doctor</p>
-          <p className="text-xs text-gray-400">Book an appointment</p>
+          <p className="font-semibold text-foreground text-sm">Find a Doctor</p>
+          <p className="text-xs text-muted-foreground">Book an appointment</p>
         </Link>
-        <Link href="/appointments" className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2 hover:border-blue-200 transition-colors">
-          <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+        <Link href="/appointments" className="bg-card rounded-xl p-4 shadow-sm border border-border flex flex-col gap-2 hover:border-primary/40 transition-colors">
+          <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
             <LucideCalendarCheck size={18} />
           </div>
-          <p className="font-semibold text-gray-800 text-sm">My Appointments</p>
-          <p className="text-xs text-gray-400">View all consultations</p>
+          <p className="font-semibold text-foreground text-sm">My Appointments</p>
+          <p className="text-xs text-muted-foreground">View all consultations</p>
         </Link>
       </div>
 
       {!loadingVitals && vitals.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-gray-700">Recent Vitals</h2>
+            <h2 className="font-semibold text-foreground">Recent Vitals</h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {vitals.map((v) => {
               const Icon = VITAL_ICONS[v.key] ?? LucideActivity;
               return (
-                <div key={v.key} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                <div key={v.key} className="rounded-lg border border-border bg-muted/40 p-3">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <Icon size={13} className="text-blue-500 shrink-0" />
-                    <p className="text-xs text-gray-400">{v.label}</p>
+                    <Icon size={13} className="text-blue-500 dark:text-blue-400 shrink-0" />
+                    <p className="text-xs text-muted-foreground">{v.label}</p>
                   </div>
-                  <p className="text-base font-bold text-gray-800">
+                  <p className="text-base font-bold text-foreground">
                     {v.value}
-                    {v.unit && <span className="text-xs font-normal text-gray-400 ml-1">{v.unit}</span>}
+                    {v.unit && <span className="text-xs font-normal text-muted-foreground ml-1">{v.unit}</span>}
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
                     {timeAgo(v.recorded_at)}
                     {v.provider_name && <span> · {v.provider_name}</span>}
                   </p>
@@ -232,22 +235,22 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-700">Upcoming Appointments</h2>
-          <Link href="/appointments" className="text-xs text-blue-600 flex items-center gap-0.5 hover:underline">
+          <h2 className="font-semibold text-foreground">Upcoming Appointments</h2>
+          <Link href="/appointments" className="text-xs text-primary flex items-center gap-0.5 hover:underline">
             See all <LucideChevronRight size={12} />
           </Link>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <LucideLoader2 size={20} className="animate-spin text-blue-400" />
+            <LucideLoader2 size={20} className="animate-spin text-primary/60" />
           </div>
         ) : appointments.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-400 text-sm">No upcoming appointments.</p>
-            <Link href="/book" className="text-blue-600 text-sm font-medium mt-1 inline-block hover:underline">Book one now</Link>
+            <p className="text-muted-foreground text-sm">No upcoming appointments.</p>
+            <Link href="/book" className="text-primary text-sm font-medium mt-1 inline-block hover:underline">Book one now</Link>
           </div>
         ) : (
           <div className="space-y-2">
@@ -263,23 +266,23 @@ export default function Dashboard() {
               const profileId = getDoctorProfileId(appt);
 
               return (
-                <div key={appt.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50">
-                  <div className={"w-9 h-9 rounded-full flex items-center justify-center shrink-0 " + (appt.appointment_type === "virtual" ? "bg-indigo-100 text-indigo-600" : "bg-green-100 text-green-600")}>
+                <div key={appt.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/40">
+                  <div className={"w-9 h-9 rounded-full flex items-center justify-center shrink-0 " + (appt.appointment_type === "virtual" ? "bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400" : "bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400")}>
                     {appt.appointment_type === "virtual" ? <LucideVideo size={16} /> : <LucideMapPin size={16} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     {doctorName && profileId ? (
-                      <button onClick={() => router.push(`/book/provider/${profileId}`)} className="text-sm font-medium text-blue-600 hover:underline text-left">
+                      <button onClick={() => router.push(`/book/provider/${profileId}`)} className="text-sm font-medium text-primary hover:underline text-left">
                         {doctorName}
                       </button>
                     ) : (
-                      <p className="text-sm font-medium text-gray-800">
+                      <p className="text-sm font-medium text-foreground">
                         {doctorName ?? (appt.appointment_type === "virtual" ? "Virtual Consultation" : "In-person Consultation")}
                       </p>
                     )}
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {formatDate(appt.start_time)} · {formatTime(appt.start_time)}
-                      {appt.service_name && <span className="text-gray-400"> · {appt.service_name}</span>}
+                      {appt.service_name && <span className="text-muted-foreground/80"> · {appt.service_name}</span>}
                     </p>
                   </div>
                   {isJoinable && appt.meet_id && (
@@ -287,7 +290,7 @@ export default function Dashboard() {
                       onClick={() => {
                         window.location.href = `${TELEHEALTH_URL}/${appt.meet_id}?userId=${patientEmail}&isOfferer=false`;
                       }}
-                      className="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700 shrink-0"
+                      className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-lg hover:bg-primary/90 shrink-0"
                     >
                       Join
                     </button>

@@ -29,6 +29,17 @@ interface Service {
   estimated_duration: number;
 }
 
+// NEW: mirrors the shape ProviderLocationPublicSerializer already returns
+// elsewhere (ProviderProfileClient.tsx uses the same fields).
+interface ProviderLocation {
+  id: string;
+  name: string;
+  address: string;
+  county: string;
+  country: string;
+  is_primary: boolean;
+}
+
 interface Provider {
   id: string;
   first_name: string;
@@ -36,8 +47,13 @@ interface Provider {
   title?: string;
   speciality: string;
   subspecialties?: string[];
-  clinic_name: string;
-  county: string;
+  // NOTE: clinic_name/county were removed from HealthcareProvider itself
+  // in migration 0015 -- these are kept optional here since /provider/list
+  // may no longer populate them at all. See getLocationLabel() below,
+  // which falls back to the provider's primary location when these are
+  // absent so the identity strip doesn't just go blank.
+  clinic_name?: string;
+  county?: string;
   bio: string;
   languages: string[];
   insurances_accepted: string[];
@@ -45,6 +61,11 @@ interface Provider {
   services: Service[];
   average_rating?: number | null;
   review_count?: number;
+  // NEW: full approved-location list, same as ProviderProfileClient's
+  // ProviderProfile.locations. Empty/undefined means this provider has no
+  // physical facilities -- the "In-person" toggle is hidden entirely in
+  // that case, since there'd be nowhere for the patient to go.
+  locations?: ProviderLocation[];
 }
 
 interface Slot {
@@ -61,6 +82,12 @@ interface BookingState {
   slot: Slot;
   date: string;
   appointmentType: "virtual" | "physical";
+  // NEW: which facility this booking is at, when physical. Threaded through
+  // to the POST payload so ProviderAppointmentSerializer.validate() (which
+  // now requires a location for physical appointments) has something to
+  // validate against.
+  locationId?: string | null;
+  locationName?: string | null;
   _invalidate?: () => void;
 }
 
@@ -116,6 +143,27 @@ function getNext7Days() {
     d.setDate(d.getDate() + i);
     return d.toISOString().split("T")[0];
   });
+}
+
+// NEW: picks which location to default the picker to / to show in the
+// identity strip fallback -- same "primary, else first" rule used by
+// ProviderProfileClient.tsx and the provider-profile page's metadata.
+function getPrimaryLocation(locations?: ProviderLocation[]): ProviderLocation | null {
+  if (!locations || locations.length === 0) return null;
+  return locations.find((l) => l.is_primary) ?? locations[0];
+}
+
+// NEW: identity-strip location text. Prefers the old flat clinic_name/county
+// fields if /provider/list still happens to send them; otherwise falls back
+// to the provider's primary location, since those flat fields no longer
+// exist on the backend model as of migration 0015.
+function getLocationLabel(provider: Provider): string | null {
+  if (provider.clinic_name || provider.county) {
+    return [provider.clinic_name, provider.county].filter(Boolean).join(", ");
+  }
+  const primary = getPrimaryLocation(provider.locations);
+  if (!primary) return null;
+  return [primary.name, primary.county].filter(Boolean).join(", ");
 }
 
 /** Renders 5 stars, filled up to the nearest whole star for `rating`. */
@@ -298,43 +346,71 @@ function ProviderCard({
   );
   const [selectedApptType, setSelectedApptType] = useState<"virtual" | "physical">("virtual");
 
+  // NEW: which of the provider's facilities is selected for physical
+  // bookings. Defaults to the primary (or first) location so a
+  // single-location provider never requires the patient to make a choice.
+  const hasLocations = (provider.locations?.length ?? 0) > 0;
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    () => getPrimaryLocation(provider.locations)?.id ?? null
+  );
+
   const visibleDays = days.slice(dayOffset, dayOffset + 3);
+
+  // NEW: cache key folds in appointment type + location, since the
+  // available-slots response now differs by location_id -- without this,
+  // switching facilities (or virtual <-> physical) would keep showing
+  // slots fetched under the previous filter.
+  const cacheKey = useCallback(
+    (day: string) =>
+      day +
+      "|" +
+      selectedApptType +
+      "|" +
+      (selectedApptType === "physical" ? selectedLocationId ?? "" : ""),
+    [selectedApptType, selectedLocationId]
+  );
 
   const fetchDay = useCallback(
     (day: string) => {
-      setLoadingDays((prev) => ({ ...prev, [day]: true }));
+      const key = cacheKey(day);
+      setLoadingDays((prev) => ({ ...prev, [key]: true }));
+      const params = new URLSearchParams({ date: day });
+      if (selectedApptType === "physical" && selectedLocationId) {
+        params.set("location_id", selectedLocationId);
+      }
       axiosClient
-        .get("/provider/" + provider.id + "/available-slots?date=" + day)
+        .get("/provider/" + provider.id + "/available-slots?" + params.toString())
         .then((res) =>
-          setDaySlots((prev) => ({ ...prev, [day]: res.data ?? [] }))
+          setDaySlots((prev) => ({ ...prev, [key]: res.data ?? [] }))
         )
-        .catch(() => setDaySlots((prev) => ({ ...prev, [day]: [] })))
+        .catch(() => setDaySlots((prev) => ({ ...prev, [key]: [] })))
         .finally(() =>
-          setLoadingDays((prev) => ({ ...prev, [day]: false }))
+          setLoadingDays((prev) => ({ ...prev, [key]: false }))
         );
     },
-    [provider.id]
+    [provider.id, selectedApptType, selectedLocationId, cacheKey]
   );
 
   useEffect(() => {
     visibleDays.forEach((day) => {
-      if (daySlots[day] !== undefined) return;
+      if (daySlots[cacheKey(day)] !== undefined) return;
       fetchDay(day);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dayOffset, provider.id]);
+  }, [dayOffset, provider.id, selectedApptType, selectedLocationId]);
 
   const invalidateDay = (date: string) => {
+    const key = cacheKey(date);
     setDaySlots((prev) => {
       const next = { ...prev };
-      delete next[date];
+      delete next[key];
       return next;
     });
     fetchDay(date);
   };
 
   const slotsForDay = (day: string) => {
-    const allSlots = daySlots[day] ?? [];
+    const allSlots = daySlots[cacheKey(day)] ?? [];
     const now = new Date();
     return allSlots.filter((slot) => {
       if (new Date(slot.start_time) <= now) return false;
@@ -347,11 +423,25 @@ function ProviderCard({
   };
 
   const handleBookSlot = (slot: Slot, day: string) => {
+    // Defensive guard: with hasLocations gating the "In-person" toggle
+    // below, this should be unreachable in practice, but avoids ever
+    // submitting a physical booking with no location if that invariant
+    // is ever violated.
+    if (selectedApptType === "physical" && hasLocations && !selectedLocationId) {
+      return;
+    }
+    const location =
+      selectedApptType === "physical"
+        ? provider.locations?.find((l) => l.id === selectedLocationId) ?? null
+        : null;
+
     onBook({
       provider,
       slot,
       date: day,
       appointmentType: selectedApptType,
+      locationId: location?.id ?? null,
+      locationName: location?.name ?? null,
       _invalidate: () => invalidateDay(day),
     });
   };
@@ -374,9 +464,11 @@ function ProviderCard({
   const languageSummary =
     provider.languages?.length > 0 ? provider.languages.join(", ") : null;
 
-  const allVisibleDaysLoaded = visibleDays.every((day) => !loadingDays[day]);
+  const locationLabel = getLocationLabel(provider);
+
+  const allVisibleDaysLoaded = visibleDays.every((day) => !loadingDays[cacheKey(day)]);
   const anyVisibleDayHasSlots = visibleDays.some(
-    (day) => !loadingDays[day] && slotsForDay(day).length > 0
+    (day) => !loadingDays[cacheKey(day)] && slotsForDay(day).length > 0
   );
 
   return (
@@ -423,10 +515,15 @@ function ProviderCard({
           </div>
 
           <div className="flex items-center gap-3 flex-wrap mt-2">
-            {(provider.clinic_name || provider.county) && (
+            {locationLabel && (
               <span className="flex items-center gap-1 text-xs text-gray-400">
                 <LucideMapPin size={12} className="shrink-0" />
-                {[provider.clinic_name, provider.county].filter(Boolean).join(", ")}
+                {locationLabel}
+                {(provider.locations?.length ?? 0) > 1 && (
+                  <span className="text-blue-600 font-medium">
+                    +{(provider.locations!.length - 1)} more
+                  </span>
+                )}
               </span>
             )}
             {languageSummary && (
@@ -486,7 +583,7 @@ function ProviderCard({
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setSelectedApptType("virtual")}
             className={
@@ -498,17 +595,41 @@ function ProviderCard({
           >
             <LucideVideo size={13} /> Virtual
           </button>
-          <button
-            onClick={() => setSelectedApptType("physical")}
-            className={
-              "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors " +
-              (selectedApptType === "physical"
-                ? "bg-green-50 border-green-300 text-green-700 font-medium"
-                : "border-gray-200 text-gray-600")
-            }
-          >
-            <LucideMapPin size={13} /> In-person
-          </button>
+          {/* Only offered when the provider actually has a facility to send
+              the patient to -- a provider with no approved locations has
+              no valid "In-person" option at all. */}
+          {hasLocations && (
+            <button
+              onClick={() => setSelectedApptType("physical")}
+              className={
+                "flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors " +
+                (selectedApptType === "physical"
+                  ? "bg-green-50 border-green-300 text-green-700 font-medium"
+                  : "border-gray-200 text-gray-600")
+              }
+            >
+              <LucideMapPin size={13} /> In-person
+            </button>
+          )}
+
+          {/* NEW: facility picker -- only rendered once physical is
+              selected and the provider actually has more than one
+              location. A single-location provider never needs this;
+              selectedLocationId is already defaulted to that one
+              location. */}
+          {selectedApptType === "physical" && (provider.locations?.length ?? 0) > 1 && (
+            <select
+              value={selectedLocationId ?? ""}
+              onChange={(e) => setSelectedLocationId(e.target.value || null)}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white focus:outline-none focus:border-blue-400"
+            >
+              {provider.locations!.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -544,7 +665,7 @@ function ProviderCard({
               key={day}
               day={day}
               slots={slotsForDay(day)}
-              loading={!!loadingDays[day]}
+              loading={!!loadingDays[cacheKey(day)]}
               onBook={(slot) => handleBookSlot(slot, day)}
             />
           ))}
@@ -595,6 +716,13 @@ function BookingModal({
       setError("Your profile is missing a name. Please update your profile first.");
       return;
     }
+    // NEW: mirrors ProviderAppointmentSerializer.validate() -- a physical
+    // booking with no location would just come back as a 400 from the
+    // backend, so catch it client-side first with a clearer message.
+    if (booking.appointmentType === "physical" && !booking.locationId) {
+      setError("Please select which location this appointment is at.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -608,6 +736,10 @@ function BookingModal({
           start_time: booking.slot.start_time,
           end_time: booking.slot.end_time,
           appointment_type: booking.appointmentType,
+          // NEW: only sent for physical bookings -- ProviderAppointmentSerializer
+          // itself nulls out a stray location on virtual bookings anyway, but
+          // there's no reason to send one that doesn't apply.
+          location: booking.appointmentType === "physical" ? booking.locationId : null,
           service: booking.slot.service_id,
           message,
           status: "scheduled",
@@ -617,9 +749,17 @@ function BookingModal({
       onConfirmed();
     } catch (err: any) {
       const backendError = err?.response?.data?.error;
+      // NEW: surface a location-specific validation message if that's
+      // what the backend rejected on (e.g. a stale location that no
+      // longer belongs to this provider), rather than a generic failure.
+      const locationError = err?.response?.data?.location;
       if (err?.response?.status === 409) {
         setError(backendError || "This time slot was just booked by someone else.");
         booking._invalidate?.();
+      } else if (locationError) {
+        setError(
+          Array.isArray(locationError) ? locationError[0] : String(locationError)
+        );
       } else {
         setError(backendError || "Booking failed. Please try again.");
       }
@@ -680,6 +820,13 @@ function BookingModal({
             <span className="font-medium text-gray-700 capitalize">
               {booking.appointmentType === "virtual" ? "Virtual" : "In-person"}
             </span>
+            {/* NEW: shows which facility, when physical */}
+            {booking.appointmentType === "physical" && booking.locationName && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-600">{booking.locationName}</span>
+              </>
+            )}
           </div>
 
           <div>

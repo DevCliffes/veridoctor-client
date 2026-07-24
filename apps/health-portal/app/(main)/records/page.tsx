@@ -117,19 +117,19 @@ const SENSITIVITY_CONFIG: Record<Sensitivity, { label: string; description: stri
   always_visible: {
     label: "Visible to all doctors",
     description: "Any treating doctor can see these records without asking.",
-    color: "text-green-700 bg-green-50 border-green-200",
+    color: "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-900",
     icon: <LucideEye size={13} />,
   },
   ask_first: {
     label: "Ask me first",
     description: "Doctors must request access and you approve or deny.",
-    color: "text-amber-700 bg-amber-50 border-amber-200",
+    color: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-900",
     icon: <LucideShield size={13} />,
   },
   never: {
     label: "Private — never share",
     description: "These records are never visible to other doctors.",
-    color: "text-red-700 bg-red-50 border-red-200",
+    color: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-900",
     icon: <LucideEyeOff size={13} />,
   },
 };
@@ -176,25 +176,25 @@ function InlinePrescription({ value }: { value: PrescriptionValue }) {
   return (
     <div className="mt-1 space-y-2">
       {value.diagnosis && (
-        <p className="text-xs text-gray-600">
-          <span className="font-medium text-gray-700">Diagnosis: </span>
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Diagnosis: </span>
           {value.diagnosis}
         </p>
       )}
       {value.drugs && value.drugs.length > 0 && (
         <div className="space-y-2">
           {value.drugs.map((drug, i) => (
-            <div key={drug.id ?? i} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-start gap-3">
-              <div className="w-7 h-7 rounded-lg bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
+            <div key={drug.id ?? i} className="bg-card rounded-xl border border-border px-4 py-3 flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0 mt-0.5">
                 <LucidePill size={13} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-800">{drug.drug_name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-semibold text-foreground">{drug.drug_name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {[drug.dosage, drug.frequency, drug.duration].filter(Boolean).join(" · ")}
                 </p>
                 {drug.instructions && (
-                  <p className="text-xs text-gray-400 mt-0.5 italic">{drug.instructions}</p>
+                  <p className="text-xs text-muted-foreground/80 mt-0.5 italic">{drug.instructions}</p>
                 )}
               </div>
             </div>
@@ -202,8 +202,8 @@ function InlinePrescription({ value }: { value: PrescriptionValue }) {
         </div>
       )}
       {value.notes && (
-        <p className="text-xs text-gray-500 italic">
-          <span className="font-medium not-italic text-gray-600">Notes: </span>
+        <p className="text-xs text-muted-foreground italic">
+          <span className="font-medium not-italic text-muted-foreground">Notes: </span>
           {value.notes}
         </p>
       )}
@@ -299,11 +299,11 @@ function SensitivityToggle({
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
             className={
-              "absolute right-0 z-20 bg-white rounded-xl border border-gray-200 shadow-lg w-64 overflow-hidden " +
+              "absolute right-0 z-20 bg-card rounded-xl border border-border shadow-lg w-64 overflow-hidden " +
               (direction === "up" ? "bottom-full mb-2" : "top-full mt-2")
             }
           >
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-3 pt-3 pb-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 pt-3 pb-1">
               Who can see these records?
             </p>
             {(Object.keys(SENSITIVITY_CONFIG) as Sensitivity[]).map((key) => {
@@ -313,8 +313,8 @@ function SensitivityToggle({
                   key={key}
                   onClick={() => handleSelect(key)}
                   className={
-                    "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-gray-50 transition-colors " +
-                    (key === current ? "bg-gray-50" : "")
+                    "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-muted/40 transition-colors " +
+                    (key === current ? "bg-muted/40" : "")
                   }
                 >
                   <span className={
@@ -324,11 +324,11 @@ function SensitivityToggle({
                     {cfg.icon}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{cfg.label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{cfg.description}</p>
+                    <p className="text-sm font-medium text-foreground">{cfg.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{cfg.description}</p>
                   </div>
                   {key === current && (
-                    <LucideShieldCheck size={14} className="text-blue-500 shrink-0 ml-auto mt-0.5" />
+                    <LucideShieldCheck size={14} className="text-blue-500 dark:text-blue-400 shrink-0 ml-auto mt-0.5" />
                   )}
                 </button>
               );
@@ -386,12 +386,12 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
   if (loading || requests.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 space-y-3">
-      <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-        <LucideBell size={16} className="text-amber-500" />
+    <div className="bg-card rounded-2xl border border-amber-200 dark:border-amber-900 shadow-sm p-5 space-y-3">
+      <h2 className="font-semibold text-foreground flex items-center gap-2">
+        <LucideBell size={16} className="text-amber-500 dark:text-amber-400" />
         Access Requests
         {pending.length > 0 && (
-          <span className="text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-medium">
+          <span className="text-xs bg-amber-500 dark:bg-amber-600 text-white px-1.5 py-0.5 rounded-full font-medium">
             {pending.length}
           </span>
         )}
@@ -399,15 +399,15 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
       {pending.length > 0 && (
         <div className="space-y-2">
           {pending.map((req) => (
-            <div key={req.id} className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+            <div key={req.id} className="bg-amber-50 dark:bg-amber-950 border border-amber-100 dark:border-amber-900 rounded-xl p-4">
               <div className="flex items-start gap-2">
-                <LucideShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <LucideShieldAlert size={15} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800">
+                  <p className="text-sm font-semibold text-foreground">
                     {req.provider_name} is requesting access to your{" "}
-                    <span className="text-blue-700">{req.requested_category}</span> records
+                    <span className="text-blue-700 dark:text-blue-400">{req.requested_category}</span> records
                   </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {req.facility_name && `${req.facility_name} · `}
                     During consultation on {formatDate(req.appointment_date)}
                   </p>
@@ -417,7 +417,7 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
                 <button
                   onClick={() => handleRespond(req.id, "approved")}
                   disabled={responding === req.id}
-                  className="flex-1 py-2 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-1"
+                  className="flex-1 py-2 text-xs font-semibold bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 flex items-center justify-center gap-1"
                 >
                   <LucideShieldCheck size={12} />
                   {responding === req.id ? "Saving…" : "Approve"}
@@ -425,7 +425,7 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
                 <button
                   onClick={() => handleRespond(req.id, "denied")}
                   disabled={responding === req.id}
-                  className="flex-1 py-2 text-xs font-semibold border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  className="flex-1 py-2 text-xs font-semibold border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50"
                 >
                   Deny
                 </button>
@@ -436,11 +436,11 @@ function AccessRequestsPanel({ identityId }: { identityId: string }) {
       )}
       {past.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Previous requests</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Previous requests</p>
           {past.map((req) => (
-            <div key={req.id} className="flex items-center justify-between text-xs text-gray-500 py-1.5 border-b border-gray-50 last:border-0">
+            <div key={req.id} className="flex items-center justify-between text-xs text-muted-foreground py-1.5 border-b border-border last:border-0">
               <span>{req.provider_name} · {req.requested_category}</span>
-              <span className={req.status === "approved" ? "text-green-600 font-medium" : "text-red-500 font-medium"}>
+              <span className={req.status === "approved" ? "text-green-600 dark:text-green-400 font-medium" : "text-red-500 dark:text-red-400 font-medium"}>
                 {req.status}
               </span>
             </div>
@@ -466,7 +466,7 @@ function CaptureBlock({ capture }: { capture: Capture }) {
 
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
         {capture.form_name || "Clinical Notes"}
       </p>
       <div className="space-y-3">
@@ -476,8 +476,8 @@ function CaptureBlock({ capture }: { capture: Capture }) {
           const isPrescription = parsePrescription(val) !== null;
           return (
             <div key={key} className={isPrescription ? "flex flex-col gap-1" : "flex gap-2 text-sm"}>
-              <span className="text-gray-400 shrink-0 min-w-[140px] capitalize text-sm">{label}</span>
-              {isPrescription ? rendered : <span className="text-gray-800 font-medium text-sm">{rendered}</span>}
+              <span className="text-muted-foreground shrink-0 min-w-[140px] capitalize text-sm">{label}</span>
+              {isPrescription ? rendered : <span className="text-foreground font-medium text-sm">{rendered}</span>}
             </div>
           );
         })}
@@ -496,23 +496,25 @@ function ConsultationCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+    <div className="bg-card rounded-2xl border border-border shadow-sm">
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full text-left px-5 py-4 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors rounded-t-2xl"
+        className="w-full text-left px-5 py-4 flex items-start justify-between gap-3 hover:bg-muted/40 transition-colors rounded-t-2xl"
       >
         <div className="flex gap-3 items-start flex-1 min-w-0">
-          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
             <LucideActivitySquare size={16} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-800">
+              <p className="text-sm font-semibold text-foreground">
                 {record.service_name ?? "Consultation"}
               </p>
               <span className={
                 "text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 " +
-                (record.appointment_type === "virtual" ? "bg-indigo-50 text-indigo-700" : "bg-green-50 text-green-700")
+                (record.appointment_type === "virtual"
+                  ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400"
+                  : "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400")
               }>
                 {record.appointment_type === "virtual"
                   ? <><LucideVideo size={11} /> Virtual</>
@@ -520,28 +522,28 @@ function ConsultationCard({
                 }
               </span>
               {record.has_clinical_notes && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-400 font-medium">
                   Clinical notes
                 </span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {record.provider_name}
               {record.speciality ? ` · ${record.speciality}` : ""}
             </p>
             {record.facility_name && (
-              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                 <LucideMapPin size={11} />
                 {[record.facility_name, record.county].filter(Boolean).join(", ")}
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{formatDate(record.date)}</p>
           </div>
         </div>
         {record.has_clinical_notes && (
           expanded
-            ? <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
-            : <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
+            ? <LucideChevronUp size={16} className="text-muted-foreground shrink-0 mt-1" />
+            : <LucideChevronDown size={16} className="text-muted-foreground shrink-0 mt-1" />
         )}
       </button>
 
@@ -551,7 +553,7 @@ function ConsultationCard({
           className="px-5 pb-3 flex items-center justify-between"
           onClick={(e) => e.stopPropagation()}
         >
-          <p className="text-xs text-gray-400">Record visibility to other doctors</p>
+          <p className="text-xs text-muted-foreground">Record visibility to other doctors</p>
           <SensitivityToggle
             summaryId={record.summary_id}
             current={record.sensitivity}
@@ -561,7 +563,7 @@ function ConsultationCard({
       )}
 
       {expanded && record.captures && record.captures.length > 0 && (
-        <div className="border-t border-gray-100 px-5 py-4 space-y-5 bg-gray-50 rounded-b-2xl">
+        <div className="border-t border-border px-5 py-4 space-y-5 bg-muted/30 rounded-b-2xl">
           {record.captures.map((cap, i) => (
             <CaptureBlock key={i} capture={cap} />
           ))}
@@ -574,69 +576,69 @@ function ConsultationCard({
 function PrescriptionCard({ record }: { record: HealthRecord }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full text-left px-5 py-4 flex items-start justify-between gap-3 hover:bg-gray-50 transition-colors"
+        className="w-full text-left px-5 py-4 flex items-start justify-between gap-3 hover:bg-muted/40 transition-colors"
       >
         <div className="flex gap-3 items-start flex-1 min-w-0">
-          <div className="w-9 h-9 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-9 h-9 rounded-full bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0 mt-0.5">
             <LucideFileText size={16} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-800">Prescription</p>
+              <p className="text-sm font-semibold text-foreground">Prescription</p>
               {record.drugs && record.drugs.length > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 font-medium">
                   {record.drugs.length} medication{record.drugs.length > 1 ? "s" : ""}
                 </span>
               )}
             </div>
             {record.diagnosis && (
-              <p className="text-xs text-gray-600 mt-0.5">{record.diagnosis}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{record.diagnosis}</p>
             )}
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {record.provider_name}
               {record.speciality ? ` · ${record.speciality}` : ""}
             </p>
             {record.facility_name && (
-              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+              <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                 <LucideMapPin size={11} />
                 {[record.facility_name, record.county].filter(Boolean).join(", ")}
               </p>
             )}
-            <p className="text-xs text-gray-400 mt-1">{formatDate(record.date)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{formatDate(record.date)}</p>
           </div>
         </div>
         {expanded
-          ? <LucideChevronUp size={16} className="text-gray-400 shrink-0 mt-1" />
-          : <LucideChevronDown size={16} className="text-gray-400 shrink-0 mt-1" />
+          ? <LucideChevronUp size={16} className="text-muted-foreground shrink-0 mt-1" />
+          : <LucideChevronDown size={16} className="text-muted-foreground shrink-0 mt-1" />
         }
       </button>
       {expanded && (
-        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-3">
+        <div className="border-t border-border px-5 py-4 bg-muted/30 space-y-3">
           {record.notes && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Doctor's Notes</p>
-              <p className="text-sm text-gray-700">{record.notes}</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Doctor's Notes</p>
+              <p className="text-sm text-foreground/90">{record.notes}</p>
             </div>
           )}
           {record.drugs && record.drugs.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Medications</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Medications</p>
               <div className="space-y-2">
                 {record.drugs.map((drug, i) => (
-                  <div key={i} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-green-100 text-green-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <div key={i} className="bg-card rounded-xl border border-border px-4 py-3 flex items-start gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0 mt-0.5">
                       <LucidePill size={13} />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">{drug.drug_name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-sm font-semibold text-foreground">{drug.drug_name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {[drug.dosage, drug.frequency, drug.duration].filter(Boolean).join(" · ")}
                       </p>
                       {drug.instructions && (
-                        <p className="text-xs text-gray-400 mt-0.5 italic">{drug.instructions}</p>
+                        <p className="text-xs text-muted-foreground/80 mt-0.5 italic">{drug.instructions}</p>
                       )}
                     </div>
                   </div>
@@ -696,26 +698,26 @@ function RecordsContent({ identityId }: { identityId: string }) {
     <div className="space-y-4 max-w-2xl mx-auto">
       {identityId && <AccessRequestsPanel identityId={identityId} />}
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <LucideActivitySquare size={20} className="text-blue-600" />
+      <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
+        <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+          <LucideActivitySquare size={20} className="text-blue-600 dark:text-blue-400" />
           Health Records
         </h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <p className="text-sm text-muted-foreground mt-0.5">
           Your complete medical history across all providers
         </p>
         <div className="mt-4 grid grid-cols-3 gap-3">
-          <div className="bg-blue-50 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-blue-700">{total}</p>
-            <p className="text-xs text-blue-600 mt-0.5">Total records</p>
+          <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{total}</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400/80 mt-0.5">Total records</p>
           </div>
-          <div className="bg-purple-50 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-purple-700">{consultationCount}</p>
-            <p className="text-xs text-purple-600 mt-0.5">Consultations</p>
+          <div className="bg-purple-50 dark:bg-purple-950 rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">{consultationCount}</p>
+            <p className="text-xs text-purple-600 dark:text-purple-400/80 mt-0.5">Consultations</p>
           </div>
-          <div className="bg-green-50 rounded-xl p-3 text-center">
-            <p className="text-2xl font-bold text-green-700">{prescriptionCount}</p>
-            <p className="text-xs text-green-600 mt-0.5">Prescriptions</p>
+          <div className="bg-green-50 dark:bg-green-950 rounded-xl p-3 text-center">
+            <p className="text-2xl font-bold text-green-700 dark:text-green-400">{prescriptionCount}</p>
+            <p className="text-xs text-green-600 dark:text-green-400/80 mt-0.5">Prescriptions</p>
           </div>
         </div>
       </div>
@@ -728,8 +730,8 @@ function RecordsContent({ identityId }: { identityId: string }) {
             className={
               "text-xs px-4 py-2 rounded-full border font-medium transition-colors " +
               (activeType === tab.key
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white border-gray-200 text-gray-600 hover:border-gray-300")
+                ? "bg-blue-600 dark:bg-blue-700 text-white border-blue-600 dark:border-blue-700"
+                : "bg-card border-border text-muted-foreground hover:border-primary/30")
             }
           >
             {tab.label}
@@ -739,13 +741,13 @@ function RecordsContent({ identityId }: { identityId: string }) {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <LucideLoader2 size={28} className="animate-spin text-blue-500" />
+          <LucideLoader2 size={28} className="animate-spin text-blue-500 dark:text-blue-400" />
         </div>
       ) : records.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
-          <LucideFileText size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No records found.</p>
-          <p className="text-gray-300 text-xs mt-1">
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-10 text-center">
+          <LucideFileText size={32} className="text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground text-sm">No records found.</p>
+          <p className="text-muted-foreground/70 text-xs mt-1">
             Records appear here after a consultation or prescription is added by a provider.
           </p>
         </div>
@@ -765,7 +767,7 @@ function RecordsContent({ identityId }: { identityId: string }) {
         </div>
       )}
 
-      <p className="text-center text-xs text-gray-300 pb-4">
+      <p className="text-center text-xs text-muted-foreground/70 pb-4">
         Records are secured under GDPR and Kenya Digital Health Act 2023.
         Only you and your treating providers can access your clinical data.
       </p>

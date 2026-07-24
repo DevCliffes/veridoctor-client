@@ -1,7 +1,13 @@
+import { ThemeProvider } from "@veridoctor/design";
+
 export default function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="min-h-screen bg-gray-50">{children}</div>;
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <div className="min-h-screen bg-background">{children}</div>
+    </ThemeProvider>
+  );
 }

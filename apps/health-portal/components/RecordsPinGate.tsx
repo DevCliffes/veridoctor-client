@@ -106,7 +106,7 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
   if (checkingStatus) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -114,8 +114,8 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
   if (statusError) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
-          <p className="text-sm text-red-600">{statusError}</p>
+        <div className="w-full max-w-sm rounded-2xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-950 p-6 text-center">
+          <p className="text-sm text-red-600 dark:text-red-400">{statusError}</p>
         </div>
       </div>
     );
@@ -125,11 +125,11 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="w-full max-w-sm rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-800">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-foreground">
           {isSetup ? "Protect your health records" : "Enter your records PIN"}
         </h2>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-muted-foreground">
           {isSetup
             ? "Set a PIN to keep your health records private, even from someone using your phone."
             : "For your privacy, we ask for your PIN before showing your health records."}
@@ -144,7 +144,7 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
             autoFocus
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-center text-xl tracking-widest focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-center text-xl tracking-widest text-foreground focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none"
             placeholder="••••"
             disabled={!!lockedMessage}
           />
@@ -157,18 +157,18 @@ export default function RecordsPinGate({ children }: RecordsPinGateProps) {
               maxLength={8}
               value={confirmPin}
               onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
-              className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-center text-xl tracking-widest focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-center text-xl tracking-widest text-foreground focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none"
               placeholder="Confirm PIN"
             />
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {lockedMessage && <p className="text-sm text-red-600">{lockedMessage}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          {lockedMessage && <p className="text-sm text-red-600 dark:text-red-400">{lockedMessage}</p>}
 
           <button
             type="submit"
             disabled={loading || pin.length < 4 || !!lockedMessage}
-            className="w-full rounded-lg bg-blue-600 py-2.5 font-medium text-white disabled:opacity-50"
+            className="w-full rounded-lg bg-blue-600 dark:bg-blue-500 py-2.5 font-medium text-white disabled:opacity-50"
           >
             {loading ? "Please wait…" : isSetup ? "Set PIN & continue" : "Unlock records"}
           </button>

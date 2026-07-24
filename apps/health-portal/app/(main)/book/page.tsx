@@ -281,12 +281,18 @@ function SlotColumn({
       </div>
 
       {!loading && slots.length > 0 && (
+        // NEW: visible border + background always present, even when
+        // disabled -- a low-contrast/dark-mode/color-inversion setup can
+        // make a bare icon-only button vanish entirely (opacity-20 on a
+        // pale gray icon reads as "not there" rather than "not clickable"
+        // once contrast shifts). The border keeps the button's presence
+        // legible in either state; only the icon itself fades on disable.
         <button
           onClick={() => setOffset(Math.max(0, offset - 1))}
           disabled={!canUp}
-          className="flex items-center justify-center py-0.5 rounded hover:bg-gray-100 disabled:opacity-20 transition-opacity"
+          className="flex items-center justify-center py-0.5 rounded border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 transition-opacity"
         >
-          <LucideChevronUp size={14} className="text-gray-500" />
+          <LucideChevronUp size={14} className="text-gray-700" />
         </button>
       )}
 

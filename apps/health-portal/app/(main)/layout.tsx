@@ -26,6 +26,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@veridoctor/design/components";
+// NEW: same ThemeToggle already used across apps/provider, apps/telehealth,
+// apps/facility, apps/health-portal -- exported from the package root
+// alongside ThemeProvider.
+import { ThemeToggle } from "@veridoctor/design";
 import {
   setIsLoggedIn,
   setAccessToken,
@@ -130,13 +134,20 @@ export default function MainAppLayout({
     >
       {/* ✅ overflow-hidden on the outer shell so only the inner content
           area scrolls — prevents the whole page from being measured
-          against the wrong height and clipping the last bit of content. */}
-      <div className="fixed bg-white top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
+          against the wrong height and clipping the last bit of content.
+          bg-white -> bg-background: this was the one hardcoded shell
+          color left over from before dark mode was wired in here; every
+          other app's shell already used bg-background. */}
+      <div className="fixed bg-background top-0 left-0 h-svh w-full flex flex-col overflow-hidden">
         <TopNav
           center={<p>Health portal</p>}
           right={
             <div className="flex items-center gap-2">
               <NotificationBell identityId={identityId} />
+              {/* NEW: the actual dark/light switch -- this is what was
+                  missing. Same component already used in the provider,
+                  telehealth, facility, and health-portal apps. */}
+              <ThemeToggle />
               <ProfileDropdown />
             </div>
           }
@@ -148,15 +159,16 @@ export default function MainAppLayout({
           <SideNav navItems={navItems} activePath={pathname} />
           {/* ✅ flex-1 min-h-0 overflow-y-auto — this is now the single
               scroll container, correctly bounded between TopNav and the
-              bottom of the viewport. */}
-          <div className="flex-1 min-h-0 overflow-y-auto bg-white p-4 rounded-lg">
+              bottom of the viewport.
+              bg-white -> bg-background: matches the outer shell fix above. */}
+          <div className="flex-1 min-h-0 overflow-y-auto bg-background p-4 rounded-lg">
             {/* Removed max-w-5xl mx-auto — matches the provider dashboard
                 fix. w-full lets content use the full available width at
                 any zoom level instead of being boxed into a fixed cap. */}
             <div className="w-full pb-8">
               {profileReady ? children : (
                 <div className="flex items-center justify-center h-full">
-                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
             </div>
